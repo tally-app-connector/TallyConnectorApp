@@ -4,7 +4,6 @@ import 'package:path/path.dart';
 import 'dart:io';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import '../models/data_model.dart';
-import '../services/neon_sync_service.dart';
 import '../services/aws_sync_service.dart';
 import '../utils/secure_storage.dart';
 
@@ -336,6 +335,9 @@ class DatabaseHelper {
             narration TEXT,
             base_units TEXT,
             additional_units TEXT,
+            closing_balance REAL DEFAULT 0,
+            closing_value REAL DEFAULT 0,
+            closing_rate REAL DEFAULT 0,
             denominator REAL,
             conversion REAL,
             gst_applicable TEXT,
@@ -363,7 +365,6 @@ class DatabaseHelper {
             mailing_names TEXT,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-
             FOREIGN KEY (company_guid) REFERENCES companies(company_guid) ON DELETE CASCADE
           )
         ''');
@@ -1243,7 +1244,7 @@ class DatabaseHelper {
 // STOCK ITEMS
 // ============================================
 
-  Future<void> saveStockItem(StockItem stockItem, String companyGuid) async {
+  Future<void> saveStockItem(StockItem stockItem, StockItemClosingData stockItemClosingData, String companyGuid) async {
     final db = await database;
 
     await db.transaction((txn) async {
@@ -1265,6 +1266,9 @@ class DatabaseHelper {
         'narration': stockItem.narration,
         'base_units': stockItem.baseUnits,
         'additional_units': stockItem.additionalUnits,
+        'closing_balance': stockItemClosingData.closingQty,
+        'closing_value': stockItemClosingData.closingValue,
+        'closing_rate': stockItemClosingData.closingRate,
         'denominator': stockItem.denominator,
         'conversion': stockItem.conversion,
         'gst_applicable': _cleanValue(stockItem.gstApplicable),
@@ -1393,7 +1397,7 @@ class DatabaseHelper {
 
   // UPDATED WITH AWS SYNC
   Future<void> saveStockItemBatch(
-      List<StockItem> stockItems, String companyGuid,
+      List<StockItem> stockItems, List<StockItemClosingData> stockItemClosingBalance, String companyGuid,
       {bool syncToAws = false}) async {
     print('💾 Saving ${stockItems.length} stock items locally...');
 
@@ -1404,7 +1408,17 @@ class DatabaseHelper {
     for (final item in stockItems) {
       try {
         if (item.guid.isEmpty == false) {
-          await saveStockItem(item, companyGuid);
+          final closingData = stockItemClosingBalance
+    .firstWhere(
+      (e) => e.guid == item.guid,
+      orElse: () => StockItemClosingData(
+        guid: item.guid,
+        closingRate: 0,
+        closingQty: 0,
+        closingValue: 0,
+      ),
+    );
+          await saveStockItem(item, closingData, companyGuid);
           successCount++;
 
           // NEW: Collect for AWS sync

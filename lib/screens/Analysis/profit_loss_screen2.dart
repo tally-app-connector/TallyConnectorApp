@@ -1,13 +1,8 @@
-// screens/profit_loss_screen.dart
-
 import 'package:flutter/material.dart';
-import 'package:sqflite/sqflite.dart';
 import '../../models/data_model.dart';
-import '../../services/analytics_service.dart';
 import '../../database/database_helper.dart';
 import '../../utils/date_utils.dart';
 import 'group_detail_screen.dart';
-import 'ledger_detail_screen.dart';
 
 class ProfitLossScreen extends StatefulWidget {
   @override
@@ -15,7 +10,6 @@ class ProfitLossScreen extends StatefulWidget {
 }
 
 class _ProfitLossScreenState extends State<ProfitLossScreen> {
-  final _analytics = AnalyticsService();
   final _db = DatabaseHelper.instance;
 
   String? _companyGuid;
@@ -36,11 +30,6 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
   Map<String, dynamic>? _plData;
   DateTime _fromDate = getFyStartDate(DateTime.now());  // Financial year start
   DateTime _toDate = getFyEndDate(DateTime.now()); // Financial year end
-
-  // Get all Contra child voucher types
-
-  // DateTime _selectedFromDate = getCurrentFyStartDate();  
-  // DateTime _selectedToDate = getCurrentFyEndDate();
 
   @override
   void initState() {
@@ -65,13 +54,7 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
 
     _companyStartDate = (company['starting_from'] as String).replaceAll('-', '');
 
-    // // Only set initial dates if not already set by user
-    // if (_selectedFromDate == null || _selectedToDate == null) {
-    //   _fromDate = company['starting_from'] as String? ?? _fromDate;
-    //   _toDate = company['ending_at'] as String? ?? _toDate;
-    //   _selectedFromDate = _parseTallyDate(_fromDate);
-    //   _selectedToDate = _parseTallyDate(_toDate);
-    // }
+
     debitNoteVoucherTypes = await getAllChildVoucherTypes(_companyGuid!, 'Debit Note');
     creditNoteVoucherTypes = await getAllChildVoucherTypes(_companyGuid!, 'Credit Note');
     stockJournalVoucherType = await getAllChildVoucherTypes(_companyGuid!, 'Stock Journal');
@@ -82,17 +65,6 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
     salesVoucherTypes = await getAllChildVoucherTypes(_companyGuid!, 'Sales');
 
     final plData = await _getProfitLossDetailed(_companyGuid!, _fromDate, _toDate);
-    // await calculateJAcidFIFO_Fixed(_companyGuid!, _fromDate, _toDate);
-    // final stockItemData = await debugStockItem(_companyGuid!,"J.ACID", _fromDate, _toDate);
-
-// await checkBatchRatesDetail(_companyGuid!);
-// await verifyAllTransactions(_companyGuid!);
-// await checkDuplicateBatchEntries(_companyGuid!);
-
-    // final stockData = await calculateStockValues( _companyGuid!, _fromDate, _toDate);
-    // Build complete directory
-    // Map<String, Map<String, List<StockTransaction>>> directory =
-    //   await buildStockDirectory(_companyGuid!, _toDate);
 
     setState(() {
       _plData = plData;
@@ -112,17 +84,6 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
     return totalClosingValue;
   }
 
-  DateTime _parseTallyDate(String tallyDate) {
-    if (tallyDate.length != 8) return DateTime.now();
-    final year = int.parse(tallyDate.substring(0, 4));
-    final month = int.parse(tallyDate.substring(4, 6));
-    final day = int.parse(tallyDate.substring(6, 8));
-    return DateTime(year, month, day);
-  }
-
-  String _toTallyDate(DateTime date) {
-    return '${date.year}${date.month.toString().padLeft(2, '0')}${date.day.toString().padLeft(2, '0')}';
-  }
 
 // ============================================================
 // GET ALL CHILD VOUCHER TYPES FOR CONTRA
@@ -154,84 +115,6 @@ Future<List<String>> getAllChildVoucherTypes(String companyGuid, String voucherT
   return result.map((row) => row['name'] as String).toList();
 }
 
-// ============================================================
-// USAGE
-// ============================================================
-
-
-
-// Output example:
-// 📋 Contra Voucher Types:
-//    - Contra
-//    - Bank Transfer
-//    - Cash Deposit
-//    - Cash Withdrawal
-
-  // Future<List<StockItemInfo>> fetchAllStockItems(String companyGuid) async {
-  //   final db = await _db.database;
-
-  //   // First, fetch all stock items
-  //   final stockItemResults = await db.rawQuery('''
-  //   SELECT 
-  //     si.name as item_name,
-  //     si.stock_item_guid,
-  //     COALESCE(si.costing_method, 'Avg. Cost') as costing_method,
-  //     COALESCE(si.base_units, '') as unit,
-  //     COALESCE(si.parent, '') as parent_name
-  //   FROM stock_items si
-  //   WHERE si.company_guid = ?
-  //     AND si.is_deleted = 0
-  // ''', [companyGuid]);
-
-  //   // Then fetch all batch allocations for opening stock
-  //   final batchResults = await db.rawQuery('''
-  //   SELECT 
-  //     siba.stock_item_guid,
-  //     COALESCE(siba.godown_name, '') as godown_name,
-  //     COALESCE(siba.batch_name, '') as batch_name,
-  //     COALESCE(siba.opening_value, 0) as amount,
-  //     COALESCE(siba.opening_balance, '') as actual_qty,
-  //     COALESCE(siba.opening_balance, '') as billed_qty,
-  //     siba.opening_rate as batch_rate
-  //   FROM stock_item_batch_allocation siba
-  //   INNER JOIN stock_items si 
-  //     ON siba.stock_item_guid = si.stock_item_guid
-  //   WHERE si.company_guid = ?
-  //     AND si.is_deleted = 0
-  // ''', [companyGuid]);
-
-  //   // Group batch allocations by stock_item_guid
-  //   final Map<String, List<BatchAllocation>> batchMap = {};
-
-  //   for (final row in batchResults) {
-  //     final stockItemGuid = row['stock_item_guid'] as String;
-  //     final batch = BatchAllocation(
-  //       godownName: row['godown_name'] as String,
-  //       batchName: row['batch_name'] as String,
-  //       amount: (row['amount'] as num?)?.toDouble() ?? 0.0,
-  //       actualQty: row['actual_qty']?.toString() ?? '',
-  //       billedQty: row['billed_qty']?.toString() ?? '',
-  //       batchRate: (row['batch_rate'] as num?)?.toDouble(),
-  //     );
-
-  //     batchMap.putIfAbsent(stockItemGuid, () => []).add(batch);
-  //   }
-
-  //   // Build final list with batch allocations
-  //   return stockItemResults.map((row) {
-  //     final stockItemGuid = row['stock_item_guid'] as String;
-
-  //     return StockItemInfo(
-  //       itemName: row['item_name'] as String,
-  //       stockItemGuid: stockItemGuid,
-  //       costingMethod: row['costing_method'] as String,
-  //       unit: row['unit'] as String,
-  //       parentName: row['parent_name'] as String,
-  //       openingData: batchMap[stockItemGuid] ?? [],
-  //     );
-  //   }).toList();
-  // }
-
 Future<List<StockItemInfo>> fetchAllStockItems(String companyGuid) async {
   final db = await _db.database;
 
@@ -242,6 +125,9 @@ Future<List<StockItemInfo>> fetchAllStockItems(String companyGuid) async {
       si.stock_item_guid,
       COALESCE(si.costing_method, 'Avg. Cost') as costing_method,
       COALESCE(si.base_units, '') as unit,
+      COALESCE(si.closing_balance, '0.0') as closing_balance,
+      COALESCE(si.closing_value, '0.0') as closing_value,
+      COALESCE(si.closing_rate, '0.0') as closing_rate,
       COALESCE(si.parent, '') as parent_name
     FROM stock_items si
     WHERE si.company_guid = ?
@@ -294,17 +180,25 @@ Future<List<StockItemInfo>> fetchAllStockItems(String companyGuid) async {
     batchMap.putIfAbsent(stockItemGuid, () => []).add(batch);
   }
 
+
   return stockItemResults.map((row) {
     final stockItemGuid = row['stock_item_guid'] as String;
 
-    return StockItemInfo(
+    final stockItem = StockItemInfo(
       itemName: row['item_name'] as String,
       stockItemGuid: stockItemGuid,
       costingMethod: row['costing_method'] as String,
       unit: row['unit'] as String,
       parentName: row['parent_name'] as String,
+      closingRate: (row['closing_rate'] as num?)?.toDouble() ?? 0.0,
+      closingQty: (row['closing_balance'] as num?)?.toDouble() ?? 0.0,
+      closingValue: (row['closing_value'] as num?)?.toDouble() ?? 0.0,
       openingData: batchMap[stockItemGuid] ?? [],
     );
+
+    print('${stockItem.itemName}, ${stockItem.costingMethod}, ${stockItem.closingRate}, ${stockItem.closingQty}, ${stockItem.closingValue}');
+
+    return stockItem;
   }).toList();
 }
   Future<List<StockTransaction>> fetchTransactionsForStockItem(
@@ -370,48 +264,48 @@ Future<List<StockItemInfo>> fetchAllStockItems(String companyGuid) async {
     }).toList();
   }
 
-  Future<Map<String, Map<String, List<StockTransaction>>>> buildStockDirectory(
-    String companyGuid,
-    String endDate,
-    List<StockItemInfo> stockItems
-  ) async {
-    // Fetch all stock items
-    // final stockItems = await fetchAllStockItems(companyGuid);
 
-    // Initialize directory
-    Map<String, Map<String, List<StockTransaction>>> directory = {};
+  Future<Map<String, Map<String, Map<String, List<StockTransaction>>>>>
+    buildStockDirectoryWithBatch(
+  String companyGuid,
+  String endDate,
+  List<StockItemInfo> stockItems,
+) async {
 
-    // For each stock item, fetch transactions and organize by godown
-    for (var item in stockItems) {
-      // if (item.itemName != "5 LT./KG. CAPACITY PLASTIC BUCKET"){
-      //   continue;
-      // }
-      // if (item.itemName !='Import Item'){
-      //   continue;
-      // }
-      final transactions = await fetchTransactionsForStockItem(
-        companyGuid,
-        item.stockItemGuid,
-        endDate,
-      );
+  Map<String, Map<String, Map<String, List<StockTransaction>>>> directory = {};
 
-      // Organize transactions by godown
-      Map<String, List<StockTransaction>> godownTransactions = {};
+  for (var item in stockItems) {
+    final transactions = await fetchTransactionsForStockItem(
+      companyGuid,
+      item.stockItemGuid,
+      endDate,
+    );
 
-      for (var transaction in transactions) {
-          // print('${item.itemName}, ${transaction.voucherId}, ${transaction.amount}, ${transaction.voucherType}, ${transaction.godownName}');
-        if (!godownTransactions.containsKey(transaction.godownName)) {
-          godownTransactions[transaction.godownName] = [];
-        }
-        godownTransactions[transaction.godownName]!.add(transaction);
-      }
+    // Godown -> Batch -> Transactions
+    Map<String, Map<String, List<StockTransaction>>> godownTransactions = {};
 
-      // Add to directory
-      directory[item.stockItemGuid] = godownTransactions;
+    for (var transaction in transactions) {
+
+      final godown = transaction.godownName;
+      final batch = transaction.batchName;
+
+      // Ensure godown exists
+      godownTransactions.putIfAbsent(godown, () => {});
+
+      // Ensure batch exists inside godown
+      godownTransactions[godown]!
+          .putIfAbsent(batch, () => []);
+
+      // Add transaction
+      godownTransactions[godown]![batch]!
+          .add(transaction);
     }
 
-    return directory;
+    directory[item.stockItemGuid] = godownTransactions;
   }
+
+  return directory;
+}
 
 // ============================================
 // CALCULATE FOR ALL ITEMS
@@ -425,28 +319,29 @@ Future<List<StockItemInfo>> fetchAllStockItems(String companyGuid) async {
     // Fetch all stock items
     final stockItems = await fetchAllStockItems(companyGuid);
 
-    // Build directory
-    final directory = await buildStockDirectory(companyGuid, toDate, stockItems);
+    var closingStock = 0.0;
+    var openingStock = 0.0;
+
+    for (final item in stockItems){
+      closingStock += item.closingValue;
+      openingStock = item.openingData.fold(0.0, (sum, data) => sum + data.amount);
+
+      print('opening data ${item.itemName} = ${openingStock}');
+    }
+
+    print(closingStock);
+    print(openingStock);
+
+    final directory = await buildStockDirectoryWithBatch(companyGuid, toDate, stockItems);
 
     List<AverageCostResult> results = [];
 
     for (var stockItem in stockItems) {
-      // Only process items with Average Cost method
-
-      // if (stockItem.itemName != "5 LT./KG. CAPACITY PLASTIC BUCKET"){
-      //   continue;
-      // }
-
-      // if (stockItem.itemName !='Import Item'){
-      //   continue;
-      // }
 
       final godownTransactions = directory[stockItem.stockItemGuid]!;
 
-      // if (godownTransactions.isEmpty) continue;
-
       if (stockItem.unit.toLowerCase().contains('not applicable')){
-    final result = await calculateCostWithoutUnit(
+      final result = await calculateCostWithoutUnit(
               stockItem: stockItem,
               godownTransactions: godownTransactions,
               fromDate: fromDate,
@@ -461,11 +356,7 @@ Future<List<StockItemInfo>> fetchAllStockItems(String companyGuid) async {
 
       }else if (stockItem.costingMethod.toLowerCase().contains('zero')){
         final result = AverageCostResult(itemName: stockItem.itemName, stockItemGuid: stockItem.stockItemGuid, godowns: {});
-
-          // for (final entry in result.godowns.entries) {
-            print(
-                '${result.itemName}= ${stockItem.costingMethod}, godownName, 0, 0, 0');
-          // }
+            print('${result.itemName}= ${stockItem.costingMethod}, godownName, 0, 0, 0');
           results.add(result);
       }else if (stockItem.costingMethod.toLowerCase().contains('fifo')){
         final result = await calculateFifoCost(
@@ -507,263 +398,15 @@ Future<List<StockItemInfo>> fetchAllStockItems(String companyGuid) async {
           }
           results.add(result);
       }
+
     }
 
     return results;
   }
 
-  // Future<AverageCostResult> calculateLifoCost({
-  //   required StockItemInfo stockItem,
-  //   required Map<String, List<StockTransaction>> godownTransactions,
-  //   required String fromDate,
-  //   required String toDate,
-  //   required String companyGuid,
-  // }) async {
-  //   Map<String, GodownAverageCost> godownResults = {};
-
-  //   // Per godown tracking
-  //   Map<String, double> totalInwardQty = {};
-  //   Map<String, double> totalOutwardQty = {};
-  //   Map<String, List<StockLot>>stockLots = {}; // All inward vouchers in order
-
-  //   // Flatten all transactions and sort by date
-  //   List<StockTransaction> allTransactions = [];
-  //   for (var godownTxns in godownTransactions.values) {
-  //     allTransactions.addAll(godownTxns);
-  //   }
-  //   allTransactions.sort((a, b) => a.voucherId.compareTo(b.voucherId));
-
-  //   // Group transactions by voucher_guid
-  //   Map<String, List<StockTransaction>> voucherBatches = {};
-  //   for (var txn in allTransactions) {
-  //     if (!voucherBatches.containsKey(txn.voucherGuid)) {
-  //       voucherBatches[txn.voucherGuid] = [];
-  //     }
-  //     voucherBatches[txn.voucherGuid]!.add(txn);
-  //   }
-
-  //   // Initialize with opening stock
-  //   for (final godownOpeningData in stockItem.openingData) {
-  //     String godownName = godownOpeningData.godownName;
-  //     if (godownName.isEmpty) {
-  //       godownName = 'Main Location';
-  //     }
-
-  //     final openingQty = double.tryParse(godownOpeningData.actualQty) ?? 0.0;
-  //     final openingAmount = godownOpeningData.amount.abs();
-
-  //     totalInwardQty[godownName] = openingQty.abs();
-  //     totalOutwardQty[godownName] = 0.0;
-  //     stockLots[godownName] = [];
-
-  //     if (openingQty > 0) {
-  //       final openingRate = openingAmount / openingQty;
-  //       stockLots[godownName]!.add(StockLot(
-  //         voucherGuid: 'OPENING_STOCK',
-  //         voucherDate: fromDate,
-  //         voucherNumber: 'Opening Balance',
-  //         voucherType: 'Opening',
-  //         qty: openingQty,
-  //         amount: openingAmount,
-  //         rate: openingRate,
-  //         type: StockInOutType.inward
-  //       ));
-  //     }
-  //   }
-
-  //   // Process transactions
-  //   Set<String> processedVouchers = {};
-
-  //   for (var txn in allTransactions) {
-  //     final voucherGuid = txn.voucherGuid;
-
-  //     if (processedVouchers.contains(voucherGuid)) {
-  //       continue;
-  //     }
-  //     processedVouchers.add(voucherGuid);
-
-  //     final dateStr = txn.voucherDate;
-  //     final voucherType = txn.voucherType;
-  //     final voucherNumber = txn.voucherNumber;
-
-  //     if (dateStr.compareTo(toDate) > 0) {
-  //       break;
-  //     }
-
-  //     // Skip Delivery Notes that have corresponding GST TAX INVOICE
-  //     final isDeliveryNote = voucherType.toLowerCase().contains('delivery note');
-
-  //     if (isDeliveryNote) {
-  //       bool hasInvoice = false;
-  //       for (var otherTxn in allTransactions) {
-  //         if (otherTxn.voucherType.toLowerCase().contains('gst tax invoice') &&
-  //             otherTxn.voucherDate == dateStr &&
-  //             otherTxn.voucherNumber == voucherNumber) {
-  //           hasInvoice = true;
-  //           break;
-  //         }
-  //       }
-  //       if (hasInvoice) continue;
-  //     }
-
-  //     final batches = voucherBatches[voucherGuid]!;
-
-  //     final isCreditNote = voucherType.toLowerCase().contains('credit') ||
-  //         voucherType == 'Credit Note';
-  //     final isDebitNote = voucherType.toLowerCase().contains('debit') ||
-  //         voucherType == 'Debit Note';
-  //     final isStockJournal = voucherType == 'Stock Journal';
-
-  //     if (voucherType == 'Physical Stock') {
-  //       continue;
-  //     }
-
-  //     for (var batch in batches) {
-  //       final godown = batch.godownName;
-  //       final amount = batch.amount;
-  //       final qty = batch.stock;
-  //       final isInward = batch.isInward;
-  //       final absAmount = amount.abs();
-
-  //       if (amount == 0 && !isStockJournal) {
-  //         continue;
-  //       }
-
-  //       if ((isCreditNote || isDebitNote) && qty == 0 && amount == 0) {
-  //         continue;
-  //       }
-
-  //       // Initialize godown if not exists
-  //       if (!totalOutwardQty.containsKey(godown)) {
-  //         totalOutwardQty[godown] = 0.0;
-  //       }
-
-  //       if (!totalInwardQty.containsKey(godown)) {
-  //         totalInwardQty[godown] = 0.0;
-  //       }
-
-  //       if (!stockLots.containsKey(godown)) {
-  //         stockLots[godown] = [];
-  //       }
-
-  //       if (isInward) {
-  //         // INWARD: Add to total inward qty and store lot
-  //         if (isCreditNote) {
-  //           totalOutwardQty[godown] = totalOutwardQty[godown]! - qty;
-  //         } else {
-  //           totalInwardQty[godown] = totalInwardQty[godown]! + qty;
-
-  //           final rate = qty > 0 ? absAmount / qty : 0.0;
-  //           stockLots[godown]!.add(StockLot(
-  //             voucherGuid: voucherGuid,
-  //             voucherDate: dateStr,
-  //             voucherNumber: voucherNumber,
-  //             voucherType: voucherType,
-  //             qty: qty,
-  //             amount: absAmount,
-  //             rate: rate,
-  //             type: StockInOutType.inward
-  //           ));
-  //         }
-  //       } else {
-  //         if (isDebitNote) {
-  //           totalInwardQty[godown] = totalInwardQty[godown]! + qty;
-  //         } else {
-  //           totalOutwardQty[godown] = totalOutwardQty[godown]! + qty;
-  //           final rate = qty > 0 ? absAmount / qty : 0.0;
-  //           stockLots[godown]!.add(StockLot(
-  //             voucherGuid: voucherGuid,
-  //             voucherDate: dateStr,
-  //             voucherNumber: voucherNumber,
-  //             voucherType: voucherType,
-  //             qty: qty,
-  //             amount: absAmount,
-  //             rate: rate,
-  //             type: StockInOutType.outward
-  //           ));
-  //         }
-  //         // OUTWARD: Add to total outward qty
-  //       }
-  //     }
-  //   }
-
-  //   // Calculate closing stock and value for each godown
-  //   for (var godown in totalInwardQty.keys) {
-  //     final inwardQty = totalInwardQty[godown]!;
-  //     final outwardQty = totalOutwardQty[godown]!;
-  //     final closingStockQty = inwardQty - outwardQty;
-
-  //     double closingValue = 0.0;
-  //     final lots = stockLots[godown]!;
-
-  //     if (closingStockQty > 0) {
-  //       // Go backwards from last inward voucher
-  //       double remainingQty = closingStockQty;
-
-  //       double tempOutWardQty = 0.0;
-
-
-  //       // Iterate from last to first
-  //       for (int i = lots.length - 1; i >= 0 && remainingQty > 0; i--) {
-  //         final lot = lots[i];
-  //         if (lot.type == StockInOutType.outward){
-  //             tempOutWardQty += lot.qty;
-  //         }else{
-  //             if (tempOutWardQty <= 0){
-  //               if (lot.qty <= remainingQty) {
-  //                 // Take entire lot
-  //                 closingValue += lot.amount;
-  //                 remainingQty -= lot.qty;
-  //               } else {
-  //                 closingValue += remainingQty * lot.rate;
-  //                 remainingQty = 0;
-  //               }
-  //             }else{
-  //               if (lot.qty <= tempOutWardQty) {
-  //                 tempOutWardQty -= lot.qty;
-  //               } else {
-
-  //                 final tempLotQty = lot.qty - tempOutWardQty;
-
-  //                 if (tempLotQty <= remainingQty) {
-  //                 // Take entire lot
-  //                 closingValue += (tempLotQty * lot.rate);
-  //                 remainingQty -= tempLotQty;
-  //               } else {
-  //                 closingValue += remainingQty * lot.rate;
-  //                 remainingQty = 0;
-  //               }
-                 
-  //               }
-  //             }
-  //         }        
-  //       }
-  //     } else {
-  //       final lastStockLot = lots.last;
-
-  //       closingValue = closingStockQty * lastStockLot.rate;
-  //     }
-
-  //     godownResults[godown] = GodownAverageCost(
-  //       godownName: godown,
-  //       totalInwardQty: inwardQty,
-  //       totalInwardValue: outwardQty,
-  //       currentStockQty: closingStockQty,
-  //       averageRate: closingStockQty > 0 ? closingValue / closingStockQty : 0.0,
-  //       closingValue: closingValue,
-  //     );
-  //   }
-
-  //   return AverageCostResult(
-  //     stockItemGuid: stockItem.stockItemGuid,
-  //     itemName: stockItem.itemName,
-  //     godowns: godownResults,
-  //   );
-  // }
-
-Future<AverageCostResult> calculateLifoCost({
+  Future<AverageCostResult> calculateLifoCost({
   required StockItemInfo stockItem,
-  required Map<String, List<StockTransaction>> godownTransactions,
+  required Map<String, Map<String, List<StockTransaction>>> godownTransactions,
   required String fromDate,
   required String toDate,
   required String companyGuid,
@@ -784,32 +427,28 @@ Future<AverageCostResult> calculateLifoCost({
     }
   }
 
-  // Per godown tracking
-  Map<String, double> totalInwardQty = {};
-  Map<String, double> totalOutwardQty = {};
-  Map<String, List<StockLot>> stockLots = {};
+  // 🔹 Godown → Batch → Lot tracking
+  Map<String, Map<String, double>> godownBatchInwardQty = {};
+  Map<String, Map<String, double>> godownBatchOutwardQty = {};
+  Map<String, Map<String, List<StockLot>>> godownBatchLots = {};
 
-  // Flatten all transactions and sort by date
+  // Flatten all transactions and sort by voucherId
   List<StockTransaction> allTransactions = [];
-  for (var godownTxns in godownTransactions.values) {
-    allTransactions.addAll(godownTxns);
+  for (var godownMap in godownTransactions.values) {
+    for (var batchList in godownMap.values) {
+      allTransactions.addAll(batchList);
+    }
   }
   allTransactions.sort((a, b) => a.voucherId.compareTo(b.voucherId));
 
   // Group transactions by voucher_guid
   Map<String, List<StockTransaction>> voucherBatches = {};
   for (var txn in allTransactions) {
-    // if (stockItem.itemName == "J.ACID"){
-    //   print('JACIDJACID, ${txn.voucherType}, ${txn.voucherDate}, ${txn.voucherNumber}, ${txn.amount}, ${txn.rate}, ${txn.stock}');
-    // }
-
-    if (!voucherBatches.containsKey(txn.voucherGuid)) {
-      voucherBatches[txn.voucherGuid] = [];
-    }
+    voucherBatches.putIfAbsent(txn.voucherGuid, () => []);
     voucherBatches[txn.voucherGuid]!.add(txn);
   }
 
-  // Initialize with opening stock
+  // 🔹 Opening Stock → Batch Level
   for (final godownOpeningData in stockItem.openingData) {
     String godownName = godownOpeningData.godownName;
     if (godownName.isEmpty) {
@@ -817,15 +456,23 @@ Future<AverageCostResult> calculateLifoCost({
     }
 
     final openingQty = double.tryParse(godownOpeningData.actualQty) ?? 0.0;
-    final openingAmount = godownOpeningData.amount.abs();
+    final openingAmount = godownOpeningData.amount;
+    final batchName = godownOpeningData.batchName;
 
-    totalInwardQty[godownName] = openingQty.abs();
-    totalOutwardQty[godownName] = 0.0;
-    stockLots[godownName] = [];
+    godownBatchInwardQty.putIfAbsent(godownName, () => {});
+    godownBatchOutwardQty.putIfAbsent(godownName, () => {});
+    godownBatchLots.putIfAbsent(godownName, () => {});
+
+    godownBatchInwardQty[godownName]!.putIfAbsent(batchName, () => 0.0);
+    godownBatchOutwardQty[godownName]!.putIfAbsent(batchName, () => 0.0);
+    godownBatchLots[godownName]!.putIfAbsent(batchName, () => []);
+
+    godownBatchInwardQty[godownName]![batchName] =
+        godownBatchInwardQty[godownName]![batchName]! + openingQty;
 
     if (openingQty > 0) {
       final openingRate = openingAmount / openingQty;
-      stockLots[godownName]!.add(StockLot(
+      godownBatchLots[godownName]![batchName]!.add(StockLot(
         voucherGuid: 'OPENING_STOCK',
         voucherDate: fromDate,
         voucherNumber: 'Opening Balance',
@@ -840,7 +487,7 @@ Future<AverageCostResult> calculateLifoCost({
 
   String currentFyStart = '';
 
-  // Helper function to calculate closing value using LIFO logic
+  // LIFO closing value helper
   double calculateLifoClosingValue(List<StockLot> lots, double closingStockQty) {
     if (closingStockQty <= 0 || lots.isEmpty) {
       if (lots.isNotEmpty) {
@@ -860,9 +507,9 @@ Future<AverageCostResult> calculateLifoCost({
       if (lot.type == StockInOutType.outward) {
         tempOutWardQty += lot.qty;
       } else {
-        if (lot.qty == 0){
-        closingValue += lot.amount;
-      }else if (tempOutWardQty <= 0) {
+        if (lot.qty == 0) {
+          closingValue += lot.amount;
+        } else if (tempOutWardQty <= 0) {
           if (lot.qty <= remainingQty) {
             closingValue += lot.amount;
             remainingQty -= lot.qty;
@@ -889,29 +536,32 @@ Future<AverageCostResult> calculateLifoCost({
       }
     }
 
-    if (remainingQty > 0){
+    if (remainingQty > 0) {
       closingValue += remainingQty * lastRate;
     }
 
-    if (closingValue == 0 && closingStockQty > 0){
+    if (closingValue == 0 && closingStockQty > 0) {
       final totalQty = lots.fold(0.0, (sum, lot) => sum + lot.qty);
       final totalValue = lots.fold(0.0, (sum, lot) => sum + lot.amount);
-
-      closingValue = closingStockQty * (totalValue/ totalQty);
+      if (totalQty > 0) {
+        closingValue = closingStockQty * (totalValue / totalQty);
+      }
     }
 
     return closingValue;
   }
 
-  // Process transactions
   Set<String> processedVouchers = {};
 
   for (var txn in allTransactions) {
     final voucherGuid = txn.voucherGuid;
 
-    if (processedVouchers.contains(voucherGuid) || txn.voucherType.toLowerCase().contains('purchase order')  || txn.voucherType.toLowerCase().contains('sales order')) {
+    if (processedVouchers.contains(voucherGuid) ||
+        txn.voucherType.toLowerCase().contains('purchase order') ||
+        txn.voucherType.toLowerCase().contains('sales order')) {
       continue;
     }
+
     processedVouchers.add(voucherGuid);
 
     final dateStr = txn.voucherDate;
@@ -924,181 +574,114 @@ Future<AverageCostResult> calculateLifoCost({
 
     final txnFyStart = getFinancialYearStartDate(dateStr);
 
-    // Check for FY boundary - reset stock valuation
+    // 🔹 FY Boundary Reset (Batch Wise)
     if (txnFyStart != currentFyStart && currentFyStart.isNotEmpty) {
-      // Calculate closing for each godown and reset
-      for (var godown in totalInwardQty.keys) {
-        final inwardQty = totalInwardQty[godown]!;
-        final outwardQty = totalOutwardQty[godown]!;
-        final closingStockQty = inwardQty - outwardQty;
+      for (var godown in godownBatchInwardQty.keys) {
+        final batchKeys = godownBatchInwardQty[godown]!.keys.toList();
+        for (var batchName in batchKeys) {
+          final inwardQty = godownBatchInwardQty[godown]![batchName]!;
+          final outwardQty = godownBatchOutwardQty[godown]![batchName] ?? 0.0;
+          final closingStockQty = inwardQty - outwardQty;
+          final lots = godownBatchLots[godown]![batchName] ?? [];
 
-        if (closingStockQty > 0) {
-          final lots = stockLots[godown]!;
-          final closingValue = calculateLifoClosingValue(lots, closingStockQty);
-          final closingRate = closingValue / closingStockQty;
+          if (closingStockQty > 0) {
+            final closingValue = calculateLifoClosingValue(lots, closingStockQty);
+            final closingRate = closingValue / closingStockQty;
 
-          // Reset with closing as new opening
-          totalInwardQty[godown] = closingStockQty;
-          totalOutwardQty[godown] = 0.0;
-          stockLots[godown] = [
-            StockLot(
-              voucherGuid: 'FY_OPENING_$txnFyStart',
-              voucherDate: txnFyStart,
-              voucherNumber: 'FY Opening Balance',
-              voucherType: 'Opening',
-              qty: closingStockQty,
-              amount: closingValue,
-              rate: closingRate,
-              type: StockInOutType.inward,
-            )
-          ];
-        }else if (closingStockQty < 0) {
-          // Negative stock: use Average Cost method
-          final lots = stockLots[godown]!;
-          double totalLotValue = 0.0;
-          double totalLotQty = 0.0;
-          for (var lot in lots) {
-            if (lot.type == StockInOutType.inward) {
-              totalLotValue += lot.amount;
-              totalLotQty += lot.qty;
+            godownBatchInwardQty[godown]![batchName] = closingStockQty;
+            godownBatchOutwardQty[godown]![batchName] = 0.0;
+            godownBatchLots[godown]![batchName] = [
+              StockLot(
+                voucherGuid: 'FY_OPENING_$txnFyStart',
+                voucherDate: txnFyStart,
+                voucherNumber: 'FY Opening Balance',
+                voucherType: 'Opening',
+                qty: closingStockQty,
+                amount: closingValue,
+                rate: closingRate,
+                type: StockInOutType.inward,
+              )
+            ];
+          } else if (closingStockQty < 0) {
+            // Negative stock: fallback to Average Cost
+            double totalLotValue = 0.0;
+            double totalLotQty = 0.0;
+            for (var lot in lots) {
+              if (lot.type == StockInOutType.inward) {
+                totalLotValue += lot.amount;
+                totalLotQty += lot.qty;
+              }
             }
-          }
-          final closingRate = totalLotQty > 0 ? totalLotValue / totalLotQty : 0.0;
-          final closingValue = closingStockQty * closingRate;
+            final closingRate = totalLotQty > 0 ? totalLotValue / totalLotQty : 0.0;
+            final closingValue = closingStockQty * closingRate;
 
-          // Reset with negative opening
-          totalInwardQty[godown] = closingStockQty;
-          totalOutwardQty[godown] = 0.0;
-          stockLots[godown] = [
-            StockLot(
-              voucherGuid: 'FY_OPENING_$txnFyStart',
-              voucherDate: txnFyStart,
-              voucherNumber: 'FY Opening Balance',
-              voucherType: 'Opening',
-              qty: closingStockQty,
-              amount: closingValue,
-              rate: closingRate,
-              type: StockInOutType.inward,
-            )
-          ];
-        } else {
-          // No stock, reset to zero
-          totalInwardQty[godown] = 0.0;
-          totalOutwardQty[godown] = 0.0;
-          stockLots[godown] = [];
+            godownBatchInwardQty[godown]![batchName] = closingStockQty;
+            godownBatchOutwardQty[godown]![batchName] = 0.0;
+            godownBatchLots[godown]![batchName] = [
+              StockLot(
+                voucherGuid: 'FY_OPENING_$txnFyStart',
+                voucherDate: txnFyStart,
+                voucherNumber: 'FY Opening Balance',
+                voucherType: 'Opening',
+                qty: closingStockQty,
+                amount: closingValue,
+                rate: closingRate,
+                type: StockInOutType.inward,
+              )
+            ];
+          } else {
+            godownBatchInwardQty[godown]![batchName] = 0.0;
+            godownBatchOutwardQty[godown]![batchName] = 0.0;
+            godownBatchLots[godown]![batchName] = [];
+          }
         }
       }
     }
 
     currentFyStart = txnFyStart;
+
     final isCreditNote = creditNoteVoucherTypes.contains(voucherType);
     final isDebitNote = debitNoteVoucherTypes.contains(voucherType);
-    final isStockJournal = stockJournalVoucherType.contains(voucherType);
-    final isDeliveryNote = deliveryNoteVoucherTypes.contains(voucherType);
-    final isReceiptNote = receiptNoteVoucherTypes.contains(voucherType);
-        final isPurchase = purchaseVoucherTypes.contains(voucherType);
+    final isPurchase = purchaseVoucherTypes.contains(voucherType);
     final isSales = salesVoucherTypes.contains(voucherType);
 
-
-    // if (isDeliveryNote) {
-    //   bool hasInvoice = false;
-    //   for (var otherTxn in allTransactions) {
-    //     if (otherTxn.voucherDate == dateStr &&
-    //         otherTxn.voucherNumber == voucherNumber) {
-    //       hasInvoice = true;
-    //       break;
-    //     }
-    //   }
-    //   if (hasInvoice){
-    //             // print("Delivery Note With Invoice => ${stockItem.itemName}, ${voucherType}, ${txn.voucherDate}, ${txn.stock}, ${txn.rate}, ${txn.amount}");
-    //             continue;
-    //         }else{
-    //             // print("Delivery Note Without Invoice => ${stockItem.itemName}, ${voucherType}, ${txn.voucherDate}, ${txn.stock}, ${txn.rate}, ${txn.amount}");
-    //         }    
-    //   }
-
-    // if (isReceiptNote) {
-    //   bool hasInvoice = false;
-    //   for (var otherTxn in allTransactions) {
-    //     if (otherTxn.voucherDate == dateStr &&
-    //         otherTxn.voucherNumber == voucherNumber) {
-    //       hasInvoice = true;
-    //       break;
-    //     }
-    //   }
-    //   if (hasInvoice){
-    //       // print("Receipt Note With Invoice => ${stockItem.itemName}, ${voucherType}, ${txn.voucherDate}, ${txn.stock}, ${txn.rate}, ${txn.amount}");
-    //       continue;
-    //   }else{
-    //       // print("Receipt Note Without Invoice => ${stockItem.itemName}, ${voucherType}, ${txn.voucherDate}, ${txn.stock}, ${txn.rate}, ${txn.amount}");
-    //   }
-    // }
+    if (voucherType == 'Physical Stock') continue;
 
     final batches = voucherBatches[voucherGuid]!;
 
-
-    // final isCreditNote = voucherType.toLowerCase().contains('cr') || voucherType == 'Credit Note';
-    // final isDebitNote = voucherType.toLowerCase().contains('debit') || voucherType == 'Debit Note';
-    // final isStockJournal = voucherType.toLowerCase().contains('sttp') || voucherType.toLowerCase().contains('stock journal') || voucherType == 'Stock Journal';
-
-    if (voucherType == 'Physical Stock') {
-      continue;
-    }
-
-    for (var batch in batches) {
-      final godown = batch.godownName;
-      final amount = batch.amount;
-      final qty = batch.stock;
-      final isInward = batch.isInward;
+    for (var batchTxn in batches) {
+      final godown = batchTxn.godownName;
+      final batchName = batchTxn.batchName;
+      final amount = batchTxn.amount;
+      final qty = batchTxn.stock;
+      final isInward = batchTxn.isInward;
       final absAmount = amount.abs();
 
-
-      if (isPurchase && (batch.trackingNumber.toLowerCase().contains('not applicable') == false)){
-        // print('Purchase = ${stockItem.itemName} => ${batch.trackingNumber}');
-          continue;
-        }
-
-        if (isSales && (batch.trackingNumber.toLowerCase().contains('not applicable') == false)){
-          // print('Sales =  ${voucherType} => ${dateStr} => ${stockItem.itemName} => ${batch.trackingNumber}');
-          continue;
-        }
-
-        if (isDebitNote && (batch.trackingNumber.toLowerCase().contains('not applicable') == false)){
-          // print('Debit = ${stockItem.itemName} => ${batch.trackingNumber}');
-          continue;
-        }
-
-        if (isCreditNote && (batch.trackingNumber.toLowerCase().contains('not applicable') == false)){
-          // print('Credit = ${stockItem.itemName} => ${batch.trackingNumber}');
-          continue;
-        }
-
-        // if (amount == 0 && !isStockJournal) {
-        //   continue;
-        // }
+      if (batchTxn.trackingNumber.toLowerCase().contains('not applicable') == false &&
+          (isPurchase || isSales || isDebitNote || isCreditNote)) {
+        continue;
+      }
 
       if ((isCreditNote || isDebitNote) && qty == 0 && amount == 0) {
         continue;
       }
 
-      // Initialize godown if not exists
-      if (!totalOutwardQty.containsKey(godown)) {
-        totalOutwardQty[godown] = 0.0;
-      }
+      // Initialize batch if not exists
+      godownBatchInwardQty.putIfAbsent(godown, () => {});
+      godownBatchOutwardQty.putIfAbsent(godown, () => {});
+      godownBatchLots.putIfAbsent(godown, () => {});
 
-      if (!totalInwardQty.containsKey(godown)) {
-        totalInwardQty[godown] = 0.0;
-      }
-
-      if (!stockLots.containsKey(godown)) {
-        stockLots[godown] = [];
-      }
+      godownBatchInwardQty[godown]!.putIfAbsent(batchName, () => 0.0);
+      godownBatchOutwardQty[godown]!.putIfAbsent(batchName, () => 0.0);
+      godownBatchLots[godown]!.putIfAbsent(batchName, () => []);
 
       if (isInward) {
         if (isCreditNote) {
-          totalOutwardQty[godown] = totalOutwardQty[godown]! - qty;
+          godownBatchOutwardQty[godown]![batchName] =
+              godownBatchOutwardQty[godown]![batchName]! - qty;
+
           final rate = qty > 0 ? absAmount / qty : 0.0;
-          stockLots[godown]!.add(StockLot(
+          godownBatchLots[godown]![batchName]!.add(StockLot(
             voucherGuid: voucherGuid,
             voucherDate: dateStr,
             voucherNumber: voucherNumber,
@@ -1108,17 +691,12 @@ Future<AverageCostResult> calculateLifoCost({
             rate: rate,
             type: StockInOutType.outward,
           ));
-
-
-          // if (stockItem.itemName == "J.ACID"){
-          //   print('${stockItem.itemName}, Outward, ${voucherType}, ${dateStr}, ${voucherNumber}, ${amount * -1}, ${rate}, ${qty * -1}');
-          // }
-
         } else {
-          totalInwardQty[godown] = totalInwardQty[godown]! + qty;
+          godownBatchInwardQty[godown]![batchName] =
+              godownBatchInwardQty[godown]![batchName]! + qty;
 
           final rate = qty > 0 ? absAmount / qty : 0.0;
-          stockLots[godown]!.add(StockLot(
+          godownBatchLots[godown]![batchName]!.add(StockLot(
             voucherGuid: voucherGuid,
             voucherDate: dateStr,
             voucherNumber: voucherNumber,
@@ -1128,17 +706,14 @@ Future<AverageCostResult> calculateLifoCost({
             rate: rate,
             type: StockInOutType.inward,
           ));
-
-          // if (stockItem.itemName == "J.ACID"){
-          //   print('${stockItem.itemName}, Inward, ${voucherType}, ${dateStr}, ${voucherNumber}, ${amount}, ${rate}, ${qty}');
-          // }
         }
       } else {
         if (isDebitNote) {
-          totalInwardQty[godown] = totalInwardQty[godown]! - qty;
+          godownBatchInwardQty[godown]![batchName] =
+              godownBatchInwardQty[godown]![batchName]! - qty;
 
           final rate = qty > 0 ? absAmount / qty : 0.0;
-          stockLots[godown]!.add(StockLot(
+          godownBatchLots[godown]![batchName]!.add(StockLot(
             voucherGuid: voucherGuid,
             voucherDate: dateStr,
             voucherNumber: voucherNumber,
@@ -1148,15 +723,12 @@ Future<AverageCostResult> calculateLifoCost({
             rate: rate,
             type: StockInOutType.inward,
           ));
-
-          // if (stockItem.itemName == "J.ACID"){
-          //   print('${stockItem.itemName}, Inward, ${voucherType}, ${dateStr}, ${voucherNumber}, ${amount * -1}, ${rate}, ${qty * -1}');
-          // }
-
         } else {
-          totalOutwardQty[godown] = totalOutwardQty[godown]! + qty;
+          godownBatchOutwardQty[godown]![batchName] =
+              godownBatchOutwardQty[godown]![batchName]! + qty;
+
           final rate = qty > 0 ? absAmount / qty : 0.0;
-          stockLots[godown]!.add(StockLot(
+          godownBatchLots[godown]![batchName]!.add(StockLot(
             voucherGuid: voucherGuid,
             voucherDate: dateStr,
             voucherNumber: voucherNumber,
@@ -1166,45 +738,52 @@ Future<AverageCostResult> calculateLifoCost({
             rate: rate,
             type: StockInOutType.outward,
           ));
-
-          // if (stockItem.itemName == "J.ACID"){
-          //   print('${stockItem.itemName}, Outward, ${voucherType}, ${dateStr}, ${voucherNumber}, ${amount}, ${rate}, ${qty}');
-          // }
         }
       }
     }
   }
 
-  // Calculate closing stock and value for each godown
-  for (var godown in totalInwardQty.keys) {
-    final inwardQty = totalInwardQty[godown]!;
-    final outwardQty = totalOutwardQty[godown]!;
-    final closingStockQty = inwardQty - outwardQty;
+  // 🔹 Final: Batch → Godown Merge (LIFO closing per batch, then sum)
+  for (var godown in godownBatchInwardQty.keys) {
+    double totalClosingQty = 0.0;
+    double totalClosingValue = 0.0;
 
-    double closingValue = 0.0;
-    final lots = stockLots[godown]!;
+    final batchKeys = godownBatchInwardQty[godown]!.keys;
+    for (var batchName in batchKeys) {
+      final inwardQty = godownBatchInwardQty[godown]![batchName]!;
+      final outwardQty = godownBatchOutwardQty[godown]![batchName] ?? 0.0;
+      final closingStockQty = inwardQty - outwardQty;
+      final lots = godownBatchLots[godown]![batchName] ?? [];
 
-    if (closingStockQty > 0) {
-      closingValue = calculateLifoClosingValue(lots, closingStockQty);
-    } else if (closingStockQty < 0) {
-      // Negative stock: use Average Cost method
-      double totalLotValue = 0.0;
-      double totalLotQty = 0.0;
-      for (var lot in lots) {
-        totalLotValue += lot.amount;
-        totalLotQty += lot.qty;
+      double batchClosingValue = 0.0;
+
+      if (closingStockQty > 0) {
+        batchClosingValue = calculateLifoClosingValue(lots, closingStockQty);
+      } else if (closingStockQty < 0) {
+        // Negative stock: Average Cost fallback
+        double totalLotValue = 0.0;
+        double totalLotQty = 0.0;
+        for (var lot in lots) {
+          if (lot.type == StockInOutType.inward) {
+            totalLotValue += lot.amount;
+            totalLotQty += lot.qty;
+          }
+        }
+        final closingRate = totalLotQty == 0 ? 0.0 : totalLotValue / totalLotQty ;
+        batchClosingValue = closingStockQty * closingRate;
       }
-      final closingRate = totalLotQty > 0 ? totalLotValue / totalLotQty : 0.0;
-      closingValue = closingStockQty * closingRate;
+
+      totalClosingQty += closingStockQty;
+      totalClosingValue += batchClosingValue;
     }
 
     godownResults[godown] = GodownAverageCost(
       godownName: godown,
-      totalInwardQty: inwardQty,
-      totalInwardValue: outwardQty,
-      currentStockQty: closingStockQty,
-      averageRate: closingStockQty > 0 ? closingValue / closingStockQty : 0.0,
-      closingValue: closingValue,
+      totalInwardQty: 0,
+      totalInwardValue: 0,
+      currentStockQty: totalClosingQty,
+      averageRate: totalClosingQty > 0 ? totalClosingValue / totalClosingQty : 0.0,
+      closingValue: totalClosingValue,
     );
   }
 
@@ -1215,9 +794,9 @@ Future<AverageCostResult> calculateLifoCost({
   );
 }
 
-Future<AverageCostResult> calculateFifoCost({
+  Future<AverageCostResult> calculateFifoCost({
   required StockItemInfo stockItem,
-  required Map<String, List<StockTransaction>> godownTransactions,
+  required Map<String, Map<String, List<StockTransaction>>> godownTransactions,
   required String fromDate,
   required String toDate,
   required String companyGuid,
@@ -1238,31 +817,28 @@ Future<AverageCostResult> calculateFifoCost({
     }
   }
 
+  // 🔹 Godown → Batch → Lot tracking
+  Map<String, Map<String, double>> godownBatchInwardQty = {};
+  Map<String, Map<String, double>> godownBatchOutwardQty = {};
+  Map<String, Map<String, List<StockLot>>> godownBatchLots = {};
 
-
-
-  // Per godown tracking
-  Map<String, double> totalInwardQty = {};
-  Map<String, double> totalOutwardQty = {};
-  Map<String, List<StockLot>> inwardLots = {}; // Only inward lots
-
-  // Flatten all transactions and sort by date
+  // Flatten all transactions and sort by voucherId
   List<StockTransaction> allTransactions = [];
-  for (var godownTxns in godownTransactions.values) {
-    allTransactions.addAll(godownTxns);
+  for (var godownMap in godownTransactions.values) {
+    for (var batchList in godownMap.values) {
+      allTransactions.addAll(batchList);
+    }
   }
   allTransactions.sort((a, b) => a.voucherId.compareTo(b.voucherId));
 
   // Group transactions by voucher_guid
   Map<String, List<StockTransaction>> voucherBatches = {};
   for (var txn in allTransactions) {
-    if (!voucherBatches.containsKey(txn.voucherGuid)) {
-      voucherBatches[txn.voucherGuid] = [];
-    }
+    voucherBatches.putIfAbsent(txn.voucherGuid, () => []);
     voucherBatches[txn.voucherGuid]!.add(txn);
   }
 
-  // Initialize with opening stock
+  // 🔹 Opening Stock → Batch Level
   for (final godownOpeningData in stockItem.openingData) {
     String godownName = godownOpeningData.godownName;
     if (godownName.isEmpty) {
@@ -1270,15 +846,23 @@ Future<AverageCostResult> calculateFifoCost({
     }
 
     final openingQty = double.tryParse(godownOpeningData.actualQty) ?? 0.0;
-    final openingAmount = godownOpeningData.amount.abs();
+    final openingAmount = godownOpeningData.amount;
+    final batchName = godownOpeningData.batchName;
 
-    totalInwardQty[godownName] = openingQty.abs();
-    totalOutwardQty[godownName] = 0.0;
-    inwardLots[godownName] = [];
+    godownBatchInwardQty.putIfAbsent(godownName, () => {});
+    godownBatchOutwardQty.putIfAbsent(godownName, () => {});
+    godownBatchLots.putIfAbsent(godownName, () => {});
 
-    if (openingQty > 0) {
+    godownBatchInwardQty[godownName]!.putIfAbsent(batchName, () => 0.0);
+    godownBatchOutwardQty[godownName]!.putIfAbsent(batchName, () => 0.0);
+    godownBatchLots[godownName]!.putIfAbsent(batchName, () => []);
+
+    godownBatchInwardQty[godownName]![batchName] =
+        godownBatchInwardQty[godownName]![batchName]! + openingQty;
+
+    // if (openingQty > 0) {
       final openingRate = openingAmount / openingQty;
-      inwardLots[godownName]!.add(StockLot(
+      godownBatchLots[godownName]![batchName]!.add(StockLot(
         voucherGuid: 'OPENING_STOCK',
         voucherDate: fromDate,
         voucherNumber: 'Opening Balance',
@@ -1288,14 +872,13 @@ Future<AverageCostResult> calculateFifoCost({
         rate: openingRate,
         type: StockInOutType.inward,
       ));
-    }
+    // }
   }
 
   String currentFyStart = '';
 
-  // Helper function to calculate closing value using FIFO logic (backwards from last)
+  // FIFO closing value helper (backwards from last lot = newest first)
   double calculateFifoClosingValue(List<StockLot> lots, double closingStockQty) {
-   
     if (closingStockQty <= 0 || lots.isEmpty) {
       return 0.0;
     }
@@ -1304,50 +887,46 @@ Future<AverageCostResult> calculateFifoCost({
     double remainingQty = closingStockQty;
     double lastRate = 0.0;
 
-    // FIFO: Go backwards from LAST inward lot (newest first)
     for (int i = lots.length - 1; i >= 0 && remainingQty > 0; i--) {
       final lot = lots[i];
       lastRate = lot.rate;
 
-      if (lot.qty == 0){
+      if (lot.qty == 0) {
         closingValue += lot.amount;
-      }else if (lot.qty <= remainingQty) {
-        // Take entire lot
+      } else if (lot.qty <= remainingQty) {
         closingValue += lot.amount;
         remainingQty -= lot.qty;
       } else {
-        // Take partial lot
         closingValue += remainingQty * lot.rate;
         remainingQty = 0;
       }
     }
 
-    if (remainingQty > 0){
+    if (remainingQty > 0) {
       closingValue += remainingQty * lastRate;
     }
 
-    if (closingValue == 0 && closingStockQty > 0){
+    if (closingValue == 0 && closingStockQty > 0) {
       final totalQty = lots.fold(0.0, (sum, lot) => sum + lot.qty);
       final totalValue = lots.fold(0.0, (sum, lot) => sum + lot.amount);
-
-      closingValue = closingStockQty * (totalValue/ totalQty);
+      if (totalQty > 0) {
+        closingValue = closingStockQty * (totalValue / totalQty);
+      }
     }
 
     return closingValue;
   }
 
-  // Process transactions
   Set<String> processedVouchers = {};
 
   for (var txn in allTransactions) {
-
     final voucherGuid = txn.voucherGuid;
 
-    if (processedVouchers.contains(voucherGuid) || txn.voucherType.toLowerCase().contains('purchase order')  || txn.voucherType.toLowerCase().contains('sales order')) {
+    if (processedVouchers.contains(voucherGuid) ||
+        txn.voucherType.toLowerCase().contains('purchase order') ||
+        txn.voucherType.toLowerCase().contains('sales order')) {
       continue;
     }
-
-        // print("${txn.voucherDate}, ${txn.godownName}, ${txn.voucherType}, ${txn.stock}, ${txn.rate}, ${txn.amount}, ${txn.voucherGuid}");
 
     processedVouchers.add(voucherGuid);
 
@@ -1361,187 +940,115 @@ Future<AverageCostResult> calculateFifoCost({
 
     final txnFyStart = getFinancialYearStartDate(dateStr);
 
-    // Check for FY boundary - reset stock valuation
+    // 🔹 FY Boundary Reset (Batch Wise)
     if (txnFyStart != currentFyStart && currentFyStart.isNotEmpty) {
-      // Calculate closing for each godown and reset
-      for (var godown in totalInwardQty.keys) {
-        final inwardQty = totalInwardQty[godown]!;
-        final outwardQty = totalOutwardQty[godown]!;
-        final closingStockQty = inwardQty - outwardQty;
+      for (var godown in godownBatchInwardQty.keys) {
+        final batchKeys = godownBatchInwardQty[godown]!.keys.toList();
+        for (var batchName in batchKeys) {
+          final inwardQty = godownBatchInwardQty[godown]![batchName]!;
+          final outwardQty = godownBatchOutwardQty[godown]![batchName] ?? 0.0;
+          final closingStockQty = inwardQty - outwardQty;
+          final lots = godownBatchLots[godown]![batchName] ?? [];
 
-        if (closingStockQty > 0) {
-          final lots = inwardLots[godown]!;
-          final closingValue = calculateFifoClosingValue(lots, closingStockQty);
-          final closingRate = closingValue / closingStockQty;
+          if (closingStockQty > 0) {
+            final closingValue = calculateFifoClosingValue(lots, closingStockQty);
+            final closingRate = closingValue / closingStockQty;
 
-          // Reset with closing as new opening
-          totalInwardQty[godown] = closingStockQty;
-          totalOutwardQty[godown] = 0.0;
-          inwardLots[godown] = [
-            StockLot(
-              voucherGuid: 'FY_OPENING_$txnFyStart',
-              voucherDate: txnFyStart,
-              voucherNumber: 'FY Opening Balance',
-              voucherType: 'Opening',
-              qty: closingStockQty,
-              amount: closingValue,
-              rate: closingRate,
-              type: StockInOutType.inward,
-            )
-          ];
-        }else if (closingStockQty < 0) {
-          // Negative stock: use Average Cost method
-          final lots = inwardLots[godown]!;
-          double totalLotValue = 0.0;
-          double totalLotQty = 0.0;
-          for (var lot in lots) {
-            totalLotValue += lot.amount;
-            totalLotQty += lot.qty;
+            godownBatchInwardQty[godown]![batchName] = closingStockQty;
+            godownBatchOutwardQty[godown]![batchName] = 0.0;
+            godownBatchLots[godown]![batchName] = [
+              StockLot(
+                voucherGuid: 'FY_OPENING_$txnFyStart',
+                voucherDate: txnFyStart,
+                voucherNumber: 'FY Opening Balance',
+                voucherType: 'Opening',
+                qty: closingStockQty,
+                amount: closingValue,
+                rate: closingRate,
+                type: StockInOutType.inward,
+              )
+            ];
+          } else if (closingStockQty < 0) {
+            // Negative stock: fallback to Average Cost
+            double totalLotValue = 0.0;
+            double totalLotQty = 0.0;
+            for (var lot in lots) {
+              totalLotValue += lot.amount;
+              totalLotQty += lot.qty;
+            }
+            final closingRate = totalLotQty > 0 ? totalLotValue / totalLotQty : 0.0;
+            final closingValue = closingStockQty * closingRate;
+
+            godownBatchInwardQty[godown]![batchName] = closingStockQty;
+            godownBatchOutwardQty[godown]![batchName] = 0.0;
+            godownBatchLots[godown]![batchName] = [
+              StockLot(
+                voucherGuid: 'FY_OPENING_$txnFyStart',
+                voucherDate: txnFyStart,
+                voucherNumber: 'FY Opening Balance',
+                voucherType: 'Opening',
+                qty: closingStockQty,
+                amount: closingValue,
+                rate: closingRate,
+                type: StockInOutType.inward,
+              )
+            ];
+          } else {
+            godownBatchInwardQty[godown]![batchName] = 0.0;
+            godownBatchOutwardQty[godown]![batchName] = 0.0;
+            godownBatchLots[godown]![batchName] = [];
           }
-          final closingRate = totalLotQty > 0 ? totalLotValue / totalLotQty : 0.0;
-          final closingValue = closingStockQty * closingRate;
-
-          // Reset with negative opening
-          totalInwardQty[godown] = closingStockQty;
-          totalOutwardQty[godown] = 0.0;
-          inwardLots[godown] = [
-            StockLot(
-              voucherGuid: 'FY_OPENING_$txnFyStart',
-              voucherDate: txnFyStart,
-              voucherNumber: 'FY Opening Balance',
-              voucherType: 'Opening',
-              qty: closingStockQty,
-              amount: closingValue,
-              rate: closingRate,
-              type: StockInOutType.inward,
-            )
-          ];
-        } else {
-          // No stock, reset to zero
-          totalInwardQty[godown] = 0.0;
-          totalOutwardQty[godown] = 0.0;
-          inwardLots[godown] = [];
         }
       }
     }
 
     currentFyStart = txnFyStart;
 
-    // Skip Delivery Notes that have corresponding GST TAX INVOICE
-    final isDeliveryNote = deliveryNoteVoucherTypes.contains(voucherType);
-    final isReceiptNote = receiptNoteVoucherTypes.contains(voucherType);    final isPurchase = purchaseVoucherTypes.contains(voucherType);
+    final isPurchase = purchaseVoucherTypes.contains(voucherType);
     final isSales = salesVoucherTypes.contains(voucherType);
-
-
-    // if (isDeliveryNote) {
-    //   bool hasInvoice = false;
-    //   for (var otherTxn in allTransactions) {
-    //     if (otherTxn.voucherDate == dateStr &&
-    //         otherTxn.voucherNumber == voucherNumber) {
-    //       hasInvoice = true;
-    //       break;
-    //     }
-    //   }
-    //   if (hasInvoice){
-    //             // print("Delivery Note With Invoice => ${stockItem.itemName}, ${voucherType}, ${txn.voucherDate}, ${txn.stock}, ${txn.rate}, ${txn.amount}");
-    //             continue;
-    //         }else{
-    //             // print("Delivery Note Without Invoice => ${stockItem.itemName}, ${voucherType}, ${txn.voucherDate}, ${txn.stock}, ${txn.rate}, ${txn.amount}");
-    //         }    
-    //   }
-
-    // if (isReceiptNote) {
-    //   bool hasInvoice = false;
-    //   for (var otherTxn in allTransactions) {
-    //     if (otherTxn.voucherDate == dateStr &&
-    //         otherTxn.voucherNumber == voucherNumber) {
-    //       hasInvoice = true;
-    //       break;
-    //     }
-    //   }
-    //   if (hasInvoice){
-    //       // print("Receipt Note With Invoice => ${stockItem.itemName}, ${voucherType}, ${txn.voucherDate}, ${txn.stock}, ${txn.rate}, ${txn.amount}");
-    //       continue;
-    //   }else{
-    //       // print("Receipt Note Without Invoice => ${stockItem.itemName}, ${voucherType}, ${txn.voucherDate}, ${txn.stock}, ${txn.rate}, ${txn.amount}");
-    //   }
-    // }
-
-    final batches = voucherBatches[voucherGuid]!;
     final isCreditNote = creditNoteVoucherTypes.contains(voucherType);
     final isDebitNote = debitNoteVoucherTypes.contains(voucherType);
-    final isStockJournal = stockJournalVoucherType.contains(voucherType);
 
-    // final isCreditNote = voucherType.toLowerCase().contains('cr') ||
-    //     voucherType == 'Credit Note';
-    // final isDebitNote = voucherType.toLowerCase().contains('debit') ||
-    //     voucherType == 'Debit Note';
-    //   final isStockJournal = voucherType.toLowerCase().contains('sttp') || voucherType.toLowerCase().contains('stock journal') || voucherType == 'Stock Journal';
+    if (voucherType == 'Physical Stock') continue;
 
-    if (voucherType == 'Physical Stock') {
-      continue;
-    }
+    final batches = voucherBatches[voucherGuid]!;
 
-    for (var batch in batches) {
-      final godown = batch.godownName;
-      final amount = batch.amount;
-      final qty = batch.stock;
-      final isInward = batch.isInward;
+    for (var batchTxn in batches) {
+      final godown = batchTxn.godownName;
+      final batchName = batchTxn.batchName;
+      final amount = batchTxn.amount;
+      final qty = batchTxn.stock;
+      final isInward = batchTxn.isInward;
       final absAmount = amount.abs();
 
-      // if (amount == 0 && !isStockJournal) {
-      //   continue;
-      // }
-      if (isPurchase && (batch.trackingNumber.toLowerCase().contains('not applicable') == false)){
-        // print('Purchase = ${stockItem.itemName} => ${batch.trackingNumber}');
-          continue;
-        }
-
-        if (isSales && (batch.trackingNumber.toLowerCase().contains('not applicable') == false)){
-          // print('Sales = ${stockItem.itemName} => ${batch.trackingNumber}');
-          continue;
-        }
-
-        if (isDebitNote && (batch.trackingNumber.toLowerCase().contains('not applicable') == false)){
-          // print('Debit = ${stockItem.itemName} => ${batch.trackingNumber}');
-          continue;
-        }
-
-        if (isCreditNote && (batch.trackingNumber.toLowerCase().contains('not applicable') == false)){
-          // print('Credit = ${stockItem.itemName} => ${batch.trackingNumber}');
-          continue;
-        }
-
-        // if (amount == 0 && !isStockJournal) {
-        //   continue;
-        // }
+      if (batchTxn.trackingNumber.toLowerCase().contains('not applicable') == false &&
+          (isPurchase || isSales || isDebitNote || isCreditNote)) {
+        continue;
+      }
 
       if ((isCreditNote || isDebitNote) && qty == 0 && amount == 0) {
         continue;
       }
 
-      // Initialize godown if not exists
-      if (!totalOutwardQty.containsKey(godown)) {
-        totalOutwardQty[godown] = 0.0;
-      }
+      // Initialize batch if not exists
+      godownBatchInwardQty.putIfAbsent(godown, () => {});
+      godownBatchOutwardQty.putIfAbsent(godown, () => {});
+      godownBatchLots.putIfAbsent(godown, () => {});
 
-      if (!totalInwardQty.containsKey(godown)) {
-        totalInwardQty[godown] = 0.0;
-      }
-
-      if (!inwardLots.containsKey(godown)) {
-        inwardLots[godown] = [];
-      }
+      godownBatchInwardQty[godown]!.putIfAbsent(batchName, () => 0.0);
+      godownBatchOutwardQty[godown]!.putIfAbsent(batchName, () => 0.0);
+      godownBatchLots[godown]!.putIfAbsent(batchName, () => []);
 
       if (isInward) {
         if (isCreditNote) {
-          totalOutwardQty[godown] = totalOutwardQty[godown]! - qty;
+          godownBatchOutwardQty[godown]![batchName] =
+              godownBatchOutwardQty[godown]![batchName]! - qty;
         } else {
-          // Add to inward qty and store lot
-          totalInwardQty[godown] = totalInwardQty[godown]! + qty;
+          godownBatchInwardQty[godown]![batchName] =
+              godownBatchInwardQty[godown]![batchName]! + qty;
 
           final rate = qty > 0 ? absAmount / qty : 0.0;
-          inwardLots[godown]!.add(StockLot(
+          godownBatchLots[godown]![batchName]!.add(StockLot(
             voucherGuid: voucherGuid,
             voucherDate: dateStr,
             voucherNumber: voucherNumber,
@@ -1554,10 +1061,11 @@ Future<AverageCostResult> calculateFifoCost({
         }
       } else {
         if (isDebitNote) {
-          totalInwardQty[godown] = totalInwardQty[godown]! - qty;
+          godownBatchInwardQty[godown]![batchName] =
+              godownBatchInwardQty[godown]![batchName]! - qty;
 
           final rate = qty > 0 ? absAmount / qty : 0.0;
-          inwardLots[godown]!.add(StockLot(
+          godownBatchLots[godown]![batchName]!.add(StockLot(
             voucherGuid: voucherGuid,
             voucherDate: dateStr,
             voucherNumber: voucherNumber,
@@ -1568,42 +1076,271 @@ Future<AverageCostResult> calculateFifoCost({
             type: StockInOutType.inward,
           ));
         } else {
-          // Just track outward qty, no need to store lot
-          totalOutwardQty[godown] = totalOutwardQty[godown]! + qty;
+          godownBatchOutwardQty[godown]![batchName] =
+              godownBatchOutwardQty[godown]![batchName]! + qty;
         }
       }
     }
   }
 
-  // Calculate closing stock and value for each godown
-  for (var godown in totalInwardQty.keys) {
-    final inwardQty = totalInwardQty[godown]!;
-    final outwardQty = totalOutwardQty[godown]!;
-    final closingStockQty = inwardQty - outwardQty;
+  // 🔹 Final: Batch → Godown Merge (FIFO closing per batch, then sum)
+  for (var godown in godownBatchInwardQty.keys) {
+    double totalClosingQty = 0.0;
+    double totalClosingValue = 0.0;
 
-    double closingValue = 0.0;
-    final lots = inwardLots[godown]!;
+    final batchKeys = godownBatchInwardQty[godown]!.keys;
+    for (var batchName in batchKeys) {
+      final inwardQty = godownBatchInwardQty[godown]![batchName]!;
+      final outwardQty = godownBatchOutwardQty[godown]![batchName] ?? 0.0;
+      final closingStockQty = inwardQty - outwardQty;
+      final lots = godownBatchLots[godown]![batchName] ?? [];
 
-    if (closingStockQty > 0) {
-      closingValue = calculateFifoClosingValue(lots, closingStockQty);
-    }else if (closingStockQty < 0) {
-      // Negative stock: use Average Cost method
-      double totalLotValue = 0.0;
-      double totalLotQty = 0.0;
-      for (var lot in lots) {
-        totalLotValue += lot.amount;
-        totalLotQty += lot.qty;
+      double batchClosingValue = 0.0;
+
+      if (closingStockQty > 0) {
+        batchClosingValue = calculateFifoClosingValue(lots, closingStockQty);
+      } else if (closingStockQty < 0) {
+        // Negative stock: Average Cost fallback
+        double totalLotValue = 0.0;
+        double totalLotQty = 0.0;
+        for (var lot in lots) {
+          totalLotValue += lot.amount;
+          totalLotQty += lot.qty;
+        }
+        final closingRate = totalLotQty == 0 ? 0.0 : totalLotValue / totalLotQty;
+        batchClosingValue = closingStockQty * closingRate;
       }
-      final closingRate = totalLotQty > 0 ? totalLotValue / totalLotQty : 0.0;
-      closingValue = closingStockQty * closingRate;
+
+      totalClosingQty += closingStockQty;
+      totalClosingValue += batchClosingValue;
     }
 
     godownResults[godown] = GodownAverageCost(
       godownName: godown,
-      totalInwardQty: inwardQty,
-      totalInwardValue: outwardQty,
-      currentStockQty: closingStockQty,
-      averageRate: closingStockQty > 0 ? closingValue / closingStockQty : 0.0,
+      totalInwardQty: 0,
+      totalInwardValue: 0,
+      currentStockQty: totalClosingQty,
+      averageRate: totalClosingQty > 0 ? totalClosingValue / totalClosingQty : 0.0,
+      closingValue: totalClosingValue,
+    );
+  }
+
+  return AverageCostResult(
+    stockItemGuid: stockItem.stockItemGuid,
+    itemName: stockItem.itemName,
+    godowns: godownResults,
+  );
+}
+
+Future<AverageCostResult> calculateAvgCost({
+  required StockItemInfo stockItem,
+  required Map<String, Map<String, List<StockTransaction>>> godownTransactions,
+  required String fromDate,
+  required String toDate,
+  required String companyGuid,
+}) async {
+
+  Map<String, GodownAverageCost> godownResults = {};
+
+  // 🔹 NEW: Godown → Batch → Accumulator
+  Map<String, Map<String, BatchAccumulator>> godownBatchData = {};
+
+  const financialYearStartMonth = 4;
+  const financialYearStartDay = 1;
+
+  String getFinancialYearStartDate(String dateStr) {
+    final year = int.parse(dateStr.substring(0, 4));
+    final month = int.parse(dateStr.substring(4, 6));
+
+    if (month < financialYearStartMonth) {
+      return '${year - 1}${financialYearStartMonth.toString().padLeft(2, '0')}${financialYearStartDay.toString().padLeft(2, '0')}';
+    } else {
+      return '$year${financialYearStartMonth.toString().padLeft(2, '0')}${financialYearStartDay.toString().padLeft(2, '0')}';
+    }
+  }
+
+  // 🔹 Flatten all transactions
+  List<StockTransaction> allTransactions = [];
+  for (var godownMap in godownTransactions.values) {
+    for (var batchList in godownMap.values) {
+      allTransactions.addAll(batchList);
+    }
+  }
+
+  allTransactions.sort((a, b) => a.voucherId.compareTo(b.voucherId));
+
+  // 🔹 Group by voucher_guid
+  Map<String, List<StockTransaction>> voucherBatches = {};
+  for (var txn in allTransactions) {
+    voucherBatches.putIfAbsent(txn.voucherGuid, () => []);
+    voucherBatches[txn.voucherGuid]!.add(txn);
+  }
+
+
+  // 🔹 Opening Stock → Batch Level
+  for (final godownOpeningData in stockItem.openingData) {
+
+    String godownName = godownOpeningData.godownName;
+    if (godownName.isEmpty) {
+      godownName = 'Main Location';
+    }
+
+    final openingQty =
+        double.tryParse(godownOpeningData.actualQty) ?? 0.0;
+    final openingAmount = godownOpeningData.amount;
+    final batchName =
+        godownOpeningData.batchName;
+
+    godownBatchData.putIfAbsent(godownName, () => {});
+    godownBatchData[godownName]!
+        .putIfAbsent(batchName, () => BatchAccumulator());
+
+    final batch = godownBatchData[godownName]![batchName]!;
+
+    batch.inwardQty += openingQty;
+    batch.inwardValue += openingAmount;
+  }
+
+  String currentFyStart = '';
+  Set<String> processedVouchers = {};
+
+  // 🔹 Process Transactions
+  for (var txn in allTransactions) {
+
+    final voucherGuid = txn.voucherGuid;
+
+    if (processedVouchers.contains(voucherGuid) ||
+        txn.voucherType.toLowerCase().contains('purchase order') ||
+        txn.voucherType.toLowerCase().contains('sales order')) {
+      continue;
+    }
+
+    processedVouchers.add(voucherGuid);
+
+    final dateStr = txn.voucherDate;
+    final voucherType = txn.voucherType;
+
+    if (dateStr.compareTo(toDate) > 0) {
+      break;
+    }
+
+    final txnFyStart = getFinancialYearStartDate(dateStr);
+
+    // 🔹 FY Boundary Reset (Batch Wise)
+    if (txnFyStart != currentFyStart &&
+        currentFyStart.isNotEmpty) {
+
+      for (var godown in godownBatchData.keys) {
+        for (var batchData
+            in godownBatchData[godown]!.values) {
+
+          final inwardQty = batchData.inwardQty;
+          final inwardValue = batchData.inwardValue;
+          final outwardQty = batchData.outwardQty;
+
+          final closingQty = inwardQty - outwardQty;
+          final closingRate =
+              inwardQty > 0 ? inwardValue / inwardQty : 0.0;
+          final closingValue = closingQty * closingRate;
+
+          batchData.inwardQty = closingQty;
+          batchData.inwardValue = closingValue;
+          batchData.outwardQty = 0.0;
+        }
+      }
+    }
+
+    currentFyStart = txnFyStart;
+
+    final isPurchase =
+        purchaseVoucherTypes.contains(voucherType);
+    final isSales =
+        salesVoucherTypes.contains(voucherType);
+    final isCreditNote =
+        creditNoteVoucherTypes.contains(voucherType);
+    final isDebitNote =
+        debitNoteVoucherTypes.contains(voucherType);
+
+    if (voucherType == 'Physical Stock') continue;
+
+    final batches = voucherBatches[voucherGuid]!;
+
+    for (var batchTxn in batches) {
+
+      final godown = batchTxn.godownName;
+      final batchName =
+          batchTxn.batchName;
+
+      final amount = batchTxn.amount;
+      final qty = batchTxn.stock;
+      final isInward = batchTxn.isInward;
+      final absAmount = amount.abs();
+
+      if (batchTxn.trackingNumber
+              .toLowerCase()
+              .contains('not applicable') ==
+          false &&
+          (isPurchase ||
+              isSales ||
+              isDebitNote ||
+              isCreditNote)) {continue;}
+
+      if ((isCreditNote || isDebitNote) &&
+          qty == 0 &&
+          amount == 0) {
+        continue;
+      }
+
+      godownBatchData.putIfAbsent(godown, () => {});
+      godownBatchData[godown]!
+          .putIfAbsent(batchName, () => BatchAccumulator());
+
+      final batchData =
+          godownBatchData[godown]![batchName]!;
+
+      if (isInward) {
+        if (isCreditNote) {
+          batchData.outwardQty -= qty;
+        } else {
+          batchData.inwardQty += qty;
+          batchData.inwardValue += absAmount;
+        }
+      } else {
+        if (isDebitNote) {
+          batchData.inwardQty -= qty;
+          batchData.inwardValue -= absAmount;
+        } else {
+          batchData.outwardQty += qty;
+        }
+      }
+    }
+  }
+
+  // 🔹 Final: Batch → Godown Merge
+  for (var godown in godownBatchData.keys) {
+
+    final batches = godownBatchData[godown]!;
+
+    double closingQty = 0.0;
+    double closingValue = 0.0;
+
+    for (var batchData in batches.values) {
+      closingQty += (batchData.inwardQty - batchData.outwardQty);
+
+      final batchRate = batchData.inwardQty != 0
+    ? batchData.inwardValue / batchData.inwardQty
+    : 0.0;
+      closingValue += (batchData.inwardQty - batchData.outwardQty) * batchRate;
+
+  
+    }
+
+    godownResults[godown] = GodownAverageCost(
+      godownName: godown,
+      totalInwardQty: 0,
+      totalInwardValue: 0,
+      currentStockQty: closingQty,
+      averageRate: 0,
       closingValue: closingValue,
     );
   }
@@ -1615,387 +1352,329 @@ Future<AverageCostResult> calculateFifoCost({
   );
 }
 
-  Future<AverageCostResult> calculateAvgCost({
-    required StockItemInfo stockItem,
-    required Map<String, List<StockTransaction>> godownTransactions,
-    required String fromDate,
-    required String toDate,
-    required String companyGuid,
-  }) async {
-    Map<String, GodownAverageCost> godownResults = {};
+  // Future<AverageCostResult> calculateAvgCost({
+  //   required StockItemInfo stockItem,
+  //   required Map<String, List<StockTransaction>> godownTransactions,
+  //   required String fromDate,
+  //   required String toDate,
+  //   required String companyGuid,
+  // }) async {
+  //   Map<String, GodownAverageCost> godownResults = {};
 
-    Map<String, double> totalInwardQty = {};
-    Map<String, double> totalInwardValue = {};
-    Map<String, double> totalOutwardQty = {};
+  //   Map<String, double> totalInwardQty = {};
+  //   Map<String, double> totalInwardValue = {};
+  //   Map<String, double> totalOutwardQty = {};
 
-    const financialYearStartMonth = 4;
-    const financialYearStartDay = 1;
+  //   const financialYearStartMonth = 4;
+  //   const financialYearStartDay = 1;
 
-    String getFinancialYearStartDate(String dateStr) {
-      final year = int.parse(dateStr.substring(0, 4));
-      final month = int.parse(dateStr.substring(4, 6));
+  //   String getFinancialYearStartDate(String dateStr) {
+  //     final year = int.parse(dateStr.substring(0, 4));
+  //     final month = int.parse(dateStr.substring(4, 6));
 
-      if (month < financialYearStartMonth) {
-        return '${year - 1}${financialYearStartMonth.toString().padLeft(2, '0')}${financialYearStartDay.toString().padLeft(2, '0')}';
-      } else {
-        return '$year${financialYearStartMonth.toString().padLeft(2, '0')}${financialYearStartDay.toString().padLeft(2, '0')}';
-      }
-    }
+  //     if (month < financialYearStartMonth) {
+  //       return '${year - 1}${financialYearStartMonth.toString().padLeft(2, '0')}${financialYearStartDay.toString().padLeft(2, '0')}';
+  //     } else {
+  //       return '$year${financialYearStartMonth.toString().padLeft(2, '0')}${financialYearStartDay.toString().padLeft(2, '0')}';
+  //     }
+  //   }
 
-    // Flatten all transactions and sort by date
-    List<StockTransaction> allTransactions = [];
-    for (var godownTxns in godownTransactions.values) {
-      allTransactions.addAll(godownTxns);
-    }
-    allTransactions.sort((a, b) => a.voucherId.compareTo(b.voucherId));
+  //   // Flatten all transactions and sort by date
+  //   List<StockTransaction> allTransactions = [];
+  //   for (var godownTxns in godownTransactions.values) {
+  //     allTransactions.addAll(godownTxns);
+  //   }
+  //   allTransactions.sort((a, b) => a.voucherId.compareTo(b.voucherId));
 
-    // Group transactions by voucher_guid
-    Map<String, List<StockTransaction>> voucherBatches = {};
-    for (var txn in allTransactions) {
-      if (!voucherBatches.containsKey(txn.voucherGuid)) {
-        voucherBatches[txn.voucherGuid] = [];
-      }
-      voucherBatches[txn.voucherGuid]!.add(txn);
-    }
+  //   // Group transactions by voucher_guid
+  //   Map<String, List<StockTransaction>> voucherBatches = {};
+  //   for (var txn in allTransactions) {
+  //     if (!voucherBatches.containsKey(txn.voucherGuid)) {
+  //       voucherBatches[txn.voucherGuid] = [];
+  //     }
+  //     voucherBatches[txn.voucherGuid]!.add(txn);
+  //   }
 
-    // Initialize with opening stock
-    for (final godownOpeningData in stockItem.openingData) {
-      String godownName = godownOpeningData.godownName;
-      if (godownName.isEmpty) {
-        godownName = 'Main Location';
-      }
+  //   // Initialize with opening stock
+  //   for (final godownOpeningData in stockItem.openingData) {
 
-      final openingQty = double.tryParse(godownOpeningData.actualQty) ?? 0.0;
-      final openingAmount = godownOpeningData.amount;
+  //     String godownName = godownOpeningData.godownName;
+  //     if (godownName.isEmpty) {
+  //       godownName = 'Main Location';
+  //     }
 
-      totalInwardQty[godownName] = openingQty;
-      totalInwardValue[godownName] = openingAmount;
-      totalOutwardQty[godownName] = 0.0;
-    }
+  //     final openingQty = double.tryParse(godownOpeningData.actualQty) ?? 0.0;
+  //     final openingAmount = godownOpeningData.amount;
 
-    String currentFyStart = '';
+  //     if (!totalInwardQty.containsKey(godownName)) {
+  //         totalInwardQty[godownName] = 0.0;
+  //         totalInwardValue[godownName] = 0.0;
+  //       }
 
-    // Process transactions
-    Set<String> processedVouchers = {};
+  //     totalInwardQty[godownName] = totalInwardQty[godownName]! + openingQty;
+  //     totalInwardValue[godownName] = totalInwardValue[godownName]! + openingAmount;
+  //     totalOutwardQty[godownName] = 0.0;
+  //   }
 
-    for (var txn in allTransactions) {
-      final voucherGuid = txn.voucherGuid;
+  //   String currentFyStart = '';
 
-      if (processedVouchers.contains(voucherGuid) || txn.voucherType.toLowerCase().contains('purchase order')  || txn.voucherType.toLowerCase().contains('sales order')) {
-        continue;
-      }
-      processedVouchers.add(voucherGuid);
+  //   // Process transactions
+  //   Set<String> processedVouchers = {};
 
-      final dateStr = txn.voucherDate;
-      final voucherType = txn.voucherType;
-      final voucherNumber = txn.voucherNumber;
+  //   for (var txn in allTransactions) {
+  //     final voucherGuid = txn.voucherGuid;
 
-      if (dateStr.compareTo(toDate) > 0) {
-        break;
-      }
+  //     if (processedVouchers.contains(voucherGuid) || txn.voucherType.toLowerCase().contains('purchase order')  || txn.voucherType.toLowerCase().contains('sales order')) {
+  //       continue;
+  //     }
+  //     processedVouchers.add(voucherGuid);
 
-      final txnFyStart = getFinancialYearStartDate(dateStr);
+  //     final dateStr = txn.voucherDate;
+  //     final voucherType = txn.voucherType;
 
-      // Check for FY boundary - reset rate
-      if (txnFyStart != currentFyStart && currentFyStart.isNotEmpty) {
-        // Calculate closing for previous FY and reset as opening for new FY
-        for (var godown in totalInwardQty.keys) {
-          final inwardQty = totalInwardQty[godown]!;
-          final inwardValue = totalInwardValue[godown]!;
-          final outwardQty = totalOutwardQty[godown]!;
-          final closingQty = inwardQty - outwardQty;
+  //     if (dateStr.compareTo(toDate) > 0) {
+  //       break;
+  //     }
 
-          final closingRate = inwardQty > 0 ? inwardValue / inwardQty : 0.0;
-          final closingValue = closingQty * closingRate;
+  //     final txnFyStart = getFinancialYearStartDate(dateStr);
 
-          // Reset: closing becomes new opening
-          totalInwardQty[godown] = closingQty;
-          totalInwardValue[godown] = closingValue;
-          totalOutwardQty[godown] = 0.0;
-        }
-      }
+  //     // Check for FY boundary - reset rate
+  //     if (txnFyStart != currentFyStart && currentFyStart.isNotEmpty) {
+  //       // Calculate closing for previous FY and reset as opening for new FY
+  //       for (var godown in totalInwardQty.keys) {
+  //         final inwardQty = totalInwardQty[godown]!;
+  //         final inwardValue = totalInwardValue[godown]!;
+  //         final outwardQty = totalOutwardQty[godown]!;
+  //         final closingQty = inwardQty - outwardQty;
 
-      currentFyStart = txnFyStart;
+  //         final closingRate = inwardQty > 0 ? inwardValue / inwardQty : 0.0;
+  //         final closingValue = closingQty * closingRate;
 
-      // Skip Delivery Notes that have corresponding GST TAX INVOICE
-      final isDeliveryNote = deliveryNoteVoucherTypes.contains(voucherType);
-    final isReceiptNote = receiptNoteVoucherTypes.contains(voucherType);
-    final isPurchase = purchaseVoucherTypes.contains(voucherType);
-    final isSales = salesVoucherTypes.contains(voucherType);
-    
+  //         // Reset: closing becomes new opening
+  //         totalInwardQty[godown] = closingQty;
+  //         totalInwardValue[godown] = closingValue;
+  //         totalOutwardQty[godown] = 0.0;
+  //       }
+  //     }
 
-    // if (isDeliveryNote) {
-    //   bool hasInvoice = false;
-    //   for (var otherTxn in allTransactions) {
-    //     if (otherTxn.voucherDate == dateStr &&
-    //         otherTxn.voucherNumber == voucherNumber) {
-    //       hasInvoice = true;
-    //       break;
-    //     }
-    //   }
-    //   if (hasInvoice){
-    //             // print("Delivery Note With Invoice => ${stockItem.itemName}, ${voucherType}, ${txn.voucherDate}, ${txn.stock}, ${txn.rate}, ${txn.amount}");
-    //             continue;
-    //         }else{
-    //             // print("Delivery Note Without Invoice => ${stockItem.itemName}, ${voucherType}, ${txn.voucherDate}, ${txn.stock}, ${txn.rate}, ${txn.amount}");
-    //         }    
-    //   }
+  //     currentFyStart = txnFyStart;
 
-    // if (isReceiptNote) {
-    //   bool hasInvoice = false;
-    //   for (var otherTxn in allTransactions) {
-    //     if (otherTxn.voucherDate == dateStr &&
-    //         otherTxn.voucherNumber == voucherNumber) {
-    //       hasInvoice = true;
-    //       break;
-    //     }
-    //   }
-    //   if (hasInvoice){
-    //       // print("Receipt Note With Invoice => ${stockItem.itemName}, ${voucherType}, ${txn.voucherDate}, ${txn.stock}, ${txn.rate}, ${txn.amount}");
-    //       continue;
-    //   }else{
-    //       // print("Receipt Note Without Invoice => ${stockItem.itemName}, ${voucherType}, ${txn.voucherDate}, ${txn.stock}, ${txn.rate}, ${txn.amount}");
-    //   }
-    // }
+  //   final isPurchase = purchaseVoucherTypes.contains(voucherType);
+  //   final isSales = salesVoucherTypes.contains(voucherType);
+  //   final batches = voucherBatches[voucherGuid]!;
+  //   final isCreditNote = creditNoteVoucherTypes.contains(voucherType);
+  //   final isDebitNote = debitNoteVoucherTypes.contains(voucherType);
 
-      final batches = voucherBatches[voucherGuid]!;
-    final isCreditNote = creditNoteVoucherTypes.contains(voucherType);
-    final isDebitNote = debitNoteVoucherTypes.contains(voucherType);
-    final isStockJournal = stockJournalVoucherType.contains(voucherType);
+  //     if (voucherType == 'Physical Stock') {
+  //       continue;
+  //     }
 
-      // final isCreditNote = voucherType.toLowerCase().contains('cr') ||
-      //     voucherType == 'Credit Note';
-      // final isDebitNote = voucherType.toLowerCase().contains('debit') ||
-      //     voucherType == 'Debit Note';
-      // final isStockJournal = voucherType.toLowerCase().contains('sttp') || voucherType.toLowerCase().contains('stock journal') || voucherType == 'Stock Journal';
+  //     for (var batch in batches) {
+  //       final godown = batch.godownName;
+  //       final amount = batch.amount;
+  //       final qty = batch.stock;
+  //       final isInward = batch.isInward;
+  //       final absAmount = amount.abs();
 
-      if (voucherType == 'Physical Stock') {
-        continue;
-      }
+  //       if (batch.trackingNumber.toLowerCase().contains('not applicable') == false && (isPurchase || isSales || isDebitNote || isCreditNote)) continue;
 
-      for (var batch in batches) {
-        final godown = batch.godownName;
-        final amount = batch.amount;
-        final qty = batch.stock;
-        final isInward = batch.isInward;
-        final absAmount = amount.abs();
+  //       if ((isCreditNote || isDebitNote) && qty == 0 && amount == 0) {
+  //         continue;
+  //       }
 
-        if (isPurchase && (batch.trackingNumber.toLowerCase().contains('not applicable') == false)){
-          continue;
-        }
+  //       // Initialize godown if not exists
+  //       if (!totalInwardQty.containsKey(godown)) {
+  //         totalInwardQty[godown] = 0.0;
+  //         totalInwardValue[godown] = 0.0;
+  //       }
 
-        if (isSales && (batch.trackingNumber.toLowerCase().contains('not applicable') == false)){
-          // print('Sales = ${stockItem.itemName} => ${batch.trackingNumber}');
-          continue;
-        }
+  //       if (!totalOutwardQty.containsKey(godown)) {
+  //         totalOutwardQty[godown] = 0.0;
+  //       }
 
-        if (isDebitNote && (batch.trackingNumber.toLowerCase().contains('not applicable') == false)){
-          continue;
-        }
+  //       if (isInward) {
+  //         if (isCreditNote) {
+  //           totalOutwardQty[godown] = totalOutwardQty[godown]! - qty;
+  //         } else {
+  //           totalInwardQty[godown] = totalInwardQty[godown]! + qty;
+  //           totalInwardValue[godown] = totalInwardValue[godown]! + absAmount;
+  //         }
+  //       } else {
+  //         // OUTWARD: Add to total outward qty
+  //         if (isDebitNote) {
+  //           totalInwardQty[godown] = totalInwardQty[godown]! - qty;
+  //           totalInwardValue[godown] = totalInwardValue[godown]! - absAmount;
+  //         } else {
+  //           totalOutwardQty[godown] = totalOutwardQty[godown]! + qty;
+  //         }
+  //       }
+  //     }
+  //   }
 
-        if (isCreditNote && (batch.trackingNumber.toLowerCase().contains('not applicable') == false)){
-          continue;
-        }
+  //   // Calculate closing stock and value for each godown
+  //   for (var godown in totalInwardQty.keys) {
+  //     final inwardQty = totalInwardQty[godown]!;
+  //     final inwardValue = totalInwardValue[godown]!;
+  //     final outwardQty = totalOutwardQty[godown]!;
+  //     final closingStockQty = inwardQty - outwardQty;
+  //     final closingRate = inwardQty > 0 ? inwardValue / inwardQty : 0.0;
 
-        // if (amount == 0 && !isStockJournal) {
-        //   continue;
-        // }
+  //     godownResults[godown] = GodownAverageCost(
+  //       godownName: godown,
+  //       totalInwardQty: inwardQty,
+  //       totalInwardValue: 0,
+  //       currentStockQty: closingStockQty,
+  //       averageRate: closingRate > 0 ? closingRate : 0.0,
+  //       closingValue: closingStockQty * closingRate,
+  //     );
+  //   }
 
-        if ((isCreditNote || isDebitNote) && qty == 0 && amount == 0) {
-          continue;
-        }
-
-        // Initialize godown if not exists
-        if (!totalInwardQty.containsKey(godown)) {
-          totalInwardQty[godown] = 0.0;
-          totalInwardValue[godown] = 0.0;
-        }
-
-        if (!totalOutwardQty.containsKey(godown)) {
-          totalOutwardQty[godown] = 0.0;
-        }
-
-        if (isInward) {
-          if (isCreditNote) {
-            totalOutwardQty[godown] = totalOutwardQty[godown]! - qty;
-          } else {
-            totalInwardQty[godown] = totalInwardQty[godown]! + qty;
-            totalInwardValue[godown] = totalInwardValue[godown]! + absAmount;
-          }
-        } else {
-          // OUTWARD: Add to total outward qty
-          if (isDebitNote) {
-            totalInwardQty[godown] = totalInwardQty[godown]! - qty;
-            totalInwardValue[godown] = totalInwardValue[godown]! - absAmount;
-          } else {
-            totalOutwardQty[godown] = totalOutwardQty[godown]! + qty;
-          }
-        }
-      }
-    }
-
-    // Calculate closing stock and value for each godown
-    for (var godown in totalInwardQty.keys) {
-      final inwardQty = totalInwardQty[godown]!;
-      final inwardValue = totalInwardValue[godown]!;
-      final outwardQty = totalOutwardQty[godown]!;
-      final closingStockQty = inwardQty - outwardQty;
-      final closingRate = inwardQty > 0 ? inwardValue / inwardQty : 0.0;
-
-      godownResults[godown] = GodownAverageCost(
-        godownName: godown,
-        totalInwardQty: inwardQty,
-        totalInwardValue: outwardQty,
-        currentStockQty: closingStockQty,
-        averageRate: closingRate > 0 ? closingRate : 0.0,
-        closingValue: closingStockQty * closingRate,
-      );
-    }
-
-    return AverageCostResult(
-      stockItemGuid: stockItem.stockItemGuid,
-      itemName: stockItem.itemName,
-      godowns: godownResults,
-    );
-  }
+  //   return AverageCostResult(
+  //     stockItemGuid: stockItem.stockItemGuid,
+  //     itemName: stockItem.itemName,
+  //     godowns: godownResults,
+  //   );
+  // }
 
   Future<AverageCostResult> calculateCostWithoutUnit({
-    required StockItemInfo stockItem,
-    required Map<String, List<StockTransaction>> godownTransactions,
-    required String fromDate,
-    required String toDate,
-    required String companyGuid,
-  }) async {
-    Map<String, GodownAverageCost> godownResults = {};
+  required StockItemInfo stockItem,
+  required Map<String, Map<String, List<StockTransaction>>> godownTransactions,
+  required String fromDate,
+  required String toDate,
+  required String companyGuid,
+}) async {
+  Map<String, GodownAverageCost> godownResults = {};
 
-    Map<String, double> totalInwardValue = {};
-    Map<String, double> totalOutwardValue = {};
+  // 🔹 Godown → Batch → Value tracking
+  Map<String, Map<String, double>> godownBatchInwardValue = {};
+  Map<String, Map<String, double>> godownBatchOutwardValue = {};
 
-
-    // Flatten all transactions and sort by date
-    List<StockTransaction> allTransactions = [];
-    for (var godownTxns in godownTransactions.values) {
-      allTransactions.addAll(godownTxns);
+  // Flatten all transactions and sort by voucherId
+  List<StockTransaction> allTransactions = [];
+  for (var godownMap in godownTransactions.values) {
+    for (var batchList in godownMap.values) {
+      allTransactions.addAll(batchList);
     }
-    allTransactions.sort((a, b) => a.voucherId.compareTo(b.voucherId));
+  }
+  allTransactions.sort((a, b) => a.voucherId.compareTo(b.voucherId));
 
-    // Group transactions by voucher_guid
-    Map<String, List<StockTransaction>> voucherBatches = {};
-    for (var txn in allTransactions) {
-      if (!voucherBatches.containsKey(txn.voucherGuid)) {
-        voucherBatches[txn.voucherGuid] = [];
-      }
-      voucherBatches[txn.voucherGuid]!.add(txn);
-    }
+  // Group transactions by voucher_guid
+  Map<String, List<StockTransaction>> voucherBatches = {};
+  for (var txn in allTransactions) {
+    voucherBatches.putIfAbsent(txn.voucherGuid, () => []);
+    voucherBatches[txn.voucherGuid]!.add(txn);
+  }
 
-    // Initialize with opening stock
-    for (final godownOpeningData in stockItem.openingData) {
-      String godownName = godownOpeningData.godownName;
-      if (godownName.isEmpty) {
-        godownName = 'Main Location';
-      }
-
-      final openingAmount = godownOpeningData.amount;
-
-      totalInwardValue[godownName] = openingAmount;
+  // 🔹 Opening Stock → Batch Level
+  for (final godownOpeningData in stockItem.openingData) {
+    String godownName = godownOpeningData.godownName;
+    if (godownName.isEmpty) {
+      godownName = 'Main Location';
     }
 
+    final openingAmount = godownOpeningData.amount;
+    final batchName = godownOpeningData.batchName;
 
-    // Process transactions
-    Set<String> processedVouchers = {};
+    godownBatchInwardValue.putIfAbsent(godownName, () => {});
+    godownBatchOutwardValue.putIfAbsent(godownName, () => {});
 
-    for (var txn in allTransactions) {
-      final voucherGuid = txn.voucherGuid;
+    godownBatchInwardValue[godownName]!.putIfAbsent(batchName, () => 0.0);
+    godownBatchOutwardValue[godownName]!.putIfAbsent(batchName, () => 0.0);
 
-      if (processedVouchers.contains(voucherGuid) || txn.voucherType.toLowerCase().contains('purchase order')  || txn.voucherType.toLowerCase().contains('sales order')) {
-        continue;
-      }
-      processedVouchers.add(voucherGuid);
+    godownBatchInwardValue[godownName]![batchName] =
+        godownBatchInwardValue[godownName]![batchName]! + openingAmount;
+  }
 
-      final dateStr = txn.voucherDate;
-      final voucherType = txn.voucherType;
-      final voucherNumber = txn.voucherNumber;
+  // Process transactions
+  Set<String> processedVouchers = {};
 
-      if (dateStr.compareTo(toDate) > 0) {
-        break;
-      }
+  for (var txn in allTransactions) {
+    final voucherGuid = txn.voucherGuid;
 
-      final batches = voucherBatches[voucherGuid]!;
-          final isCreditNote = creditNoteVoucherTypes.contains(voucherType);
-    final isDebitNote = debitNoteVoucherTypes.contains(voucherType);
-    final isStockJournal = stockJournalVoucherType.contains(voucherType);
+    if (processedVouchers.contains(voucherGuid) ||
+        txn.voucherType.toLowerCase().contains('purchase order') ||
+        txn.voucherType.toLowerCase().contains('sales order')) {
+      continue;
+    }
+    processedVouchers.add(voucherGuid);
 
+    final dateStr = txn.voucherDate;
+    final voucherType = txn.voucherType;
 
-      // final isCreditNote = voucherType.toLowerCase().contains('cr') ||
-      //     voucherType == 'Credit Note';
-      // final isDebitNote = voucherType.toLowerCase().contains('debit') ||
-      //     voucherType == 'Debit Note';
-      // final isStockJournal = voucherType.toLowerCase().contains('sttp') || voucherType.toLowerCase().contains('stock journal') || voucherType == 'Stock Journal';
+    if (dateStr.compareTo(toDate) > 0) {
+      break;
+    }
 
-      if (voucherType == 'Physical Stock') {
-        continue;
-      }
+    if (voucherType == 'Physical Stock') {
+      continue;
+    }
 
-      for (var batch in batches) {
-        final godown = batch.godownName;
-        final amount = batch.amount;
-        final isInward = batch.isInward;
-        final absAmount = amount.abs();
+    final batches = voucherBatches[voucherGuid]!;
 
-          final isCreditNote = creditNoteVoucherTypes.contains(voucherType);
-    final isDebitNote = debitNoteVoucherTypes.contains(voucherType);
+    for (var batchTxn in batches) {
+      final godown = batchTxn.godownName;
+      final batchName = batchTxn.batchName;
+      final amount = batchTxn.amount;
+      final isInward = batchTxn.isInward;
+      final absAmount = amount.abs();
 
-      // final isCreditNote = voucherType.toLowerCase().contains('cr') ||
-      //     voucherType == 'Credit Note';
-      // final isDebitNote = voucherType.toLowerCase().contains('debit') ||
-      //     voucherType == 'Debit Note';
+      final isCreditNote = creditNoteVoucherTypes.contains(voucherType);
+      final isDebitNote = debitNoteVoucherTypes.contains(voucherType);
 
-      if (!totalInwardValue.containsKey(godown)) {
-          totalInwardValue[godown] = 0.0;
-        }
+      // Initialize batch if not exists
+      godownBatchInwardValue.putIfAbsent(godown, () => {});
+      godownBatchOutwardValue.putIfAbsent(godown, () => {});
 
-        if (!totalOutwardValue.containsKey(godown)) {
-          totalOutwardValue[godown] = 0.0;
-        }
-    if (isInward) {
-          if (isCreditNote) {
-            totalOutwardValue[godown] = totalOutwardValue[godown]! - absAmount;
-          } else {
-            totalInwardValue[godown] = totalInwardValue[godown]! + absAmount;
-          }
+      godownBatchInwardValue[godown]!.putIfAbsent(batchName, () => 0.0);
+      godownBatchOutwardValue[godown]!.putIfAbsent(batchName, () => 0.0);
+
+      if (isInward) {
+        if (isCreditNote) {
+          godownBatchOutwardValue[godown]![batchName] =
+              godownBatchOutwardValue[godown]![batchName]! - absAmount;
         } else {
-          // OUTWARD: Add to total outward qty
-          if (isDebitNote) {
-            totalInwardValue[godown] = totalInwardValue[godown]! - absAmount;
-          } else {
-            totalOutwardValue[godown] = totalOutwardValue[godown]! + absAmount;
-          }
+          godownBatchInwardValue[godown]![batchName] =
+              godownBatchInwardValue[godown]![batchName]! + absAmount;
+        }
+      } else {
+        if (isDebitNote) {
+          godownBatchInwardValue[godown]![batchName] =
+              godownBatchInwardValue[godown]![batchName]! - absAmount;
+        } else {
+          godownBatchOutwardValue[godown]![batchName] =
+              godownBatchOutwardValue[godown]![batchName]! + absAmount;
         }
       }
-      
+    }
+  }
+
+  // 🔹 Final: Batch → Godown Merge
+  for (var godown in godownBatchInwardValue.keys) {
+    double totalInward = 0.0;
+    double totalOutward = 0.0;
+
+    final batchKeys = godownBatchInwardValue[godown]!.keys;
+    for (var batchName in batchKeys) {
+      totalInward += godownBatchInwardValue[godown]![batchName] ?? 0.0;
+      totalOutward += godownBatchOutwardValue[godown]![batchName] ?? 0.0;
     }
 
-    // Calculate closing stock and value for each godown
-    for (var godown in totalInwardValue.keys) {
-      final inwardValue = totalInwardValue[godown] ?? 0.0;
-      final outwardValue = totalOutwardValue[godown] ?? 0.0;
-
-      godownResults[godown] = GodownAverageCost(
-        godownName: godown,
-        totalInwardQty: 0,
-        totalInwardValue: inwardValue,
-        currentStockQty: 0,
-        averageRate: 0.0,
-        closingValue: inwardValue - outwardValue,
-      );
-    }
-
-    return AverageCostResult(
-      stockItemGuid: stockItem.stockItemGuid,
-      itemName: stockItem.itemName,
-      godowns: godownResults,
+    godownResults[godown] = GodownAverageCost(
+      godownName: godown,
+      totalInwardQty: 0,
+      totalInwardValue: totalInward,
+      currentStockQty: 0,
+      averageRate: 0.0,
+      closingValue: totalInward - totalOutward,
     );
   }
+
+  return AverageCostResult(
+    stockItemGuid: stockItem.stockItemGuid,
+    itemName: stockItem.itemName,
+    godowns: godownResults,
+  );
+}
 
   Future<Map<String, dynamic>> _getProfitLossDetailed(
     String companyGuid,
@@ -2458,22 +2137,6 @@ final openingStockResult = await db.rawQuery('''
     );
   }
 
-  void _navigateToLedger(String ledgerName) {
-    if (_companyGuid == null || _companyName == null) return;
-
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => LedgerDetailScreen(
-          companyGuid: _companyGuid!,
-          companyName: _companyName!,
-          ledgerName: ledgerName,
-          fromDate: dateToString(_fromDate),
-          toDate: dateToString(_toDate),
-        ),
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -2698,47 +2361,6 @@ final openingStockResult = await db.rawQuery('''
     );
   }
 
-  // Widget _buildSubItems(List<dynamic> items) {
-  //   if (items.isEmpty) return SizedBox.shrink();
-
-  //   return Column(
-  //     children: items.map((item) {
-  //       final ledgerName = item['ledger_name'] as String? ?? '';
-  //       final netAmount = (item['net_amount'] as num?)?.toDouble() ??
-  //                        (item['closing_balance'] as num?)?.toDouble() ?? 0.0;
-
-  //       return InkWell(
-  //         onTap: () => _navigateToLedger(ledgerName),
-  //         child: Padding(
-  //           padding: EdgeInsets.only(left: 32, right: 16, top: 4, bottom: 4),
-  //           child: Row(
-  //             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-  //             children: [
-  //               Expanded(
-  //                 child: Row(
-  //                   children: [
-  //                     Expanded(
-  //                       child: Text(
-  //                         ledgerName,
-  //                         style: TextStyle(fontSize: 12, color: Colors.grey[700]),
-  //                       ),
-  //                     ),
-  //                     Icon(Icons.chevron_right, size: 14, color: Colors.grey[500]),
-  //                   ],
-  //                 ),
-  //               ),
-  //               SizedBox(width: 8),
-  //               Text(
-  //                 _formatAmount(netAmount),
-  //                 style: TextStyle(fontSize: 12, color: Colors.grey[700]),
-  //               ),
-  //             ],
-  //           ),
-  //         ),
-  //       );
-  //     }).toList(),
-  //   );
-  // }
 
   Widget _buildGrossProfitRow(String label, double amount) {
     return Container(

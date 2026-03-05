@@ -792,6 +792,23 @@ class _AnalyticsDashboardState extends State<AnalyticsDashboard> {
                     ),
                     
                     SizedBox(height: 12),
+
+                    _buildReportCard(
+                      title: 'Profit & Loss A/c',
+                      subtitle: 'View income, expenses, and profitability',
+                      icon: Icons.trending_up,
+                      color: Colors.green,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => StockSummaryScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                    
+                    SizedBox(height: 12),
                     
                     _buildReportCard(
                       title: 'Balance Sheet',

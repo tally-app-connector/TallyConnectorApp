@@ -168,8 +168,22 @@ class TallyXmlParser {
     createdAt: now,
     updatedAt: now,
   );
+} 
+static List<StockItemClosingData> parseStockItemClosingBalances(String xml) {
+  final stockItems = <StockItemClosingData>[];
+  final document = XmlDocument.parse(xml);
+  final items = document.findAllElements('STOCKITEM');
+  
+  for (final item in items) {
+   stockItems.add( StockItemClosingData(
+      guid: _getElementText(item, 'GUID'),
+      closingQty: _parseQuantity(_getElementText(item, 'CLOSINGBALANCE')),
+      closingValue: (_parseFormattedNumber(_getElementText(item, 'CLOSINGVALUE'))) * -1,
+      closingRate: _parseRate(_getElementText(item, 'CLOSINGRATE')),
+    ));
+  }
+  return stockItems;
 }
-
   /// Parse Stock Items from Tally XML
   static List<StockItem> parseStockItems(String xml) {
     try {

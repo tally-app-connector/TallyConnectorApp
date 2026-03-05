@@ -620,6 +620,45 @@ Future<String> getAllStockItems(String companyName, int lastAlterId) async {
   return result;
 }
 
+Future<String> getStockClosingBalances(String companyName) async {
+  print('📥 Fetching stock closing balances from Tally...');
+  
+  final xml = '''
+<ENVELOPE>
+  <HEADER>
+    <VERSION>1</VERSION>
+    <TALLYREQUEST>Export</TALLYREQUEST>
+    <TYPE>Collection</TYPE>
+    <ID>StockClosing</ID>
+  </HEADER>
+  <BODY>
+    <DESC>
+      <STATICVARIABLES>
+        <SVEXPORTFORMAT>\$\$SysName:XML</SVEXPORTFORMAT>
+        <SVCURRENTCOMPANY>$companyName</SVCURRENTCOMPANY>
+      </STATICVARIABLES>
+      <TDL>
+        <TDLMESSAGE>
+          <COLLECTION NAME="StockClosing" ISMODIFY="No">
+            <TYPE>StockItem</TYPE>
+            <NATIVEMETHOD>NAME</NATIVEMETHOD>
+            <NATIVEMETHOD>GUID</NATIVEMETHOD>
+            <NATIVEMETHOD>CLOSINGBALANCE</NATIVEMETHOD>
+            <NATIVEMETHOD>CLOSINGVALUE</NATIVEMETHOD>
+            <NATIVEMETHOD>CLOSINGRATE</NATIVEMETHOD>
+          </COLLECTION>
+        </TDLMESSAGE>
+      </TDL>
+    </DESC>
+  </BODY>
+</ENVELOPE>
+''';
+  
+  final result = await getTallyData(xml);
+  print('✅ Stock closing balances fetched!');
+  return result;
+}
+
 
 Future<String> getAllLedgers(String companyName, int lastAlterId) async {
   print('📥 Fetching all ledgers from Tally...');

@@ -1437,6 +1437,9 @@ class StockItemInfo {
   final String costingMethod;
   final String unit;
   final String parentName;
+  final double closingRate;
+  final double closingQty;
+  final double closingValue;
   final List<BatchAllocation> openingData;
 
   StockItemInfo({
@@ -1445,6 +1448,9 @@ class StockItemInfo {
     required this.costingMethod,
     required this.unit,
     required this.parentName,
+    required this.closingRate,
+    required this.closingQty,
+    required this.closingValue,
     required this.openingData,
   });
 }
@@ -1569,4 +1575,25 @@ class FifoCostResult {
     required this.itemName,
     required this.godowns,
   });
+}
+
+class StockItemClosingData{
+
+  final String guid;
+  final double closingRate;
+  final double closingQty;
+  final double closingValue;
+
+  StockItemClosingData({
+    required this.guid,
+    required this.closingRate,
+    required this.closingQty,
+    required this.closingValue
+  });
+}
+
+class BatchAccumulator {
+  double inwardQty = 0.0;
+  double inwardValue = 0.0;
+  double outwardQty = 0.0;
 }
