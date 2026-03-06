@@ -335,9 +335,6 @@ class DatabaseHelper {
             narration TEXT,
             base_units TEXT,
             additional_units TEXT,
-            closing_balance REAL DEFAULT 0,
-            closing_value REAL DEFAULT 0,
-            closing_rate REAL DEFAULT 0,
             denominator REAL,
             conversion REAL,
             gst_applicable TEXT,
@@ -397,6 +394,19 @@ class DatabaseHelper {
         opening_value REAL DEFAULT 0,
         opening_rate REAL DEFAULT 0,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+
+        FOREIGN KEY (company_guid) REFERENCES companies(company_guid) ON DELETE CASCADE,
+        FOREIGN KEY (stock_item_guid) REFERENCES stock_items(stock_item_guid) ON DELETE CASCADE      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE stock_item_closing_balance (
+        company_guid TEXT NOT NULL,
+        stock_item_guid TEXT,
+        closing_balance REAL DEFAULT 0,
+        closing_value REAL DEFAULT 0,
+        closing_rate REAL DEFAULT 0,
+        closing_date TEXT,
 
         FOREIGN KEY (company_guid) REFERENCES companies(company_guid) ON DELETE CASCADE,
         FOREIGN KEY (stock_item_guid) REFERENCES stock_items(stock_item_guid) ON DELETE CASCADE      )
@@ -1068,7 +1078,7 @@ class DatabaseHelper {
   }
 
   /// Save single company (insert or update) - UPDATED WITH AWS SYNC
-  Future<void> saveCompany(Company company, {bool syncToAws = false}) async {
+  Future<void> saveCompany(Company company, {bool syncToAws = true}) async {
     final db = await database;
 
     final companyData =
@@ -1096,7 +1106,7 @@ class DatabaseHelper {
 
   /// Save multiple companies in batch - UPDATED WITH AWS SYNC
   Future<void> saveCompanyBatch(List<Company> companies,
-      {bool syncToAws = false}) async {
+      {bool syncToAws = true}) async {
     print('💾 Saving ${companies.length} companies locally...');
 
     final db = await database;
@@ -1244,7 +1254,7 @@ class DatabaseHelper {
 // STOCK ITEMS
 // ============================================
 
-  Future<void> saveStockItem(StockItem stockItem, StockItemClosingData stockItemClosingData, String companyGuid) async {
+  Future<void> saveStockItem(StockItem stockItem, List<StockItemClosingData> stockItemClosingData, String companyGuid) async {
     final db = await database;
 
     await db.transaction((txn) async {
@@ -1266,9 +1276,6 @@ class DatabaseHelper {
         'narration': stockItem.narration,
         'base_units': stockItem.baseUnits,
         'additional_units': stockItem.additionalUnits,
-        'closing_balance': stockItemClosingData.closingQty,
-        'closing_value': stockItemClosingData.closingValue,
-        'closing_rate': stockItemClosingData.closingRate,
         'denominator': stockItem.denominator,
         'conversion': stockItem.conversion,
         'gst_applicable': _cleanValue(stockItem.gstApplicable),
@@ -1351,6 +1358,21 @@ class DatabaseHelper {
         }
       }
 
+      if (stockItemClosingData.isNotEmpty) {
+        await txn.delete('stock_item_closing_balance',
+            where: 'stock_item_guid = ?', whereArgs: [stockItemId]);
+        for (final closingData in stockItemClosingData) {
+          await txn.insert('stock_item_closing_balance', {
+            'company_guid': companyGuid,
+            'stock_item_guid': stockItemId,
+            'closing_balance': closingData.closingQty,
+            'closing_value': closingData.closingValue,
+            'closing_rate': closingData.closingRate,
+            'closing_date': closingData.date
+          });
+        }
+      }
+
       if (stockItem.gstDetails.isNotEmpty) {
         await txn.delete('stock_item_gst_history',
             where: 'stock_item_guid = ?', whereArgs: [stockItemId]);
@@ -1396,57 +1418,153 @@ class DatabaseHelper {
   }
 
   // UPDATED WITH AWS SYNC
-  Future<void> saveStockItemBatch(
-      List<StockItem> stockItems, List<StockItemClosingData> stockItemClosingBalance, String companyGuid,
-      {bool syncToAws = false}) async {
-    print('💾 Saving ${stockItems.length} stock items locally...');
+Future<void> saveStockItemBatch(
+    List<StockItem> stockItems,
+    List<StockItemClosingData> allClosingData,
+    String companyGuid,
+    {bool syncToAws = true}) async {
+  print('💾 Saving ${stockItems.length} stock items locally...');
 
-    int successCount = 0;
-    int failCount = 0;
-    final savedStockItemMaps = <Map<String, dynamic>>[];
+  int successCount = 0;
+  int failCount = 0;
 
-    for (final item in stockItems) {
-      try {
-        if (item.guid.isEmpty == false) {
-          final closingData = stockItemClosingBalance
-    .firstWhere(
-      (e) => e.guid == item.guid,
-      orElse: () => StockItemClosingData(
-        guid: item.guid,
-        closingRate: 0,
-        closingQty: 0,
-        closingValue: 0,
-      ),
-    );
-          await saveStockItem(item, closingData, companyGuid);
-          successCount++;
+  final savedStockItemMaps = <Map<String, dynamic>>[];
 
-          // NEW: Collect for AWS sync
-          if (syncToAws) {
-            savedStockItemMaps
-                .add(await _convertStockItemToMap(item, companyGuid));
+  // Sub-table rows for AWS
+  final allHsnHistory = <Map<String, dynamic>>[];
+  final allBatchAllocations = <Map<String, dynamic>>[];
+  final allClosingBalances = <Map<String, dynamic>>[];
+  final allGstHistory = <Map<String, dynamic>>[];
+
+  for (final item in stockItems) {
+    try {
+      if (item.guid.isNotEmpty) {
+        final closingData =
+            allClosingData.where((e) => e.guid == item.guid).toList();
+
+        await saveStockItem(item, closingData, companyGuid);
+        successCount++;
+
+        if (syncToAws) {
+          savedStockItemMaps
+              .add(await _convertStockItemToMap(item, companyGuid));
+
+          // ── HSN History ──
+          for (final hsn in item.hsnDetails) {
+            allHsnHistory.add({
+              'company_guid': companyGuid,
+              'stock_item_guid': item.guid,
+              'applicable_from': hsn.applicableFrom,
+              'hsn_code': hsn.hsnCode,
+              'hsn_description': hsn.hsnDescription,
+              'source_of_details': hsn.sourceOfDetails,
+            });
+          }
+
+          // ── Batch Allocations ──
+          for (final batch in item.batchAllocations) {
+            allBatchAllocations.add({
+              'company_guid': companyGuid,
+              'stock_item_guid': item.guid,
+              'godown_name': batch.godownName,
+              'batch_name': batch.batchName,
+              'mfd_on': batch.mfdOn,
+              'opening_balance': batch.openingBalance,
+              'opening_value': batch.openingValue,
+              'opening_rate': batch.openingRate,
+            });
+          }
+
+          // ── Closing Balances ──
+          for (final closing in closingData) {
+            allClosingBalances.add({
+              'company_guid': companyGuid,
+              'stock_item_guid': item.guid,
+              'closing_balance': closing.closingQty,
+              'closing_value': closing.closingValue,
+              'closing_rate': closing.closingRate,
+              'closing_date': closing.date,
+            });
+          }
+
+          // ── GST History ──
+          for (final gst in item.gstDetails) {
+            for (final state in gst.statewiseDetails) {
+              final rates = <String, double?>{
+                'CGST': null,
+                'SGST/UTGST': null,
+                'IGST': null,
+                'Cess': null,
+                'State Cess': null,
+              };
+              for (final rate in state.rateDetails) {
+                rates[rate.dutyHead] = rate.rate;
+              }
+
+              allGstHistory.add({
+                'company_guid': companyGuid,
+                'stock_item_guid': item.guid,
+                'applicable_from': gst.applicableFrom,
+                'taxability': gst.taxability,
+                'state_name': _cleanValue(state.stateName),
+                'cgst_rate': rates['CGST'],
+                'sgst_rate': rates['SGST/UTGST'],
+                'igst_rate': rates['IGST'],
+                'cess_rate': rates['Cess'],
+                'state_cess_rate': rates['State Cess'],
+                'is_reverse_charge_applicable':
+                    gst.isReverseChargeApplicable ? 1 : 0,
+                'is_non_gst_goods': gst.isNonGstGoods ? 1 : 0,
+                'gst_ineligible_itc': gst.gstIneligibleItc ? 1 : 0,
+              });
+            }
           }
         }
-      } catch (e) {
-        print('❌ Error saving ${item.name}: $e');
-        failCount++;
       }
-    }
-
-    print('✅ Local save complete! Success: $successCount, Failed: $failCount');
-
-    // NEW: Auto-sync to AWS
-    if (syncToAws && savedStockItemMaps.isNotEmpty) {
-      try {
-        await AwsSyncService.instance
-            .syncStockItems(savedStockItemMaps, companyGuid);
-        print('☁️ Synced $successCount stock items to AWS');
-      } catch (e) {
-        print('⚠️ AWS sync failed for stock items: $e');
-      }
+    } catch (e) {
+      print('❌ Error saving ${item.name}: $e');
+      failCount++;
     }
   }
 
+  print('✅ Local save complete! Success: $successCount, Failed: $failCount');
+
+  if (syncToAws && savedStockItemMaps.isNotEmpty) {
+    try {
+      await AwsSyncService.instance
+          .syncStockItems(savedStockItemMaps, companyGuid);
+      print('☁️ Synced $successCount stock items to AWS');
+
+      if (allHsnHistory.isNotEmpty) {
+        await AwsSyncService.instance
+            .syncStockItemHsnHistory(allHsnHistory, companyGuid);
+        print('☁️ Synced ${allHsnHistory.length} HSN history records to AWS');
+      }
+
+      if (allBatchAllocations.isNotEmpty) {
+        await AwsSyncService.instance
+            .syncStockItemBatchAllocation(allBatchAllocations, companyGuid);
+        print(
+            '☁️ Synced ${allBatchAllocations.length} batch allocations to AWS');
+      }
+
+      if (allClosingBalances.isNotEmpty) {
+        await AwsSyncService.instance
+            .syncStockItemClosingBalance(allClosingBalances, companyGuid);
+        print(
+            '☁️ Synced ${allClosingBalances.length} stock closing balances to AWS');
+      }
+
+      if (allGstHistory.isNotEmpty) {
+        await AwsSyncService.instance
+            .syncStockItemGstHistory(allGstHistory, companyGuid);
+        print('☁️ Synced ${allGstHistory.length} GST history records to AWS');
+      }
+    } catch (e) {
+      print('⚠️ AWS sync failed for stock items: $e');
+    }
+  }
+}
 // STOCK ITEM CONVERSION
 // ============================================
   Future<Map<String, dynamic>> _convertStockItemToMap(
@@ -1539,7 +1657,7 @@ class DatabaseHelper {
 
   // Process and insert new groups (handles parent resolution) - UPDATED WITH AWS SYNC
   Future<void> processNewGroups(List<Group> newGroups, String companyGuid,
-      {bool syncToAws = false}) async {
+      {bool syncToAws = true}) async {
     final db = await database;
 
     // Get existing groups from DB
@@ -1820,40 +1938,123 @@ class DatabaseHelper {
   }
 
   // UPDATED WITH AWS SYNC
-  Future<void> saveLedgerBatch(List<Ledger> ledgers, String companyGuid,
-      {bool syncToAws = false}) async {
-    print('💾 Saving ${ledgers.length} ledgers locally...');
+Future<void> saveLedgerBatch(List<Ledger> ledgers, String companyGuid,
+    {bool syncToAws = true}) async {
+  print('💾 Saving ${ledgers.length} ledgers locally...');
 
-    int successCount = 0;
-    final savedLedgerMaps = <Map<String, dynamic>>[];
+  int successCount = 0;
+  final savedLedgerMaps = <Map<String, dynamic>>[];
 
-    for (final ledger in ledgers) {
-      try {
-        await saveLedger(ledger, companyGuid);
-        successCount++;
+  // Collect sub-table rows for AWS
+  final allContacts = <Map<String, dynamic>>[];
+  final allMailingDetails = <Map<String, dynamic>>[];
+  final allGstRegistrations = <Map<String, dynamic>>[];
+  final allClosingBalances = <Map<String, dynamic>>[];
 
-        // NEW: Collect for AWS sync
-        if (syncToAws) {
-          savedLedgerMaps.add(await _convertLedgerToMap(ledger, companyGuid));
+  for (final ledger in ledgers) {
+    try {
+      await saveLedger(ledger, companyGuid);
+      successCount++;
+
+      if (syncToAws) {
+        savedLedgerMaps.add(await _convertLedgerToMap(ledger, companyGuid));
+
+        // ── Contacts ──
+        for (final contact in ledger.contacts) {
+          allContacts.add({
+            'ledger_guid': ledger.guid,
+            'company_guid': companyGuid,
+            'name': contact.name,
+            'phone_number': contact.phoneNumber,
+            'country_isd_code': contact.countryIsdCode,
+            'is_default_whatsapp_num': contact.isDefaultWhatsappNum ? 1 : 0,
+          });
         }
-      } catch (e) {
-        print('❌ Error saving ${ledger.name}: $e');
-      }
-    }
 
-    print('✅ Saved: $successCount/${ledgers.length} ledgers locally');
+        // ── Mailing Details ──
+        for (final mailing in ledger.mailingDetails) {
+          allMailingDetails.add({
+            'ledger_guid': ledger.guid,
+            'company_guid': companyGuid,
+            'applicable_from': mailing.applicableFrom,
+            'mailing_name': mailing.mailingName,
+            'state': mailing.state,
+            'country': mailing.country,
+            'pincode': mailing.pincode,
+            'address': jsonEncode(mailing.address),
+          });
+        }
 
-    // NEW: Auto-sync to AWS
-    if (syncToAws && savedLedgerMaps.isNotEmpty) {
-      try {
-        await AwsSyncService.instance.syncLedgers(savedLedgerMaps, companyGuid);
-        print('☁️ Synced $successCount ledgers to AWS');
-      } catch (e) {
-        print('⚠️ AWS sync failed for ledgers: $e');
+        // ── GST Registrations ──
+        for (final gst in ledger.gstRegistrations) {
+          allGstRegistrations.add({
+            'ledger_guid': ledger.guid,
+            'company_guid': companyGuid,
+            'applicable_from': gst.applicableFrom,
+            'gst_registration_type': gst.gstRegistrationType,
+            'place_of_supply': gst.placeOfSupply,
+            'gstin': gst.gstin,
+            'transporter_id': gst.transporterId,
+            'is_oth_territory_assessee': gst.isOthTerritoryAssessee ? 1 : 0,
+            'consider_purchase_for_export':
+                gst.considerPurchaseForExport ? 1 : 0,
+            'is_transporter': gst.isTransporter ? 1 : 0,
+          });
+        }
+
+        // ── Closing Balances ──
+        for (final closing in ledger.closingBalances) {
+          allClosingBalances.add({
+            'ledger_guid': ledger.guid,
+            'company_guid': companyGuid,
+            'closing_date': closing.date,
+            'amount': closing.amount,
+          });
+        }
       }
+    } catch (e) {
+      print('❌ Error saving ${ledger.name}: $e');
     }
   }
 
+  print('✅ Saved: $successCount/${ledgers.length} ledgers locally');
+
+  if (syncToAws && savedLedgerMaps.isNotEmpty) {
+    try {
+      await AwsSyncService.instance.syncLedgers(savedLedgerMaps, companyGuid);
+      print('☁️ Synced $successCount ledgers to AWS');
+
+      if (allContacts.isNotEmpty) {
+        await AwsSyncService.instance
+            .syncLedgerContacts(allContacts, companyGuid);
+        print('☁️ Synced ${allContacts.length} ledger contacts to AWS');
+      }
+
+      if (allMailingDetails.isNotEmpty) {
+        await AwsSyncService.instance
+            .syncLedgerMailingDetails(allMailingDetails, companyGuid);
+        print(
+            '☁️ Synced ${allMailingDetails.length} ledger mailing details to AWS');
+      }
+
+      if (allGstRegistrations.isNotEmpty) {
+        await AwsSyncService.instance
+            .syncLedgerGstRegistrations(allGstRegistrations, companyGuid);
+        print(
+            '☁️ Synced ${allGstRegistrations.length} ledger GST registrations to AWS');
+      }
+
+      if (allClosingBalances.isNotEmpty) {
+        await AwsSyncService.instance
+            .syncLedgerClosingBalances(allClosingBalances, companyGuid);
+        print(
+            '☁️ Synced ${allClosingBalances.length} ledger closing balances to AWS');
+      }
+    } catch (e) {
+      print('⚠️ AWS sync failed for ledgers: $e');
+    }
+  }
+}
   // NEW: Convert Ledger to Map for AWS sync
   Future<Map<String, dynamic>> _convertLedgerToMap(
       Ledger ledger, String companyGuid) async {
@@ -1992,7 +2193,7 @@ Future<String?> resolveVoucherTypeParentGuid(
 Future<void> processNewVoucherTypes(
   List<VoucherType> newVoucherTypes,
   String companyGuid,
-  {bool syncToAws = false}
+  {bool syncToAws = true}
 ) async {
   final db = await database;
 
@@ -2363,7 +2564,7 @@ Future<void> updateLastSyncedVoucherTypesAlterId(String companyGuid, int alterId
 
   /// Save multiple vouchers - UPDATED WITH AWS SYNC
   Future<void> saveVoucherBatch(List<Voucher> vouchers, String companyGuid,
-      {bool syncToAws = false}) async {
+      {bool syncToAws = true}) async {
     print('💾 Saving ${vouchers.length} vouchers locally...');
 
     int successCount = 0;
@@ -2488,20 +2689,24 @@ Future<void> updateLastSyncedVoucherTypesAlterId(String companyGuid, int alterId
 // ============================================================
 Future<Map<String, dynamic>> _convertVoucherToMap(
     Voucher voucher, String companyGuid) async {
-  final db = await database;
-
-  // Build lookup maps
   final ledgerMap = await _buildLedgerLookupMapForSync(companyGuid);
   final stockItemMap = await _buildStockItemLookupMapForSync(companyGuid);
 
-  // Get party ledger GUID
+  // Resolve party ledger GUID
   String? partyLedgerGuid;
   if (voucher.partyLedgerName != null &&
       voucher.partyLedgerName!.isNotEmpty) {
     partyLedgerGuid = ledgerMap[voucher.partyLedgerName];
   }
 
-  // Main voucher data
+  // Resolve voucher type GUID
+  String? voucherTypeGuid;
+  final vType = await getVoucherTypeByName(companyGuid, voucher.voucherType);
+  if (vType != null && vType.guid.isNotEmpty) {
+    voucherTypeGuid = vType.guid;
+  }
+
+  // ── Main voucher ──
   final voucherData = {
     'company_guid': companyGuid,
     'voucher_guid': voucher.guid,
@@ -2512,6 +2717,7 @@ Future<Map<String, dynamic>> _convertVoucherToMap(
     'date': voucher.date,
     'effective_date': voucher.effectiveDate,
     'voucher_type': voucher.voucherType,
+    'voucher_type_guid': voucherTypeGuid,   // ← was missing
     'voucher_number': voucher.voucherNumber,
     'voucher_number_series': voucher.voucherNumberSeries,
     'persisted_view': voucher.persistedView,
@@ -2536,11 +2742,12 @@ Future<Map<String, dynamic>> _convertVoucherToMap(
     'updated_at': DateTime.now().toIso8601String(),
   };
 
-  // Ledger entries
+  // ── Ledger entries ──
   final ledgerEntries = <Map<String, dynamic>>[];
   for (final ledger in voucher.ledgerEntries) {
     ledgerEntries.add({
       'voucher_guid': voucher.guid,
+      'company_guid': companyGuid,             // ← was missing
       'ledger_name': ledger.ledgerName,
       'ledger_guid': ledgerMap[ledger.ledgerName],
       'amount': ledger.amount,
@@ -2558,13 +2765,14 @@ Future<Map<String, dynamic>> _convertVoucherToMap(
     });
   }
 
-  // Inventory entries and batch allocations
+  // ── Inventory entries + batch allocations ──
   final inventoryEntries = <Map<String, dynamic>>[];
   final batchAllocations = <Map<String, dynamic>>[];
-  
+
   for (final inventory in voucher.inventoryEntries) {
     inventoryEntries.add({
       'voucher_guid': voucher.guid,
+      'company_guid': companyGuid,             // ← was missing
       'stock_item_name': inventory.stockItemName,
       'stock_item_guid': stockItemMap[inventory.stockItemName],
       'rate': inventory.rate,
@@ -2588,10 +2796,10 @@ Future<Map<String, dynamic>> _convertVoucherToMap(
       'is_deemed_positive': inventory.isDeemedPositive == true ? 1 : 0,
     });
 
-    // Batch allocations for this inventory item
     for (final batch in inventory.batchAllocations) {
       batchAllocations.add({
         'voucher_guid': voucher.guid,
+        'company_guid': companyGuid,           // ← was missing
         'godown_name': batch.godownName,
         'stock_item_name': inventory.stockItemName,
         'stock_item_guid': stockItemMap[inventory.stockItemName],
@@ -2600,6 +2808,7 @@ Future<Map<String, dynamic>> _convertVoucherToMap(
         'actual_qty': batch.actualQty,
         'billed_qty': batch.billedQty,
         'batch_id': batch.batchId,
+        'tracking_number': batch.trackingNumber,
         'mfg_date': batch.mfgDate,
         'expiry_date': batch.expiryDate,
         'batch_rate': batch.batchRate,
@@ -2609,7 +2818,6 @@ Future<Map<String, dynamic>> _convertVoucherToMap(
     }
   }
 
-  // Return everything wrapped
   return {
     'voucher': voucherData,
     'ledger_entries': ledgerEntries,

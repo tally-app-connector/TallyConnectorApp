@@ -1,6 +1,8 @@
 import 'package:http/http.dart' as http;
 import 'package:xml/xml.dart';
 import 'dart:convert';
+import '../models/data_model.dart';
+import './tally_xml_parser.dart';
 
 class TallyService {
   final String tallyUrl = 'http://localhost:9000';
@@ -620,9 +622,120 @@ Future<String> getAllStockItems(String companyName, int lastAlterId) async {
   return result;
 }
 
-Future<String> getStockClosingBalances(String companyName) async {
-  print('📥 Fetching stock closing balances from Tally...');
+// Future<String> getStockClosingBalances(String companyName) async {
+//   print('📥 Fetching stock closing balances from Tally...');
   
+//   final xml = '''
+// <ENVELOPE>
+//   <HEADER>
+//     <VERSION>1</VERSION>
+//     <TALLYREQUEST>Export</TALLYREQUEST>
+//     <TYPE>Collection</TYPE>
+//     <ID>StockClosing</ID>
+//   </HEADER>
+//   <BODY>
+//     <DESC>
+//       <STATICVARIABLES>
+//         <SVEXPORTFORMAT>\$\$SysName:XML</SVEXPORTFORMAT>
+//         <SVCURRENTCOMPANY>$companyName</SVCURRENTCOMPANY>
+//       </STATICVARIABLES>
+//       <TDL>
+//         <TDLMESSAGE>
+//           <COLLECTION NAME="StockClosing" ISMODIFY="No">
+//             <TYPE>StockItem</TYPE>
+//             <NATIVEMETHOD>NAME</NATIVEMETHOD>
+//             <NATIVEMETHOD>GUID</NATIVEMETHOD>
+//             <NATIVEMETHOD>CLOSINGBALANCE</NATIVEMETHOD>
+//             <NATIVEMETHOD>CLOSINGVALUE</NATIVEMETHOD>
+//             <NATIVEMETHOD>CLOSINGRATE</NATIVEMETHOD>
+//           </COLLECTION>
+//         </TDLMESSAGE>
+//       </TDL>
+//     </DESC>
+//   </BODY>
+// </ENVELOPE>
+// ''';
+  
+//   final result = await getTallyData(xml);
+//   print('✅ Stock closing balances fetched!');
+//   return result;
+// }
+
+List<MonthEntry> _buildLastTwoFYMonths() {
+  final today = DateTime.now();
+  final currentFYStart = today.month >= 4 ? today.year : today.year - 1;
+
+  // Start from 2 FYs ago, include current FY
+  final fromFY = currentFYStart - 2;
+
+  final entries = <MonthEntry>[];
+
+  for (int fy = fromFY; fy <= currentFYStart; fy++) { // ✅ <= includes current FY
+    final monthSchedule = [
+      [fy,      4], [fy,      5], [fy,      6],
+      [fy,      7], [fy,      8], [fy,      9],
+      [fy,     10], [fy,     11], [fy,     12],
+      [fy + 1,  1], [fy + 1,  2], [fy + 1,  3],
+    ];
+
+    for (final ym in monthSchedule) {
+      final yr = ym[0];
+      final mo = ym[1];
+      final lastDay = DateTime(yr, mo + 1, 0).day;
+      final monthEnd = DateTime(yr, mo, lastDay);
+
+      // ✅ Skip future months
+      if (monthEnd.isAfter(today)) continue;
+
+      entries.add(MonthEntry(
+        fy:       'FY $fy-${(fy + 1).toString().substring(2)}',
+        label:    _monthLabel(yr, mo),
+        fromDate: '${fy}0401',
+        toDate:   '$yr${mo.toString().padLeft(2, '0')}${lastDay.toString().padLeft(2, '0')}',
+      ));
+    }
+  }
+
+  return entries;
+}
+
+String _monthLabel(int year, int month) {
+  const names = [
+    '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+  ];
+  return '${names[month]} $year';
+}
+
+
+Future<List<StockItemClosingData>> getStockClosingBalances(String companyName) async {
+  print('📥 Fetching stock closing balances for last 2 FYs...');
+
+  final months = _buildLastTwoFYMonths();
+  List<StockItemClosingData> results = [];
+
+  // Batch into groups of 6 to avoid overwhelming Tally
+  const batchSize = 6;
+  for (int i = 0; i < months.length; i += batchSize) {
+    final batch = months.sublist(i, (i + batchSize).clamp(0, months.length));
+
+    final batchResults = await Future.wait(
+      batch.map((m) => _fetchSingleMonth(companyName, m)),
+    );
+
+    results.addAll(batchResults.expand((list) => list));
+    print('✅ Batch ${(i ~/ batchSize) + 1}/${(months.length / batchSize).ceil()} done');
+  }
+
+  print('✅ All monthly stock closing balances fetched!');
+  return results;
+}
+
+// ── Fetch single month ─────────────────────────────────────────
+Future<List<StockItemClosingData>> _fetchSingleMonth(
+  String companyName,
+  MonthEntry m,
+) async {
   final xml = '''
 <ENVELOPE>
   <HEADER>
@@ -636,6 +749,8 @@ Future<String> getStockClosingBalances(String companyName) async {
       <STATICVARIABLES>
         <SVEXPORTFORMAT>\$\$SysName:XML</SVEXPORTFORMAT>
         <SVCURRENTCOMPANY>$companyName</SVCURRENTCOMPANY>
+        <SVFROMDATE TYPE="Date">${m.fromDate}</SVFROMDATE>
+        <SVTODATE TYPE="Date">${m.toDate}</SVTODATE>
       </STATICVARIABLES>
       <TDL>
         <TDLMESSAGE>
@@ -653,10 +768,15 @@ Future<String> getStockClosingBalances(String companyName) async {
   </BODY>
 </ENVELOPE>
 ''';
-  
-  final result = await getTallyData(xml);
-  print('✅ Stock closing balances fetched!');
-  return result;
+
+    try {
+    final rawXml = await getTallyData(xml);
+    final document = TallyXmlParser.parseStockItemClosingBalances(rawXml);
+    return document.map((data) => StockItemClosingData(guid: data.guid, closingRate: data.closingRate, closingQty: data.closingQty, closingValue: data.closingValue, date: m.toDate)).toList();
+  } catch (e) {
+    print('⚠️ Error for ${m.label}: $e');
+    return [];
+  }
 }
 
 

@@ -17,8 +17,8 @@ class _StockSummaryScreenState extends State<StockSummaryScreen> {
   bool _isMaintainInventory = true;
 
   List<StockItemInfo> _stockItems = [];
-  DateTime _fromDate = getFyStartDate(DateTime.now());
-  DateTime _toDate = getFyEndDate(DateTime.now());
+  List<String> _availableMonths = []; // e.g. ['20260228', '20260131', ...]
+  String? _selectedMonth;             // currently selected closing_date
 
   @override
   void initState() {
@@ -39,7 +39,11 @@ class _StockSummaryScreenState extends State<StockSummaryScreen> {
     _companyName = company['company_name'] as String;
     _isMaintainInventory = (company['integrate_inventory'] as int) == 1;
 
-    final stockItems = await fetchAllStockItems(_companyGuid!);
+    // Load available months first
+    await _loadAvailableMonths();
+
+    // Load stock items for selected month
+    final stockItems = await fetchAllStockItems(_companyGuid!, _selectedMonth);
 
     setState(() {
       _stockItems = stockItems;
@@ -47,81 +51,247 @@ class _StockSummaryScreenState extends State<StockSummaryScreen> {
     });
   }
 
-  Future<List<StockItemInfo>> fetchAllStockItems(String companyGuid) async {
+  // ── Load distinct months from DB ─────────────────────────────
+  Future<void> _loadAvailableMonths() async {
     final db = await _db.database;
+    final rows = await db.rawQuery('''
+      SELECT DISTINCT closing_date
+      FROM stock_item_closing_balance
+      WHERE company_guid = ?
+      ORDER BY closing_date DESC
+    ''', [_companyGuid]);
 
-    final stockItemResults = await db.rawQuery('''
-      SELECT 
-        si.name as item_name,
-        si.stock_item_guid,
-        COALESCE(si.costing_method, 'Avg. Cost') as costing_method,
-        COALESCE(si.base_units, '') as unit,
-        COALESCE(si.closing_balance, '0.0') as closing_balance,
-        COALESCE(si.closing_value, '0.0') as closing_value,
-        COALESCE(si.closing_rate, '0.0') as closing_rate,
-        COALESCE(si.parent, '') as parent_name
-      FROM stock_items si
-      WHERE si.company_guid = ?
-        AND si.is_deleted = 0
-        AND (
-          EXISTS (
-            SELECT 1 FROM stock_item_batch_allocation siba
-            WHERE siba.stock_item_guid = si.stock_item_guid
-          )
-          OR EXISTS (
-            SELECT 1 FROM voucher_inventory_entries vie
-            WHERE vie.stock_item_guid = si.stock_item_guid
-              AND vie.company_guid = si.company_guid
-          )
-        )
-    ''', [companyGuid]);
+    _availableMonths = rows.map((r) => r['closing_date'] as String).toList();
 
-    final batchResults = await db.rawQuery('''
-      SELECT 
-        siba.stock_item_guid,
-        COALESCE(siba.godown_name, '') as godown_name,
-        COALESCE(siba.batch_name, '') as batch_name,
-        COALESCE(siba.opening_value, 0) as amount,
-        COALESCE(siba.opening_balance, '') as actual_qty,
-        COALESCE(siba.opening_balance, '') as billed_qty,
-        siba.opening_rate as batch_rate
-      FROM stock_item_batch_allocation siba
-      INNER JOIN stock_items si 
-        ON siba.stock_item_guid = si.stock_item_guid
-      WHERE si.company_guid = ?
-        AND si.is_deleted = 0
-    ''', [companyGuid]);
-
-    final Map<String, List<BatchAllocation>> batchMap = {};
-    for (final row in batchResults) {
-      final stockItemGuid = row['stock_item_guid'] as String;
-      final batch = BatchAllocation(
-        godownName: row['godown_name'] as String,
-        trackingNumber: "Not Applicable",
-        batchName: row['batch_name'] as String,
-        amount: (row['amount'] as num?)?.toDouble() ?? 0.0,
-        actualQty: row['actual_qty']?.toString() ?? '',
-        billedQty: row['billed_qty']?.toString() ?? '',
-        batchRate: (row['batch_rate'] as num?)?.toDouble(),
-      );
-      batchMap.putIfAbsent(stockItemGuid, () => []).add(batch);
+    // Default to latest month
+    if (_selectedMonth == null && _availableMonths.isNotEmpty) {
+      _selectedMonth = _availableMonths.first;
     }
-
-    return stockItemResults.map((row) {
-      final stockItemGuid = row['stock_item_guid'] as String;
-      return StockItemInfo(
-        itemName: row['item_name'] as String,
-        stockItemGuid: stockItemGuid,
-        costingMethod: row['costing_method'] as String,
-        unit: row['unit'] as String,
-        parentName: row['parent_name'] as String,
-        closingRate: (row['closing_rate'] as num?)?.toDouble() ?? 0.0,
-        closingQty: (row['closing_balance'] as num?)?.toDouble() ?? 0.0,
-        closingValue: (row['closing_value'] as num?)?.toDouble() ?? 0.0,
-        openingData: batchMap[stockItemGuid] ?? [],
-      );
-    }).toList();
   }
+
+  // ── Fetch stock items for a specific month ───────────────────
+  // Future<List<StockItemInfo>> fetchAllStockItems(
+  //     String companyGuid, String? closingDate) async {
+  //   final db = await _db.database;
+
+  //   final stockItemResults = await db.rawQuery('''
+  //     SELECT 
+  //       si.name as item_name,
+  //       si.stock_item_guid,
+  //       COALESCE(si.costing_method, 'Avg. Cost') as costing_method,
+  //       COALESCE(si.base_units, '') as unit,
+  //       COALESCE(cb.closing_balance, 0.0) as closing_balance,
+  //       COALESCE(cb.closing_value, 0.0) as closing_value,
+  //       COALESCE(cb.closing_rate, 0.0) as closing_rate,
+  //       COALESCE(cb.closing_date, '') as closing_date,
+  //       COALESCE(si.parent, '') as parent_name
+  //     FROM stock_items si
+  //     LEFT JOIN stock_item_closing_balance cb
+  //       ON cb.stock_item_guid = si.stock_item_guid
+  //       AND cb.company_guid = ?
+  //       AND cb.closing_date = ?
+  //     WHERE si.company_guid = ?
+  //       AND si.is_deleted = 0
+  //       AND (
+  //         EXISTS (SELECT 1 FROM stock_item_batch_allocation siba WHERE siba.stock_item_guid = si.stock_item_guid)
+  //         OR EXISTS (SELECT 1 FROM voucher_inventory_entries vie WHERE vie.stock_item_guid = si.stock_item_guid AND vie.company_guid = si.company_guid)
+  //       )
+  //     ORDER BY si.name ASC
+  //   ''', [companyGuid, closingDate ?? '', companyGuid]);
+
+  //   return stockItemResults.map((row) {
+  //     return StockItemInfo(
+  //       itemName: row['item_name'] as String,
+  //       stockItemGuid: row['stock_item_guid'] as String,
+  //       costingMethod: row['costing_method'] as String,
+  //       unit: row['unit'] as String,
+  //       parentName: row['parent_name'] as String,
+  //       closingRate: (row['closing_rate'] as num?)?.toDouble() ?? 0.0,
+  //       closingQty: (row['closing_balance'] as num?)?.toDouble() ?? 0.0,
+  //       closingValue: (row['closing_value'] as num?)?.toDouble() ?? 0.0,
+  //       openingData: [],
+  //     );
+  //   }).toList();
+  // }
+
+  Future<List<StockItemInfo>> fetchAllStockItems(
+    String companyGuid, String? closingDate) async {
+  final db = await _db.database;
+
+  final stockItemResults = await db.rawQuery('''
+    SELECT 
+      si.name as item_name,
+      si.stock_item_guid,
+      COALESCE(si.costing_method, 'Avg. Cost') as costing_method,
+      COALESCE(si.base_units, '') as unit,
+      COALESCE(cb.closing_balance, 0.0) as closing_balance,
+      COALESCE(cb.closing_value, 0.0) as closing_value,
+      COALESCE(cb.closing_rate, 0.0) as closing_rate,
+      COALESCE(si.parent, '') as parent_name
+    FROM stock_items si
+    INNER JOIN (
+      SELECT DISTINCT stock_item_guid FROM stock_item_batch_allocation
+      UNION
+      SELECT DISTINCT stock_item_guid FROM voucher_inventory_entries WHERE company_guid = ?
+    ) active ON active.stock_item_guid = si.stock_item_guid
+    LEFT JOIN stock_item_closing_balance cb
+      ON cb.stock_item_guid = si.stock_item_guid
+      AND cb.company_guid = ?
+      AND cb.closing_date = ?
+    WHERE si.company_guid = ?
+      AND si.is_deleted = 0
+    ORDER BY si.name ASC
+  ''', [companyGuid, companyGuid, closingDate ?? '', companyGuid]);
+
+  return stockItemResults.map((row) => StockItemInfo(
+    itemName: row['item_name'] as String,
+    stockItemGuid: row['stock_item_guid'] as String,
+    costingMethod: row['costing_method'] as String,
+    unit: row['unit'] as String,
+    parentName: row['parent_name'] as String,
+    closingRate: (row['closing_rate'] as num?)?.toDouble() ?? 0.0,
+    closingQty: (row['closing_balance'] as num?)?.toDouble() ?? 0.0,
+    closingValue: (row['closing_value'] as num?)?.toDouble() ?? 0.0,
+    openingData: [],
+  )).toList();
+}
+
+  // ── On month chip tap ────────────────────────────────────────
+  Future<void> _onMonthSelected(String closingDate) async {
+    if (_selectedMonth == closingDate) return;
+    setState(() {
+      _selectedMonth = closingDate;
+      _loading = true;
+    });
+    final items = await fetchAllStockItems(_companyGuid!, closingDate);
+    setState(() {
+      _stockItems = items;
+      _loading = false;
+    });
+  }
+
+  // ── Show month picker bottom sheet ───────────────────────────
+  void _showMonthPicker() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) {
+        // Group months by FY
+        final Map<String, List<String>> fyGroups = {};
+        for (final date in _availableMonths) {
+          final fy = _getFYLabel(date);
+          fyGroups.putIfAbsent(fy, () => []).add(date);
+        }
+
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Handle bar
+                Container(
+                  margin: const EdgeInsets.only(top: 10),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Text(
+                    'Select Month',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ),
+                const Divider(height: 1),
+                Flexible(
+                  child: ListView(
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    children: fyGroups.entries.map((entry) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // FY label
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+                            child: Text(
+                              entry.key,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.blue[700],
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ),
+                          // Month chips
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            child: Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: entry.value.map((date) {
+                                final isSelected = date == _selectedMonth;
+                                return GestureDetector(
+                                  onTap: () {
+                                    Navigator.pop(context);
+                                    _onMonthSelected(date);
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 14, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: isSelected
+                                          ? Colors.blue[700]
+                                          : Colors.grey[100],
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                        color: isSelected
+                                            ? Colors.blue[700]!
+                                            : Colors.grey[300]!,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      _formatMonthLabel(date),
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w500,
+                                        color: isSelected
+                                            ? Colors.white
+                                            : Colors.black87,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                        ],
+                      );
+                    }).toList(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // ── Helpers ──────────────────────────────────────────────────
 
   double get _totalClosingValue =>
       _stockItems.fold(0.0, (sum, item) => sum + item.closingValue);
@@ -134,43 +304,25 @@ class _StockSummaryScreenState extends State<StockSummaryScreen> {
     return amount < 0 ? '-$formatted' : formatted;
   }
 
-  String _formatDate(String tallyDate) {
+  // "20250331" → "Mar 2025"
+  String _formatMonthLabel(String tallyDate) {
     if (tallyDate.length != 8) return tallyDate;
-    final year = tallyDate.substring(0, 4);
-    final month = tallyDate.substring(4, 6);
-    final day = tallyDate.substring(6, 8);
-    return '$day-$month-$year';
+    const months = [
+      '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    final year = int.tryParse(tallyDate.substring(0, 4)) ?? 0;
+    final month = int.tryParse(tallyDate.substring(4, 6)) ?? 0;
+    return '${months[month]} $year';
   }
 
-  Future<void> _selectDateRange() async {
-    final DateTimeRange? picked = await showDateRangePicker(
-      context: context,
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
-      initialDateRange: DateTimeRange(start: _fromDate, end: _toDate),
-      builder: (context, child) {
-        return Theme(
-          data: ThemeData.light().copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: Colors.blue,
-              onPrimary: Colors.white,
-              surface: Colors.white,
-              onSurface: Colors.black,
-            ),
-            dialogBackgroundColor: Colors.white,
-          ),
-          child: child!,
-        );
-      },
-    );
-
-    if (picked != null) {
-      setState(() {
-        _fromDate = picked.start;
-        _toDate = picked.end;
-      });
-      await _loadData();
-    }
+  // "20250331" → "FY 2024-25"
+  String _getFYLabel(String tallyDate) {
+    if (tallyDate.length != 8) return '';
+    final year = int.tryParse(tallyDate.substring(0, 4)) ?? 0;
+    final month = int.tryParse(tallyDate.substring(4, 6)) ?? 0;
+    final fyStart = month >= 4 ? year : year - 1;
+    return 'FY $fyStart-${(fyStart + 1).toString().substring(2)}';
   }
 
   @override
@@ -198,11 +350,6 @@ class _StockSummaryScreenState extends State<StockSummaryScreen> {
         iconTheme: const IconThemeData(color: Colors.black87),
         actions: [
           IconButton(
-            icon: const Icon(Icons.calendar_today_outlined, size: 20),
-            onPressed: _selectDateRange,
-            tooltip: 'Select Date Range',
-          ),
-          IconButton(
             icon: const Icon(Icons.refresh_outlined, size: 20),
             onPressed: _loadData,
             tooltip: 'Refresh',
@@ -211,7 +358,7 @@ class _StockSummaryScreenState extends State<StockSummaryScreen> {
       ),
       body: Column(
         children: [
-          // Company & Date Header
+          // ── Company + Month Selector Header ──────────────────
           Container(
             width: double.infinity,
             color: Colors.white,
@@ -227,12 +374,39 @@ class _StockSummaryScreenState extends State<StockSummaryScreen> {
                     color: Colors.black87,
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  '${_formatDate(dateToString(_fromDate))}  →  ${_formatDate(dateToString(_toDate))}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
+                const SizedBox(height: 8),
+                // Month selector pill
+                GestureDetector(
+                  onTap: _showMonthPicker,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: Colors.blue[50],
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.blue[200]!),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.calendar_month_outlined,
+                            size: 15, color: Colors.blue[700]),
+                        const SizedBox(width: 6),
+                        Text(
+                          _selectedMonth != null
+                              ? 'Closing: ${_formatMonthLabel(_selectedMonth!)}'
+                              : 'Select Month',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.blue[700],
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(Icons.keyboard_arrow_down_rounded,
+                            size: 16, color: Colors.blue[700]),
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -241,7 +415,7 @@ class _StockSummaryScreenState extends State<StockSummaryScreen> {
 
           const Divider(height: 1, thickness: 1),
 
-          // Table Header
+          // ── Table Header ──────────────────────────────────────
           Container(
             color: Colors.blue[700],
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -298,7 +472,7 @@ class _StockSummaryScreenState extends State<StockSummaryScreen> {
             ),
           ),
 
-          // Table Rows
+          // ── Table Rows ────────────────────────────────────────
           Expanded(
             child: _stockItems.isEmpty
                 ? Center(
@@ -331,7 +505,6 @@ class _StockSummaryScreenState extends State<StockSummaryScreen> {
                             horizontal: 16, vertical: 10),
                         child: Row(
                           children: [
-                            // Item Name + unit
                             Expanded(
                               flex: 4,
                               child: Column(
@@ -358,7 +531,6 @@ class _StockSummaryScreenState extends State<StockSummaryScreen> {
                                 ],
                               ),
                             ),
-                            // Closing Qty
                             SizedBox(
                               width: 70,
                               child: Text(
@@ -372,7 +544,6 @@ class _StockSummaryScreenState extends State<StockSummaryScreen> {
                                 ),
                               ),
                             ),
-                            // Closing Rate
                             SizedBox(
                               width: 80,
                               child: Text(
@@ -384,7 +555,6 @@ class _StockSummaryScreenState extends State<StockSummaryScreen> {
                                 ),
                               ),
                             ),
-                            // Closing Value
                             SizedBox(
                               width: 90,
                               child: Text(
@@ -406,7 +576,7 @@ class _StockSummaryScreenState extends State<StockSummaryScreen> {
                   ),
           ),
 
-          // Total Footer
+          // ── Total Footer ──────────────────────────────────────
           Container(
             decoration: BoxDecoration(
               color: Colors.blue[700],
@@ -421,14 +591,27 @@ class _StockSummaryScreenState extends State<StockSummaryScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
               children: [
-                const Expanded(
-                  child: Text(
-                    'Total Closing Stock',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
-                    ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Total Closing Stock',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                        ),
+                      ),
+                      if (_selectedMonth != null)
+                        Text(
+                          'As of ${_formatMonthLabel(_selectedMonth!)}',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.7),
+                            fontSize: 11,
+                          ),
+                        ),
+                    ],
                   ),
                 ),
                 Text(

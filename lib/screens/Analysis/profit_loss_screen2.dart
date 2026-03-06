@@ -119,15 +119,12 @@ Future<List<StockItemInfo>> fetchAllStockItems(String companyGuid) async {
   final db = await _db.database;
 
   // Fetch stock items that have opening batch allocations or at least one voucher
-  final stockItemResults = await db.rawQuery('''
+    final stockItemResults = await db.rawQuery('''
     SELECT 
       si.name as item_name,
       si.stock_item_guid,
       COALESCE(si.costing_method, 'Avg. Cost') as costing_method,
       COALESCE(si.base_units, '') as unit,
-      COALESCE(si.closing_balance, '0.0') as closing_balance,
-      COALESCE(si.closing_value, '0.0') as closing_value,
-      COALESCE(si.closing_rate, '0.0') as closing_rate,
       COALESCE(si.parent, '') as parent_name
     FROM stock_items si
     WHERE si.company_guid = ?
@@ -318,19 +315,6 @@ Future<List<StockItemInfo>> fetchAllStockItems(String companyGuid) async {
   }) async {
     // Fetch all stock items
     final stockItems = await fetchAllStockItems(companyGuid);
-
-    var closingStock = 0.0;
-    var openingStock = 0.0;
-
-    for (final item in stockItems){
-      closingStock += item.closingValue;
-      openingStock = item.openingData.fold(0.0, (sum, data) => sum + data.amount);
-
-      print('opening data ${item.itemName} = ${openingStock}');
-    }
-
-    print(closingStock);
-    print(openingStock);
 
     final directory = await buildStockDirectoryWithBatch(companyGuid, toDate, stockItems);
 
@@ -1752,11 +1736,19 @@ Future<AverageCostResult> calculateAvgCost({
           AND g.is_deleted = 0
       )
       SELECT 
-        SUM(CASE WHEN vle.amount > 0 THEN vle.amount ELSE 0 END) as credit_total,
-        SUM(CASE WHEN vle.amount < 0 THEN ABS(vle.amount) ELSE 0 END) as debit_total,
-        (SUM(CASE WHEN vle.amount > 0 THEN vle.amount ELSE 0 END) - 
-         SUM(CASE WHEN vle.amount < 0 THEN ABS(vle.amount) ELSE 0 END)) as net_sales,
-        COUNT(DISTINCT v.voucher_guid) as vouchers
+    -- Credit = deemed positive side (normal sales)
+    SUM(CASE WHEN vle.is_deemed_positive = 1 THEN ABS(vle.amount) ELSE 0 END) as credit_total,
+    
+    -- Debit = deemed negative side (sales returns)
+    SUM(CASE WHEN vle.is_deemed_positive = 0 THEN ABS(vle.amount) ELSE 0 END) as debit_total,
+    
+    -- Net = credit - debit
+    SUM(CASE 
+      WHEN vle.is_deemed_positive = 1 THEN ABS(vle.amount)
+      ELSE -ABS(vle.amount)
+    END) as net_sales,
+    
+    COUNT(DISTINCT v.voucher_guid) as vouchers
       FROM voucher_ledger_entries vle
       INNER JOIN vouchers v ON v.voucher_guid = vle.voucher_guid
       INNER JOIN ledgers l ON l.name = vle.ledger_name AND l.company_guid = v.company_guid
@@ -2001,15 +1993,15 @@ Future<AverageCostResult> calculateAvgCost({
     double totalOpeningStock = 0.0;
 
 if (_isMaintainInventory){
-    final allItemClosings = await calculateAllAverageCost(companyGuid: _companyGuid!, fromDate: fromDateStr, toDate: toDateStr);
+    // final allItemClosings = await calculateAllAverageCost(companyGuid: _companyGuid!, fromDate: fromDateStr, toDate: toDateStr);
 
-    totalClosingStock = getTotalClosingValue(allItemClosings);
+    // totalClosingStock = getTotalClosingValue(allItemClosings);
 
-    final previousDay = dateToString(fromDate).compareTo(_companyStartDate) <= 0 ? fromDateStr : getPreviousDate(fromDateStr);
+    // final previousDay = dateToString(fromDate).compareTo(_companyStartDate) <= 0 ? fromDateStr : getPreviousDate(fromDateStr);
 
-    final allItemOpening = await calculateAllAverageCost(companyGuid: _companyGuid!,fromDate: previousDay,toDate: previousDay);
+    // final allItemOpening = await calculateAllAverageCost(companyGuid: _companyGuid!,fromDate: previousDay,toDate: previousDay);
 
-    totalOpeningStock = getTotalClosingValue(allItemOpening);
+    // totalOpeningStock = getTotalClosingValue(allItemOpening);
 
 }else{
 

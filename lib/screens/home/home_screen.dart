@@ -11,6 +11,7 @@ import '../../utils/message_helper.dart';
 import '../desktop/setting_screen.dart';
 import '../../services/sync_service.dart';
 import '../Analysis/analysis_home_screen.dart';
+import '../sync_screen.dart';
 
 
 class HomeScreen extends StatefulWidget {
@@ -127,6 +128,16 @@ Future<void> _openHomeAnalysisScreen() async {
     ),
   );
 }
+
+Future<void> _openSyncServiceScreen() async {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => SyncScreen(),
+    ),
+  );
+}
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -162,6 +173,11 @@ Future<void> _openHomeAnalysisScreen() async {
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: _openHomeAnalysisScreen,
+            tooltip: 'Setting',
+          ),
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: _openSyncServiceScreen,
             tooltip: 'Setting',
           ),
 

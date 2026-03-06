@@ -242,7 +242,7 @@ class Company {
       'last_synced_ledgers_alter_id': lastSyncedLedgersAlterId,
       'last_synced_stock_items_alter_id': lastSyncedStockItemsAlterId,
       'last_synced_vouchers_alter_id': lastSyncedVouchersAlterId,
-      'last_synced_voucher_type_alter_id': lastSyncedVoucherTypeAlterId,
+      'last_synced_voucher_types_alter_id': lastSyncedVoucherTypeAlterId,
       'is_selected': isSelected ? 1 : 0,
       'created_at': createdAt,
       'updated_at': updatedAt,
@@ -320,7 +320,7 @@ class Company {
       lastSyncedLedgersAlterId: map['last_synced_ledgers_alter_id'] ?? 0,
       lastSyncedStockItemsAlterId: map['last_synced_stock_items_alter_id'] ?? 0,
       lastSyncedVouchersAlterId: map['last_synced_vouchers_alter_id'] ?? 0,
-      lastSyncedVoucherTypeAlterId: map['last_synced_voucher_type_alter_id'] ?? 0,
+      lastSyncedVoucherTypeAlterId: map['last_synced_voucher_types_alter_id'] ?? 0,
       isSelected: map['is_selected'] == 1,
       createdAt: map['created_at'] ?? DateTime.now().toIso8601String(),
       updatedAt: map['updated_at'] ?? DateTime.now().toIso8601String(),
@@ -1583,12 +1583,14 @@ class StockItemClosingData{
   final double closingRate;
   final double closingQty;
   final double closingValue;
+  final String date;
 
   StockItemClosingData({
     required this.guid,
     required this.closingRate,
     required this.closingQty,
-    required this.closingValue
+    required this.closingValue,
+    required this.date
   });
 }
 
@@ -1596,4 +1598,76 @@ class BatchAccumulator {
   double inwardQty = 0.0;
   double inwardValue = 0.0;
   double outwardQty = 0.0;
+}
+
+// ── Internal helper model ──────────────────────────────────────
+class MonthEntry {
+  final String fy;
+  final String label;
+  final String fromDate;
+  final String toDate;
+  const MonthEntry({
+    required this.fy,
+    required this.label,
+    required this.fromDate,
+    required this.toDate,
+  });
+}
+
+// ── Public models ──────────────────────────────────────────────
+class MonthlyStockClosing {
+  final String fy;
+  final String month;
+  final String fromDate;
+  final String toDate;
+  final double totalValue;
+  final List<StockItemClosing> items;
+
+  const MonthlyStockClosing({
+    required this.fy,
+    required this.month,
+    required this.fromDate,
+    required this.toDate,
+    required this.totalValue,
+    required this.items,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'fy':         fy,
+    'month':      month,
+    'fromDate':   fromDate,
+    'toDate':     toDate,
+    'totalValue': totalValue,
+    'items':      items.map((i) => i.toJson()).toList(),
+  };
+}
+
+class StockItemClosing {
+  final String name;
+  final String guid;
+  final double closingBalance;
+  final double closingValue;
+  final double closingRate;
+  final String month;
+  final String toDate;
+
+  const StockItemClosing({
+    required this.name,
+    required this.guid,
+    required this.closingBalance,
+    required this.closingValue,
+    required this.closingRate,
+    required this.month,
+    required this.toDate,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'name':           name,
+    'guid':           guid,
+    'closingBalance': closingBalance,
+    'closingValue':   closingValue,
+    'closingRate':    closingRate,
+    'month':          month,
+    'toDate':         toDate,
+  };
 }

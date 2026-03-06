@@ -1143,7 +1143,7 @@ Future<void> syncCompany(Map<String, dynamic> company) async {
         last_synced_ledgers_alter_id,
         last_synced_stock_items_alter_id,
         last_synced_vouchers_alter_id,
-        last_synced_voucher_type_alter_id,
+        last_synced_voucher_types_alter_id,
         is_selected,
         created_at,
         updated_at
@@ -1218,7 +1218,7 @@ Future<void> syncCompany(Map<String, dynamic> company) async {
         last_synced_ledgers_alter_id = EXCLUDED.last_synced_ledgers_alter_id,
         last_synced_stock_items_alter_id = EXCLUDED.last_synced_stock_items_alter_id,
         last_synced_vouchers_alter_id = EXCLUDED.last_synced_vouchers_alter_id,
-        last_synced_voucher_type_alter_id = EXCLUDED.last_synced_voucher_type_alter_id,
+        last_synced_voucher_types_alter_id = EXCLUDED.last_synced_voucher_types_alter_id,
         is_selected = EXCLUDED.is_selected,
         updated_at = EXCLUDED.updated_at
       ''',
@@ -1284,7 +1284,7 @@ Future<void> syncCompany(Map<String, dynamic> company) async {
         company['last_synced_ledgers_alter_id'] ?? 0,               // \$59
         company['last_synced_stock_items_alter_id'] ?? 0,           // \$60
         company['last_synced_vouchers_alter_id'] ?? 0,              // \$61
-        company['last_synced_voucher_type_alter_id'] ?? 0,          // \$62
+        company['last_synced_voucher_types_alter_id'] ?? 0,          // \$62
         company['is_selected'] ?? 0,                                // \$63
         company['created_at'],                                      // \$64
         company['updated_at'],                                      // \$65

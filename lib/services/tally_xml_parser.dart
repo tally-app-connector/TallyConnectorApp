@@ -177,6 +177,7 @@ static List<StockItemClosingData> parseStockItemClosingBalances(String xml) {
   for (final item in items) {
    stockItems.add( StockItemClosingData(
       guid: _getElementText(item, 'GUID'),
+      date: _getElementText(item, 'DATE'),
       closingQty: _parseQuantity(_getElementText(item, 'CLOSINGBALANCE')),
       closingValue: (_parseFormattedNumber(_getElementText(item, 'CLOSINGVALUE'))) * -1,
       closingRate: _parseRate(_getElementText(item, 'CLOSINGRATE')),

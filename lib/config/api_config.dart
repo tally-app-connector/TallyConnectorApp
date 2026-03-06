@@ -41,7 +41,7 @@ class AwsAuroraConfig {
 
   // Your Aurora Writer Endpoint
   static const String host =
-      'tally-cloud-sync-db-instance-1.cp8em48qwti1.ap-south-1.rds.amazonaws.com';
+      'tally-cloud-sync-db-writer.cp8em48qwti1.ap-south-1.rds.amazonaws.com';
 
   // Default database (change if you created a custom one)
   static const String database = 'postgres';
@@ -50,13 +50,13 @@ class AwsAuroraConfig {
   static const String username = 'tally_admin';
 
   // Your password from AWS Secrets Manager
-  // TODO: Replace with your actual password or load from secure storage => rHa_m6uUnA)$3c)b:?M6Y7]sLLH$
-  static const String password = 'rHa_m6uUnA)\$3c)b:?M6Y7]sLLH\$';
+  // TODO: Replace with your actual password or load from secure storage => rHa_m6uUnA)$3c)b:?M6Y7]sLLH$ 1[SI|pxOO1_J9x|auAzt$R9)F0Uv
+  static const String password = '1[SI|pxOO1_J9x|auAzt\$R9)F0Uv';
 
   // Port (default PostgreSQL)
   static const int port = 5432;
 
   // Connection timeouts (slightly higher for Aurora cold starts)
-  static const int connectTimeout = 30; // seconds
-  static const int queryTimeout = 60; // seconds
+  static const int connectTimeout = 60; // seconds
+  static const int queryTimeout = 120; // seconds
 }

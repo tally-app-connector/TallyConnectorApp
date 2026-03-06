@@ -131,16 +131,13 @@ class SyncService {
 
       await _syncGroups(companyName, companyId, company?['last_synced_groups_alter_id'] ?? 0);
 
-      await _syncLedgers(companyName, companyId,
-          company?['last_synced_ledgers_alter_id'] ?? 0);
+      await _syncLedgers(companyName, companyId, company?['last_synced_ledgers_alter_id'] ?? 0);
 
-      await _syncStockItems(companyName, companyId,
-          company?['last_synced_stock_items_alter_id'] ?? 0);
+      await _syncStockItems(companyName, companyId, company?['last_synced_stock_items_alter_id'] ?? 0);
 
-      // await _syncVoucherTypes(companyName, companyId, company?['last_synced_groups_alter_id'] ?? 0);
+      await _syncVoucherTypes(companyName, companyId, company?['last_synced_groups_alter_id'] ?? 0);
 
-      // await _syncVouchers(companyName, companyId, companyStart,
-      //     company?['last_synced_voucher_types_alter_id'] ?? 0);
+      await _syncVouchers(companyName, companyId, companyStart, company?['last_synced_voucher_types_alter_id'] ?? 0);
 
       print("all data synced");
 
@@ -454,13 +451,15 @@ class SyncService {
   Future _syncStockItems(
       String companyName, String companyId, int lastAlterId) async {
     final xml = await _tallyService.getAllStockItems(companyName, lastAlterId);
-    final closingBalanceXml = await _tallyService.getStockClosingBalances(companyName);
+    final allClosingData = await _tallyService.getStockClosingBalances(companyName);
     
     final stockItems = TallyXmlParser.parseStockItems(xml);
-    final stockItemClosingData = TallyXmlParser.parseStockItemClosingBalances(closingBalanceXml);
+    // final stockItemMonthWiseClosingData = closingBalanceXmlArray.map((monthXml) => TallyXmlParser.parseStockItemClosingBalances(monthXml));
+  // ✅ Flatten all months into one big list
+  
 
     if (stockItems.isNotEmpty) {
-      await _db.saveStockItemBatch(stockItems, stockItemClosingData, companyId);
+      await _db.saveStockItemBatch(stockItems, allClosingData, companyId);
 
       // Get max alterId from synced vouchers
       final maxAlterId =
