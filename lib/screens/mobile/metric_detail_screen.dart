@@ -1,0 +1,996 @@
+import 'dart:typed_data';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:screenshot/screenshot.dart';
+import '../theme/app_theme.dart';
+import '../icons/app_icons.dart';
+import '../models/report_data.dart';
+import '../models/company_model.dart';
+import '../widgets/report_widgets.dart';
+import '../widgets/charts/sales_purchase_combo_chart.dart';
+import '../widgets/charts/report_chart.dart' hide SalesPurchaseComboChart;
+import '../service/sales/sales_service.dart';
+import '../service/company_logo_service.dart';
+import '../service/excel_export_service.dart';
+import '../main.dart';
+import '../models/sales_data.dart' hide ChartPeriod;
+import '../widgets/detail_widgets.dart';
+import '../utils/chart_period_helper.dart';
+import 'pdf_export_screen.dart';
+import 'excel_export_screen.dart';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MetricDetailScreen — Reusable analytics detail screen for any ReportMetric.
+//
+// Pass the desired [metric] to display its title, icon, chart types, and data.
+// Layout: value card → trend chart → combo chart → bar/stacked/grid/gauges.
+// ─────────────────────────────────────────────────────────────────────────────
+
+class MetricDetailScreen extends StatefulWidget {
+  final ReportMetric metric;
+
+  const MetricDetailScreen({super.key, required this.metric});
+
+  @override
+  State<MetricDetailScreen> createState() => _MetricDetailScreenState();
+}
+
+class _MetricDetailScreenState extends State<MetricDetailScreen> {
+  // ═══════════════════════════════════════════════════════════════════════════
+  //  STATE
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  // Date range filter (MoM, YTD, Quarter, Custom)
+  DateRangeFilter _dateRange = DateRangeFilter.ytd();
+
+  // Chart display settings — default comes from the metric
+  late ReportChartType _chartType = widget.metric.defaultChartType;
+  int _chartPeriodIndex = 0; // 0 = Monthly, 1 = Quarterly, 2 = YoY
+
+  // Loading flag
+  bool _isLoading = true;
+
+  // Report data objects
+  ReportValue _reportValue = ReportValue(
+    primaryValue: '—',
+    primaryUnit: '',
+    primaryLabel: 'Loading...',
+    changePercent: '',
+    isPositiveChange: true,
+    periodStart: DateTime.now(),
+    periodEnd: DateTime.now(),
+  );
+  ReportChartData _chartData = const ReportChartData(
+    dataPoints: [],
+    chartType: ReportChartType.bar,
+    title: '',
+    legends: [],
+  );
+  SalesPurchaseChartData _salesPurchaseData = const SalesPurchaseChartData(
+    dataPoints: [],
+    title: '',
+  );
+  RevenueExpenseProfitData _revExpProfitData = const RevenueExpenseProfitData(
+    revenue: 0,
+    expense: 0,
+    profit: 0,
+  );
+
+  // Top items
+  List<TopSellingItem> _topItems = const [];
+
+  // Service & company
+  final SalesAnalyticsService _salesAnalyticsService = SalesAnalyticsService();
+  final ScreenshotController _screenshotController = ScreenshotController();
+  String? _companyGuid;
+  Company? _company;
+  Uint8List? _companyLogoBytes;
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  //  LIFECYCLE
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCompany();
+  }
+
+  /// Parse company date string (ISO "2024-04-01" or Tally "20240401") into DateTime.
+  DateTime? _parseFYDate(String? dateStr) {
+    if (dateStr == null || dateStr.isEmpty) return null;
+    if (dateStr.contains('-')) return DateTime.tryParse(dateStr);
+    if (dateStr.length == 8) {
+      final y = int.tryParse(dateStr.substring(0, 4));
+      final m = int.tryParse(dateStr.substring(4, 6));
+      final d = int.tryParse(dateStr.substring(6, 8));
+      if (y != null && m != null && d != null) return DateTime(y, m, d);
+    }
+    return null;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  //  DATA LOADING
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /// Resolves the active company GUID using a priority chain:
+  ///   1. SecureStorage selected company
+  ///   2. is_selected = 1 in companies table
+  ///   3. Any company in companies table
+  ///   4. Distinct company_guid from vouchers table
+  Future<void> _loadCompany() async {
+    _companyGuid = AppState.selectedCompany?.guid;
+    _company = AppState.selectedCompany;
+
+    // Load saved company logo
+    if (_companyGuid != null) {
+      final logo = await CompanyLogoService.loadLogo(_companyGuid!);
+      if (mounted) {
+        setState(() => _companyLogoBytes = logo);
+      }
+    }
+
+    _loadData();
+  }
+
+  /// Fetches trend, combo, and revenue/expense/profit data from the analytics
+  /// service for the current [widget.metric]. Falls back to mock data when no
+  /// company is available or on error.
+  Future<void> _loadData() async {
+    final metric = widget.metric;
+    final period = ChartPeriodExtension.fromIndex(_chartPeriodIndex);
+
+    // No company found — show empty state
+    if (_companyGuid == null) {
+      setState(() => _isLoading = false);
+      return;
+    }
+
+    try {
+      final guid = _companyGuid!;
+      final today = DateTime.now();
+
+      // Resolve start/end dates from selected filter
+      late DateTime start;
+      late DateTime end;
+
+      // Get company's actual FY start from DB
+      final fyStart = _parseFYDate(_company?.startingFrom) ??
+          (today.month >= 4 ? DateTime(today.year, 4, 1) : DateTime(today.year - 1, 4, 1));
+      final fyMonth = fyStart.month;
+
+      switch (_dateRange.type) {
+        case DateRangeType.mom:
+          start = DateTime(today.year, today.month, 1);
+          end = today;
+          break;
+        case DateRangeType.ytd:
+          // Use company's actual FY start date
+          start = fyStart;
+          end = today;
+          break;
+        case DateRangeType.quarter:
+          // Fiscal quarter based on company's FY start month
+          final fiscalMonth = today.month >= fyMonth ? today.month : today.month + 12;
+          final qStartOffset = ((fiscalMonth - fyMonth) ~/ 3) * 3 + fyMonth;
+          final qStartMonth = qStartOffset > 12 ? qStartOffset - 12 : qStartOffset;
+          final qStartYear = qStartOffset > 12
+              ? today.year
+              : (today.month >= fyMonth ? today.year : today.year - 1);
+          start = DateTime(qStartYear, qStartMonth, 1);
+          end = today;
+          break;
+        case DateRangeType.custom:
+          start = _dateRange.startDate;
+          end = _dateRange.endDate.isAfter(today) ? today : _dateRange.endDate;
+          break;
+      }
+
+      // Adjust start date for quarterly/yearly grouping
+      switch (period) {
+        case ChartPeriod.monthly:
+          break;
+        case ChartPeriod.quarterly:
+          if (_dateRange.type != DateRangeType.mom) {
+            start = DateTime(start.year, start.month, 1);
+          }
+          break;
+        case ChartPeriod.yearly:
+          if (_dateRange.type == DateRangeType.ytd ||
+              _dateRange.type == DateRangeType.quarter) {
+            start = DateTime(start.year, 1, 1);
+          }
+          break;
+      }
+
+      // Fetch trend chart data based on the actual metric
+      final ReportChartData realChart;
+      switch (metric) {
+        case ReportMetric.sales:
+          realChart = await _salesAnalyticsService.getSalesTrend(
+            companyGuid: guid,
+            chartType: _chartType, period: period,
+          );
+        case ReportMetric.purchase:
+          realChart = await _salesAnalyticsService.getPurchaseTrend(
+            companyGuid: guid,
+            chartType: _chartType, period: period,
+          );
+        case ReportMetric.profit:
+          realChart = await _salesAnalyticsService.getProfitTrend(
+            companyGuid: guid,
+            chartType: _chartType, period: period,
+          );
+        case ReportMetric.gst:
+          realChart = await _salesAnalyticsService.getGSTTrend(
+            companyGuid: guid,
+            chartType: _chartType, period: period,
+          );
+        case ReportMetric.receipts:
+          realChart = await _salesAnalyticsService.getReceiptsTrend(
+            companyGuid: guid,
+            chartType: _chartType, period: period,
+          );
+        case ReportMetric.payments:
+          realChart = await _salesAnalyticsService.getPaymentsTrend(
+            companyGuid: guid,
+            chartType: _chartType, period: period,
+          );
+        case ReportMetric.receivable:
+          realChart = await _salesAnalyticsService.getReceivableChart(
+            companyGuid: guid, chartType: _chartType,
+          );
+        case ReportMetric.payable:
+          realChart = await _salesAnalyticsService.getPayableChart(
+            companyGuid: guid, chartType: _chartType,
+          );
+        case ReportMetric.stock:
+          realChart = await _salesAnalyticsService.getStockChart(
+            companyGuid: guid, chartType: _chartType,
+          );
+      }
+
+      // Fetch sales vs purchase combo data
+      final realCombo = await _salesAnalyticsService.getSalesPurchaseTrend(
+        companyGuid: guid,
+        period: period,
+      );
+
+      // Fetch revenue / expense / profit breakdown
+      final revExpProfit = await _salesAnalyticsService.getRevenueExpenseProfit(
+        companyGuid: guid
+      );
+
+      // Fetch the actual total value for this metric from the service
+      final derivedValue = await _salesAnalyticsService.getReportValueForMetric(
+        metric,
+        companyGuid: guid
+      );
+
+      // Auto-aggregate monthly data into quarters/years based on data count
+      final autoPeriod = autoSelectPeriod(realChart.dataPoints.length);
+      final aggChart = aggregateChartData(realChart, autoPeriod);
+      final aggCombo = aggregateSalesPurchaseData(realCombo, autoPeriod);
+
+      final useRevExpProfit =
+          revExpProfit.revenue != 0 || revExpProfit.expense != 0;
+      final finalRevExpProfit = useRevExpProfit
+          ? revExpProfit
+          : _deriveRevExpProfitFromCombo(aggCombo);
+
+      // Fetch top items from DB
+      final topItems = await _salesAnalyticsService.getTopItems(
+        metric,
+        companyGuid: guid
+      );
+
+      setState(() {
+        _reportValue = derivedValue;
+        _chartData = aggChart;
+        _salesPurchaseData = aggCombo;
+        _revExpProfitData = finalRevExpProfit;
+        _topItems = topItems;
+        _isLoading = false;
+      });
+    } catch (e, stack) {
+      debugPrint('Error loading ${metric.displayName} data: $e');
+      debugPrint('$stack');
+      setState(() => _isLoading = false);
+    }
+  }
+
+  /// Derives revenue/expense/profit totals from combo chart data points.
+  RevenueExpenseProfitData _deriveRevExpProfitFromCombo(
+      SalesPurchaseChartData combo) {
+    final totalRevenue =
+        combo.dataPoints.fold<double>(0.0, (sum, dp) => sum + dp.salesValue);
+    final totalExpense =
+        combo.dataPoints.fold<double>(0.0, (sum, dp) => sum + dp.purchaseValue);
+    return RevenueExpenseProfitData(
+      revenue: totalRevenue,
+      expense: totalExpense,
+      profit: totalRevenue - totalExpense,
+    );
+  }
+
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  //  USER ACTIONS
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  void _onDateRangeChanged(DateRangeFilter range) {
+    setState(() => _dateRange = range);
+    _loadData();
+  }
+
+  void _showCustomDatePicker() async {
+    final now = DateTime.now();
+    final initialStart =
+        _dateRange.startDate.isAfter(now) ? now : _dateRange.startDate;
+    final initialEnd =
+        _dateRange.endDate.isAfter(now) ? now : _dateRange.endDate;
+
+    final range = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: now,
+      initialDateRange: DateTimeRange(
+        start: initialStart,
+        end: initialEnd,
+      ),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: AppColors.blue,
+              onPrimary: Colors.white,
+              onSurface: AppColors.textPrimary,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (range != null) {
+      _onDateRangeChanged(DateRangeFilter.custom(range.start, range.end));
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  //  REPORT CARDS (for PDF screenshot capture)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /// Returns the chart card widgets for PDF capture via ScreenshotController.
+  List<Widget> _getReportCards() {
+    final metric = widget.metric;
+    return [
+      // Value card
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pagePadding),
+        child: ReportValueCard(
+          value: _reportValue,
+          icon: metric.icon,
+          iconBgColor: metric.iconBgColor,
+        ),
+      ),
+
+      // Trend chart card
+      _buildChartCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(_chartData.title, style: AppTypography.cardLabel),
+            const SizedBox(height: 16),
+            ReportChart(data: _chartData, height: 200),
+            if (_chartData.legends.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Center(child: ChartLegend(items: _chartData.legends)),
+            ],
+          ],
+        ),
+      ),
+
+      // Sales vs Purchase combo chart
+      _buildChartCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(_salesPurchaseData.title, style: AppTypography.cardLabel),
+            const SizedBox(height: 16),
+            (_salesPurchaseData.dataPoints.isEmpty)
+                ? SizedBox(
+                    height: 220,
+                    child: Center(
+                      child: Text(
+                        'No Data',
+                        style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium
+                                ?.copyWith(color: AppColors.textSecondary) ??
+                            const TextStyle(color: AppColors.textSecondary),
+                      ),
+                    ),
+                  )
+                : SalesPurchaseComboChart(
+                    data: _salesPurchaseData, height: 220),
+          ],
+        ),
+      ),
+
+      // Sales / Purchase / Profit bar chart
+      _buildChartCard(
+        child: SalesPurchaseProfitBarChart(data: _revExpProfitData),
+      ),
+
+      // Stacked bar chart
+      _buildChartCard(
+        child: SalesPurchaseStackedBarChart(data: _salesPurchaseData),
+      ),
+
+      // Revenue / Expense / Profit grid chart
+      _buildChartCard(
+        child: RevenueExpenseProfitGridChart(data: _revExpProfitData),
+      ),
+
+      // Gauges
+      _buildChartCard(
+        child: SalesPurchaseProfitGauges(data: _revExpProfitData),
+      ),
+    ];
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  //  PDF EXPORT
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  Future<void> _openPdfExport() async {
+    final now = DateTime.now().toIso8601String();
+    final company = _company ??
+        Company(
+          guid: 'demo-guid',
+          masterId: 0,
+          alterId: 0,
+          name: 'Demo Company',
+          startingFrom: now,
+          endingAt: now,
+          address: '123 Test Street',
+          city: 'Mumbai',
+          state: 'Maharashtra',
+          gsttin: '27AABCU9603R1ZM',
+          createdAt: now,
+          updatedAt: now,
+        );
+
+    // Show loading overlay
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(
+        child: CircularProgressIndicator(color: AppColors.blue),
+      ),
+    );
+
+    try {
+      final width = MediaQuery.of(context).size.width;
+      final cards = _getReportCards();
+      final cardCaptures = <Uint8List>[];
+
+      for (final card in cards) {
+        final capture = await _screenshotController.captureFromLongWidget(
+          InheritedTheme.captureAll(
+            context,
+            MediaQuery(
+              data: MediaQuery.of(context),
+              child: Material(
+                color: Colors.white,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 5),
+                  child: SizedBox(width: width, child: card),
+                ),
+              ),
+            ),
+          ),
+          delay: const Duration(milliseconds: 100),
+          pixelRatio: 3.0,
+          context: context,
+        );
+        cardCaptures.add(capture);
+      }
+
+      if (!mounted) return;
+      Navigator.pop(context); // dismiss loading
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PdfExportScreen(
+            company: company,
+            metric: widget.metric,
+            reportValue: _reportValue,
+            chartData: _chartData,
+            dateRange: _dateRange,
+            salesPurchaseData: _salesPurchaseData,
+            revExpProfitData: _revExpProfitData,
+            cardCaptures: cardCaptures,
+            companyLogoBytes: _companyLogoBytes,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.pop(context); // dismiss loading
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to capture screen: $e')),
+      );
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  //  EXCEL EXPORT
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  Future<void> _openExcelExport() async {
+    if (_companyGuid == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content:
+                Text('No company selected. Please select a company first.')),
+      );
+      return;
+    }
+    final companyGuid = _companyGuid!;
+    final companyName = _company?.name ?? 'Company';
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(
+        child: CircularProgressIndicator(color: AppColors.blue),
+      ),
+    );
+
+    try {
+      final result = await ExcelExportService.generateStockItemsExcel(
+        companyGuid: companyGuid,
+        companyName: companyName,
+        dateRange: _dateRange,
+        companyLogoBytes: _companyLogoBytes,
+      );
+
+      final fileName =
+          '${companyName.replaceAll(' ', '_')}_stock_items.xlsx';
+
+      if (!mounted) return;
+      Navigator.pop(context); // dismiss loading
+
+      if (result.items.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'No stock items found. Please sync stock items & vouchers with inventory entries first.',
+            ),
+            duration: Duration(seconds: 4),
+          ),
+        );
+        return;
+      }
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ExcelExportScreen(
+            companyName: companyName,
+            fileName: fileName,
+            excelBytes: result.bytes,
+            items: result.items,
+            dateRange: _dateRange,
+            companyLogoBytes: _companyLogoBytes,
+          ),
+        ),
+      );
+    } catch (e, stack) {
+      debugPrint('Excel export error: $e');
+      debugPrint('$stack');
+      if (!mounted) return;
+      Navigator.pop(context); // dismiss loading
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to generate Excel: $e')),
+      );
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  //  SHARE REPORT BOTTOM SHEET
+  //
+  //  Opens a modal bottom sheet with two export options:
+  //    • Share as PDF  — formatted report with charts
+  //    • Share as Excel — raw tabular data for spreadsheets
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  void _showShareOptions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Drag handle
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFD1D5DB),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+
+              // Section title
+              Padding(
+                padding: const EdgeInsets.only(left: 20, bottom: 12),
+                child: Text('SHARE REPORT', style: AppTypography.cardLabel),
+              ),
+
+              // Option 1 — PDF export
+              ListTile(
+                leading: SvgPicture.string(
+                  AppIcons.filePdf,
+                  width: 36,
+                  height: 36,
+                ),
+                title: Text('Share as PDF',
+                    style: AppTypography.itemTitle),
+                subtitle: Text('Formatted report with charts',
+                    style: AppTypography.itemSubtitle),
+                trailing: const Icon(Icons.chevron_right,
+                    color: AppColors.textSecondary, size: 20),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _openPdfExport();
+                },
+              ),
+
+              // Divider between options
+              Divider(
+                height: 1,
+                thickness: 0.5,
+                indent: 20,
+                endIndent: 20,
+                color: Colors.grey.shade300,
+              ),
+
+              // Option 2 — Excel export
+              ListTile(
+                leading: SvgPicture.string(
+                  AppIcons.fileCsv,
+                  width: 36,
+                  height: 36,
+                ),
+                title: Text('Share as Excel',
+                    style: AppTypography.itemTitle),
+                subtitle: Text('Raw data for spreadsheets',
+                    style: AppTypography.itemSubtitle),
+                trailing: const Icon(Icons.chevron_right,
+                    color: AppColors.textSecondary, size: 20),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _openExcelExport();
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  //  BUILD
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  @override
+  Widget build(BuildContext context) {
+    final metric = widget.metric;
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.dark.copyWith(
+        statusBarColor: Colors.transparent,
+      ),
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        body: SafeArea(
+          child: Column(
+            children: [
+              // ── Header (back button + title + share icon) ──
+              _buildHeader(),
+              const SizedBox(height: 14),
+
+              // ── Scrollable content ──
+              Expanded(
+                child: _isLoading
+                    ? const Center(
+                        child: CircularProgressIndicator(color: AppColors.blue),
+                      )
+                    : SingleChildScrollView(
+                        physics: const BouncingScrollPhysics(),
+                        padding: const EdgeInsets.only(bottom: 32),
+                        child: Column(
+                          children: [
+                            // Date range selector (MoM / YTD / Quarter / Custom)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: AppSpacing.pagePadding,
+                              ),
+                              child: DateRangeSelector(
+                                selected: _dateRange,
+                                onChanged: _onDateRangeChanged,
+                                onCustomTap: _showCustomDatePicker,
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+
+                            // Value card (icon + total value from the metric)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: AppSpacing.pagePadding,
+                              ),
+                              child: ReportValueCard(
+                                value: _reportValue,
+                                icon: metric.icon,
+                                iconBgColor: metric.iconBgColor,
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+
+                            // Trend chart (bar / line / combo / etc.)
+                            _buildChartCard(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Text(_chartData.title,
+                                          style: AppTypography.cardLabel),
+                                      const Spacer(),
+                                      ReportChartPeriodSelector(
+                                        selectedIndex: _chartPeriodIndex,
+                                        onChanged: (index) {
+                                          setState(() =>
+                                              _chartPeriodIndex = index);
+                                          _loadData();
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 10),
+                                  ChartTypeSelector(
+                                    selected: _chartType,
+                                    availableTypes:
+                                        metric.applicableChartTypes,
+                                    onChanged: (type) {
+                                      setState(() => _chartType = type);
+                                      _loadData();
+                                    },
+                                  ),
+                                  const SizedBox(height: 16),
+                                  ReportChart(data: _chartData, height: 200),
+                                  if (_chartData.legends.isNotEmpty) ...[
+                                    const SizedBox(height: 16),
+                                    Center(
+                                      child: ChartLegend(
+                                          items: _chartData.legends),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+
+                            // Sales vs Purchase combo chart
+                            _buildChartCard(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(_salesPurchaseData.title,
+                                      style: AppTypography.cardLabel),
+                                  const SizedBox(height: 16),
+                                  (_salesPurchaseData.dataPoints.isEmpty)
+                                      ? SizedBox(
+                                          height: 220,
+                                          child: Center(
+                                            child: Text(
+                                              'No Data',
+                                              style: Theme.of(context)
+                                                      .textTheme
+                                                      .bodyMedium
+                                                      ?.copyWith(
+                                                        color: AppColors
+                                                            .textSecondary,
+                                                      ) ??
+                                                  const TextStyle(
+                                                      color: AppColors
+                                                          .textSecondary),
+                                            ),
+                                          ),
+                                        )
+                                      : SalesPurchaseComboChart(
+                                          data: _salesPurchaseData,
+                                          height: 220,
+                                        ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+
+                            // Sales / Purchase / Profit bar chart
+                            _buildChartCard(
+                              child: SalesPurchaseProfitBarChart(
+                                data: _revExpProfitData,
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+
+                            // Stacked bar chart
+                            _buildChartCard(
+                              child: SalesPurchaseStackedBarChart(
+                                data: _salesPurchaseData,
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+
+                            // Revenue / Expense / Profit grid chart
+                            _buildChartCard(
+                              child: RevenueExpenseProfitGridChart(
+                                data: _revExpProfitData,
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+
+                            // Sales / Purchase / Profit gauges
+                            _buildChartCard(
+                              child: SalesPurchaseProfitGauges(
+                                data: _revExpProfitData,
+                              ),
+                            ),
+
+                            // Top items (not for receivable/payable)
+                            if (_topItems.isNotEmpty) ...[
+                              const SizedBox(height: 20),
+                              _buildTopItems(),
+                            ],
+                          ],
+                        ),
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  //  REUSABLE SUB-WIDGETS
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /// Standard card wrapper used by every chart section.
+  Widget _buildChartCard({required Widget child}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pagePadding),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(AppRadius.card),
+          boxShadow: AppShadows.card,
+        ),
+        child: child,
+      ),
+    );
+  }
+
+  /// Top items section using ExpandableCard + TopSellingItemRow
+  Widget _buildTopItems() {
+    final metric = widget.metric;
+    return ExpandableCard(
+      title: metric.topItemsTitle,
+      initialVisibleCount: 5,
+      loadMoreCount: 5,
+      children: _topItems.asMap().entries.map((entry) {
+        final index = entry.key;
+        final item = entry.value;
+        return TopSellingItemRow(
+          rank: item.rank,
+          name: item.name,
+          units: _formatItemNumber(item.unitsSold),
+          revenue: _formatItemCurrency(item.revenue),
+          change:
+              '${item.isPositive ? '+' : ''}${item.changePercent.toStringAsFixed(1)}%',
+          isPositive: item.isPositive,
+          showDivider: index < _topItems.length - 1,
+        );
+      }).toList(),
+    );
+  }
+
+  String _formatItemNumber(int number) {
+    if (number >= 100000) {
+      return '${(number / 100000).toStringAsFixed(1)}L';
+    } else if (number >= 1000) {
+      return '${(number / 1000).toStringAsFixed(0)}K';
+    }
+    return number.toString();
+  }
+
+  String _formatItemCurrency(double amount) {
+    if (amount >= 10000000) {
+      return '₹${(amount / 10000000).toStringAsFixed(2)} Cr';
+    } else if (amount >= 100000) {
+      return '₹${(amount / 100000).toStringAsFixed(1)} L';
+    }
+    return '₹${amount.toStringAsFixed(0)}';
+  }
+
+  /// Header row: back arrow, page title, and share button.
+  Widget _buildHeader() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, AppSpacing.pagePadding, 0),
+      child: Row(
+        children: [
+          // Back button
+          GestureDetector(
+            onTap: () => Navigator.of(context).pop(),
+            child: const SizedBox(
+              width: 36,
+              height: 36,
+              child: Center(
+                child: Icon(
+                  Icons.arrow_back_ios_new,
+                  size: 16,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+
+          // Title — dynamic from metric
+          Text(widget.metric.displayName, style: AppTypography.pageTitle),
+          const Spacer(),
+
+          // Share button — opens the share-report bottom sheet
+          GestureDetector(
+            onTap: _showShareOptions,
+            child: Container(
+              width: 36,
+              height: 36,
+              margin: const EdgeInsets.only(right: 10),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.divider),
+              ),
+              child: Center(
+                child: SvgPicture.string(
+                  AppIcons.share,
+                  width: 18,
+                  height: 18,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:tally_connector/screens/mobile/dashboard_screen.dart';
 import '../../services/auth_service.dart';
 import '../../utils/validators.dart';
 import '../../utils/message_helper.dart';
@@ -7,6 +9,7 @@ import 'signup_screen.dart';
 import 'forgot_password_screen.dart';
 import 'email_verification_screen.dart';
 import '../home/home_screen.dart';
+import '../mobile/mobile_home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -21,6 +24,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _isLoading = false;
   bool _obscurePassword = true;
+  final bool _isMobile = Platform.isAndroid || Platform.isIOS;
 
   @override
   void dispose() {
@@ -68,10 +72,12 @@ class _LoginScreenState extends State<LoginScreen> {
       // Show verification prompt
       _showVerificationPrompt();
     } else {
-      // Go to home
+      // Go to home (mobile or desktop)
       Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
+        MaterialPageRoute(
+          builder: (_) => _isMobile ? const DashboardScreen() : const HomeScreen(),
+        ),
         (route) => false,
       );
     }
@@ -103,7 +109,9 @@ class _LoginScreenState extends State<LoginScreen> {
               Navigator.pop(context); // Close dialog
               Navigator.pushAndRemoveUntil(
                 context,
-                MaterialPageRoute(builder: (_) => const HomeScreen()),
+                MaterialPageRoute(
+                  builder: (_) => _isMobile ? const DashboardScreen() : const HomeScreen(),
+                ),
                 (route) => false,
               );
             },

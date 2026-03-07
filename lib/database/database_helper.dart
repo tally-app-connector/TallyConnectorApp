@@ -4,6 +4,7 @@ import 'package:path/path.dart';
 import 'dart:io';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import '../models/data_model.dart';
+import '../models/user_model.dart';
 import '../services/aws_sync_service.dart';
 import '../utils/secure_storage.dart';
 
@@ -1166,10 +1167,18 @@ class DatabaseHelper {
 
     // NEW: Auto-sync to AWS
     if (syncToAws) {
+      String? user_id;
+      final userData = await SecureStorage.getUser();
+      if (userData != null) {
+        final user = User.fromJson(jsonDecode(userData));
+        user_id = user.email;
+      }
+      
       for (final company in companies) {
         try {
           final companyData = {
             'company_guid': company.guid,
+            'user_id': user_id,
             'master_id': company.masterId,
             'alter_id': company.alterId,
             'company_name': company.name,

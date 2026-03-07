@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(flutter analyze lib/screens/mobile/)",
+      "Bash(where.exe flutter)",
+      "Bash(ls /c/flutter_projects/TallyConnecterApp/lib/screens/mobile/*.dart)",
+      "Bash(cmd.exe /c \"flutter analyze lib\\\\screens\\\\mobile\\\\ 2>&1\")",
+      "Bash(flutter pub get)",
+      "Bash(/c/flutter/bin/flutter analyze)",
+      "Bash(cmd.exe /c \"cd /d C:\\\\flutter_projects\\\\TallyConnecterApp && flutter analyze 2>&1\")"
+    ]
+  }
+}

@@ -1,9 +1,15 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/home/home_screen.dart';
+import 'screens/mobile/dashboard_screen.dart';
+import 'screens/main.dart';
+import 'screens/models/company_model.dart';
+import 'database/database_helper.dart';
 import 'utils/secure_storage.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const MyApp());
 }
 
@@ -43,14 +49,39 @@ class _SplashScreenState extends State<SplashScreen> {
 
     final isLoggedIn = await SecureStorage.isLoggedIn();
 
+    if (isLoggedIn) {
+      await _initAppState();
+    }
+
     if (mounted) {
+      final bool isMobile = Platform.isAndroid || Platform.isIOS;
+      final Widget homeScreen = isMobile ? const DashboardScreen() : const HomeScreen();
+
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (_) =>
-              isLoggedIn ? const HomeScreen() : const LoginScreen(),
+          builder: (_) => isLoggedIn ? homeScreen : const LoginScreen(),
         ),
       );
+    }
+  }
+
+  Future<void> _initAppState() async {
+    try {
+      final db = await DatabaseHelper.instance.database;
+      final companyMaps = await db.query('companies');
+      final companies = companyMaps.map((m) => Company.fromMap(m)).toList();
+      AppState.companies = companies;
+
+      final savedGuid = await SecureStorage.getSelectedCompanyGuid();
+      if (savedGuid != null && savedGuid.isNotEmpty) {
+        final match = companies.where((c) => c.guid == savedGuid);
+        AppState.selectedCompany = match.isNotEmpty ? match.first : (companies.isNotEmpty ? companies.first : null);
+      } else if (companies.isNotEmpty) {
+        AppState.selectedCompany = companies.first;
+      }
+    } catch (e) {
+      debugPrint('Failed to init AppState: $e');
     }
   }
 

@@ -1034,6 +1034,7 @@ Future<void> _createTablesInSchema(String schemaName) async {
         ON CONFLICT (company_guid) 
         DO UPDATE SET
           master_id = EXCLUDED.master_id,
+          user_id = EXCLUDED.user_id,
           alter_id = EXCLUDED.alter_id,
           company_name = EXCLUDED.company_name,
           reserved_name = EXCLUDED.reserved_name,

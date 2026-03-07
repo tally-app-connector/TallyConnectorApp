@@ -475,8 +475,16 @@ class CloudToLocalSyncService {
   // ============================================================
 
   /// Fetch list of companies from cloud (for company selection screen)
-  Future<List<Map<String, dynamic>>> fetchCompaniesFromCloud() async {
+  Future<List<Map<String, dynamic>>> fetchCompaniesFromCloud({String? userId}) async {
     await _ensureConnection();
+
+    if (userId != null) {
+      final rows = await _connection!.execute(
+        'SELECT company_guid, company_name, gsttin, pan, state, city, starting_from, ending_at, currency_name, maintain_inventory, is_gst_applicable, created_at, updated_at FROM user_data.companies WHERE is_deleted = 0 AND user_id = \$1 ORDER BY company_name',
+        parameters: [userId],
+      );
+      return rows.map((row) => _resultRowToMap(row, rows.schema)).toList();
+    }
 
     final rows = await _connection!.execute('''
       SELECT company_guid, company_name, gsttin, pan, state, city,

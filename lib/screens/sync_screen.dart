@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'dart:math';
+import 'dart:convert';
 import '../database/database_helper.dart';
 import '../services/cloud_to_local_sync_service.dart';
-// import '../database/database_helper.dart'; // Your local DB helper
+import '../utils/secure_storage.dart';
+import '../models/user_model.dart';
 
 class SyncScreen extends StatefulWidget {
   const SyncScreen({super.key});
@@ -65,7 +67,15 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
     });
 
     try {
-      final companies = await CloudToLocalSyncService.instance.fetchCompaniesFromCloud();
+      // Get current user's ID to filter companies
+      String? userId;
+      final userData = await SecureStorage.getUser();
+      if (userData != null) {
+        final user = User.fromJson(jsonDecode(userData));
+        userId = user.email;
+      }
+
+      final companies = await CloudToLocalSyncService.instance.fetchCompaniesFromCloud(userId: userId);
       setState(() {
         _companies = companies.map((c) => CompanyItem(
           guid: c['company_guid'] ?? '',
@@ -145,6 +155,13 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
     }
 
     stopwatch.stop();
+
+    // Save the first synced company as selected if none is set
+    final currentGuid = await SecureStorage.getSelectedCompanyGuid();
+    if ((currentGuid == null || currentGuid.isEmpty) && selected.isNotEmpty) {
+      await SecureStorage.saveCompanyGuid(selected.first.guid);
+    }
+
     setState(() {
       _syncTime = '${(stopwatch.elapsedMilliseconds / 1000).toStringAsFixed(1)}s';
       _phase = 'complete';
@@ -164,38 +181,7 @@ void _updateStepFromProgress(double progress) {
     }
   }
 }
-  // Demo simulation — remove when integrating real sync
-  Future<void> _simulateSync() async {
-    final counts = [1, 28, 18, 156, 43, 847, 2341, 1205, 890, 312];
-    for (int i = 0; i < _syncSteps.length; i++) {
-      setState(() {
-        _currentStep = i;
-        _syncSteps[i].status = StepStatus.syncing;
-        _syncStatus = 'Syncing ${_syncSteps[i].name.toLowerCase()}...';
-      });
-
-      await Future.delayed(Duration(milliseconds: 300 + (100 * (i % 3))));
-
-      setState(() {
-        _syncSteps[i].status = StepStatus.done;
-        _syncSteps[i].count = counts[i];
-        _syncProgress = (i + 1) / _syncSteps.length;
-      });
-    }
-    _syncResult = SyncResult()
-      ..success = true
-      ..companies = 1
-      ..groups = 28
-      ..voucherTypes = 18
-      ..ledgers = 156
-      ..stockItems = 43
-      ..vouchers = 847
-      ..ledgerEntries = 2341
-      ..inventoryEntries = 1205
-      ..batchAllocations = 890
-      ..closingBalances = 312;
-  }
-
+ 
   List<SyncStep> _buildSyncSteps() {
     return [
       SyncStep(name: 'Company Info', icon: Icons.business, table: 'companies'),
@@ -290,31 +276,46 @@ void _updateStepFromProgress(double progress) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'TALLY CLOUD SYNC',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 2,
-                  color: const Color(0xFF38BDF8),
-                ),
+          // Back button
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                color: Colors.white.withOpacity(0.06),
               ),
-              const SizedBox(height: 4),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                  letterSpacing: -0.5,
+              child: const Icon(Icons.arrow_back_ios_new, size: 18, color: Colors.white),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'TALLY CLOUD SYNC',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 2,
+                    color: const Color(0xFF38BDF8),
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 4),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+              ],
+            ),
           ),
           Container(
             width: 44,
