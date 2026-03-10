@@ -479,9 +479,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     final schema = AwsSyncService.instance.getSchemaName(company.guid);
                     await AwsSyncService.instance.createViewsIfNeeded(schema);
                     // Sync this company's data to local SQLite (fire and forget)
-                    DataSyncService.instance.syncCompany(company.guid).catchError((e) {
-                      developer.log('⚠️ Background sync failed: $e', name: 'Dashboard');
-                    });
+                    // DataSyncService.instance.syncCompany(company.guid).catchError((e) {
+                    //   developer.log('⚠️ Background sync failed: $e', name: 'Dashboard');
+                    // });
                     _loadMetricData();
                   },
                 );

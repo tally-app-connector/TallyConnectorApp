@@ -101,7 +101,8 @@ class SyncService {
   }
 
   /// Sync all master data (ledgers, groups, stock items, voucher types)
-  Future<Map<String, int>> syncMasterData({
+  
+    Future<Map<String, int>> syncIncrementalData({
     bool neonSync = false,
   }) async {
     int groupCount = 0;
@@ -135,9 +136,177 @@ class SyncService {
 
       await _syncStockItems(companyName, companyId, company?['last_synced_stock_items_alter_id'] ?? 0);
 
-      await _syncVoucherTypes(companyName, companyId, company?['last_synced_groups_alter_id'] ?? 0);
+      await _syncVoucherTypes(companyName, companyId, company?['last_synced_voucher_types_alter_id'] ?? 0);
 
-      await _syncVouchers(companyName, companyId, companyStart, company?['last_synced_voucher_types_alter_id'] ?? 0);
+      await _syncVouchers(companyName, companyId, companyStart, company?['last_synced_vouchers_alter_id'] ?? 0);
+
+      print("all data synced");
+
+      // // ✅ Sync Groups
+      // final groupsXml = await _tallyService.getGroups(
+      //     companyName, company?['last_synced_alter_id'] ?? 0);
+      // await _syncGroups(groupsXml, companyId, neonSync: neonSync);
+
+      // // ✅ Sync Ledgers
+      // print('📒 Syncing ledgers...');
+      // final Map<String, String> groupNameToGuid = {};
+      // final db = await _db.database;
+      // final allGroups = await db.query('groups'); // Fetch ALL groups from DB
+      // for (var group in allGroups) {
+      //   groupNameToGuid[group['group_name'] as String] =
+      //       group['group_guid'] as String;
+      // }
+      // print('📋 Built group map with ${groupNameToGuid.length} groups');
+      // final ledgersXml = await _tallyService.getLedgers(
+      //     companyName, company?['last_synced_alter_id'] ?? 0);
+      // await _syncLedgers(ledgersXml, companyId,
+      //     groupNameToGuid: groupNameToGuid, neonSync: neonSync); // Pass map
+
+      //     final batches = await _tallyService.getCompleteVouchersInBatches(companyName, 5457);
+
+      // for (int i = 0; i < batches.length; i++) {
+      //   print('Processing batch ${i + 1}/${batches.length}');
+
+      //   // Parse XML to structured data
+      //   final vouchers = TallyXmlParser.parseVouchers(batches[i]);
+
+      //   print('Parsed ${vouchers.length} vouchers');
+
+      //   // Save to database
+      //   for (final voucher in vouchers) {
+      //     print('Voucher: ${voucher.voucherType} - ${voucher.voucherNumber}');
+      //     print('  Date: ${voucher.date}');
+      //     print('  Party: ${voucher.partyLedgerName}');
+
+      //     // Ledger Entries
+      //     for (final ledger in voucher.ledgerEntries) {
+      //       print('  Ledger: ${ledger.ledgerName} = ${ledger.amount}');
+      //     }
+
+      //     // Inventory Entries
+      //     for (final inventory in voucher.inventoryEntries) {
+      //       print('  Item: ${inventory.stockItemName} x ${inventory.actualQty} @ ${inventory.rate}');
+      //     }
+
+      //     // Save to database
+      //     // await saveVoucherToDatabase(voucher);
+      //   }
+      // }
+
+      // print('✅ All vouchers synced!');
+
+      //   final stockItemsData = await _syncStockItems(stockItemsXml);
+      //   stockItemCount = stockItemsData['count'];
+      //   print('✅ Synced $stockItemCount stock items');
+
+      //   // Update timestamp in company table
+      //   if (companyId != null) {
+      //     final maxAlterId = stockItemsData['max_alter_id'] as int? ?? 0;
+      //     if (maxAlterId > 0){
+      //       await _db.updateCompany(companyId, {
+      //                 'last_synced_stock_items_alter_id': maxAlterId,
+      //                 'sync_date': DateTime.now().millisecondsSinceEpoch,
+      //               });
+      //     }
+      //     if (neonSync) {
+      //       await _neonSync.updateSyncTimestampForEntity(
+      //         companyId,
+      //         'stock_items',
+      //         maxAlterId,
+      //       );
+      //     }
+      //   }
+
+      //   // ✅ Sync Voucher Types
+      //   print('📝 Syncing voucher types...');
+      //   final voucherTypesXml = await _tallyService.getVoucherTypes();
+      //   final voucherTypesData = await _syncVoucherTypes(voucherTypesXml);
+      //   voucherTypeCount = voucherTypesData['count'];
+      //   print('✅ Synced $voucherTypeCount voucher types');
+
+      //   // Update timestamp in company table
+      //   if (companyId != null) {
+      //     final maxAlterId = voucherTypesData['max_alter_id'] as int? ?? 0;
+      //     if (maxAlterId > 0){
+      //       await _db.updateCompany(companyId, {
+      //                 'last_synced_voucher_types_alter_id': maxAlterId,
+      //                 'sync_date': DateTime.now().millisecondsSinceEpoch,
+      //               });
+      //     }
+      //     if (neonSync) {
+      //       await _neonSync.updateSyncTimestampForEntity(
+      //         companyId,
+      //         'voucher_types',
+      //         maxAlterId,
+      //       );
+      //     }
+      //   }
+
+      //   // ✅ Upload to Neon (if enabled)
+      //   if (neonSync) {
+      //     print('\n☁️  Uploading master data to Neon...');
+
+      //     await _neonSync.syncGroups(groupsData['data']['groups'],companyId!);
+      //     await _neonSync.syncLedgers(ledgersData['data']['ledgers'],companyId);
+      //     await _neonSync.syncStockItems(stockItemsData['data']['stock_items'],companyId);
+      //     await _neonSync.syncVoucherTypes(voucherTypesData['data']['voucher_types'],companyId);
+
+      //     print('✅ Master data uploaded to Neon');
+      //   }
+
+      return {
+        'ledgers': ledgerCount,
+        'groups': groupCount,
+        'stock_items': stockItemCount,
+        'voucher_types': voucherTypeCount,
+      };
+    } catch (e) {
+      print('❌ Error syncing master data: $e');
+      rethrow;
+    } finally {
+      // if (neonSync) {
+      //   await _neonSync.close();
+      // }
+    }
+  }
+
+  Future<Map<String, int>> syncAllData({
+    bool neonSync = false,
+  }) async {
+    int groupCount = 0;
+    int ledgerCount = 0;
+    int stockItemCount = 0;
+    int voucherTypeCount = 0;
+
+    final company = await _db.getSelectedCompanyByGuid();
+    final String? companyId = company?['company_guid'];
+    final String? companyName = company?['company_name'];
+    final String companyStart =
+        company?['starting_from'] ?? getCurrentFyStartDate();
+
+    if (companyName == null || companyId == null) {
+      return {
+        'ledgers': 0,
+        'groups': 0,
+        'stock_items': 0,
+        'voucher_types': 0,
+      };
+    }
+
+    try {
+      // if (neonSync) {
+      //   await _neonSync.initialize();
+      // }
+
+      await _syncGroups(companyName, companyId, 0);
+
+      await _syncLedgers(companyName, companyId, 0);
+
+      await _syncStockItems(companyName, companyId, 0);
+
+      await _syncVoucherTypes(companyName, companyId, 0);
+
+      await _syncAllVouchers(companyName, companyId, companyStart, 0);
 
       print("all data synced");
 
@@ -512,25 +681,25 @@ class SyncService {
     }
   }
 
-  // Future _syncVouchers(String companyName, String companyId, String companyStartDate, int lastAlterId) async {
-  //   final xml = await _tallyService.getAllVouchers(companyName, 0);
-  //   final vouchers = TallyXmlParser.parseVouchers(xml);
+  Future _syncVouchers(String companyName, String companyId, String companyStartDate, int lastAlterId) async {
+    final xml = await _tallyService.getNewVouchers(companyName, lastAlterId);
+    final vouchers = TallyXmlParser.parseVouchers(xml);
 
-  //   if (vouchers.isNotEmpty){
-  //     await _db.saveVoucherBatch(vouchers, companyId);
+    if (vouchers.isNotEmpty){
+      await _db.saveVoucherBatch(vouchers, companyId);
 
-  //     final maxAlterId = vouchers.map((v) => v.alterId).reduce((a, b) => a > b ? a : b);
-  //     if (maxAlterId > lastAlterId) {
-  //       await _db.updateSyncTracking(
-  //         companyId,
-  //         lastSyncedVouchersAlterId: maxAlterId,
-  //       );
-  //     }
-  //   }
+      final maxAlterId = vouchers.map((v) => v.alterId).reduce((a, b) => a > b ? a : b);
+      if (maxAlterId > lastAlterId) {
+        await _db.updateSyncTracking(
+          companyId,
+          lastSyncedVouchersAlterId: maxAlterId,
+        );
+      }
+    }
 
-  //   await detectAndDeleteMissingVouchers(companyName, companyId);
+    // await detectAndDeleteMissingVouchers(companyName, companyId);
 
-  // }
+  }
 
     Future _syncVoucherTypes(String companyName, String companyId, int lastAlterId) async {
     final xml = await _tallyService.getVoucherTypes(companyName, lastAlterId);
@@ -553,15 +722,10 @@ class SyncService {
   }
 
 
-  Future _syncVouchers(String companyName, String companyId,
+  Future _syncAllVouchers(String companyName, String companyId,
       String companyStartDate, int lastAlterId) async {
     final startDate = DateTime.parse(companyStartDate);
-    // // Parse company start date (yyyymmdd)
-    // final startDate = DateTime(
-    //   int.parse(companyStartDate.substring(0, 4)),
-    //   int.parse(companyStartDate.substring(4, 6)),
-    //   int.parse(companyStartDate.substring(6, 8)),
-    // );
+    
 
     final now = DateTime.now();
 
@@ -598,8 +762,9 @@ class SyncService {
 
     // Sync vouchers for each financial year
     for (final fy in fyRanges) {
+
       final results = await _tallyService
-          .getAllVouchersBatched(companyName, 0, fy['start']!, fy['end']!,
+          .getAllVouchersBatched(companyName, fy['start']!, fy['end']!,
               onProgress: (fetched, total) {
         print('Fetched $fetched / $total'); // or update your UI
       });
@@ -647,13 +812,26 @@ class SyncService {
         '${date.day.toString().padLeft(2, '0')}';
   }
 
-  Future<void> detectAndDeleteMissingVouchers(
-      String companyName, String companyId) async {
+  Future<void> detectAndDeleteMissingVouchers() async {
     print('🔍 Checking for deleted vouchers...');
 
+    final company = await _db.getSelectedCompanyByGuid();
+    final String? companyId = company?['company_guid'];
+    final String? companyName = company?['company_name'];
+    final String companyStart =
+        company?['starting_from'] ?? getCurrentFyStartDate();
+    final String currentYearEndDate = getCurrentFyEndDate();
+
+        
+    final startDate = DateTime.parse(companyStart);
+    final endDate = DateTime.parse(currentYearEndDate);
+
+if (companyName == null || companyId == null) {
+      return ;
+    }
     try {
       // Step 1: Get all GUIDs from Tally
-      final tallyXml = await _tallyService.getAllVouchersGuid(companyName);
+      final tallyXml = await _tallyService.getAllVouchersGuid(companyName, _formatDate(startDate), _formatDate(endDate));
       final tallyGuids = TallyXmlParser.parseVoucherGuids(tallyXml);
 
       if (tallyGuids.isEmpty) {
@@ -688,7 +866,7 @@ class SyncService {
       print('🗑️ Found ${deletedGuids.length} deleted vouchers');
 
       // Step 4: Delete them from database
-      await _db.deleteVouchersByGuids(deletedGuids);
+      await _db.deleteVouchersByGuids(deletedGuids, companyId);
 
       print('✅ Cleanup complete! Removed ${deletedGuids.length} vouchers');
     } catch (e) {
@@ -697,42 +875,6 @@ class SyncService {
     }
   }
 
-  double _parseBalanceSimple(String balanceText) {
-    try {
-      String original = balanceText.trim().toUpperCase();
-
-      if (original.isEmpty ||
-          original == '0' ||
-          original == '0 DR' ||
-          original == '0 CR') {
-        return 0.0;
-      }
-
-      bool hasCr = original.contains(' CR') || original.endsWith('CR');
-      String cleaned = balanceText.replaceAll(RegExp(r'[^\d.-]'), '');
-      double value = double.tryParse(cleaned)?.abs() ?? 0.0;
-
-      if (value == 0.0) {
-        return 0.0;
-      }
-
-      if (hasCr) {
-        return -value;
-      } else {
-        return value;
-      }
-    } catch (e) {
-      print('❌ Error parsing balance "$balanceText": $e');
-      return 0.0;
-    }
-  }
-
-  int _parseAmountValueInt(String amountText) {
-    if (amountText.isEmpty) return 0;
-    final cleaned = amountText.replaceAll(RegExp(r'[^\d.-]'), '');
-    final value = double.tryParse(cleaned)?.abs() ?? 0.0;
-    return value.round();
-  }
 
   String cleanTallyValue(String value) {
     return value

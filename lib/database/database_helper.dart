@@ -2878,41 +2878,63 @@ Future<Map<String, dynamic>> _convertVoucherToMap(
     );
   }
 
-  // Delete vouchers by GUIDs
-  Future<void> deleteVouchersByGuids(List<String> guids) async {
-    final db = await database;
-    final batch = db.batch();
+  // // Delete vouchers by GUIDs
+  // Future<void> deleteVouchersByGuids(List<String> guids) async {
+  //   final db = await database;
+  //   final batch = db.batch();
 
-    for (var guid in guids) {
-      batch.delete(
-        'vouchers',
-        where: 'voucher_guid = ?',
-        whereArgs: [guid],
-      );
+  //   for (var guid in guids) {
+  //     batch.delete(
+  //       'vouchers',
+  //       where: 'voucher_guid = ?',
+  //       whereArgs: [guid],
+  //     );
 
-      // Also delete related data
-      batch.delete(
-        'voucher_ledger_entries',
-        where: 'voucher_guid = ?',
-        whereArgs: [guid],
-      );
+  //     // Also delete related data
+  //     batch.delete(
+  //       'voucher_ledger_entries',
+  //       where: 'voucher_guid = ?',
+  //       whereArgs: [guid],
+  //     );
 
-      batch.delete(
-        'voucher_inventory_entries',
-        where: 'voucher_guid = ?',
-        whereArgs: [guid],
-      );
+  //     batch.delete(
+  //       'voucher_inventory_entries',
+  //       where: 'voucher_guid = ?',
+  //       whereArgs: [guid],
+  //     );
 
-      batch.delete(
-        'voucher_batch_allocations',
-        where: 'voucher_guid = ?',
-        whereArgs: [guid],
-      );
-    }
+  //     batch.delete(
+  //       'voucher_batch_allocations',
+  //       where: 'voucher_guid = ?',
+  //       whereArgs: [guid],
+  //     );
+  //   }
 
-    await batch.commit(noResult: true);
-    print('✅ Deleted ${guids.length} vouchers and related entries');
+  //   await batch.commit(noResult: true);
+  //   print('✅ Deleted ${guids.length} vouchers and related entries');
+  // }
+
+  Future<void> deleteVouchersByGuids(List<String> guids, String companyGuid) async {
+  // Delete locally
+  final db = await database;
+  final batch = db.batch();
+
+  for (var guid in guids) {
+    batch.delete('vouchers', where: 'voucher_guid = ?', whereArgs: [guid]);
+    batch.delete('voucher_ledger_entries', where: 'voucher_guid = ?', whereArgs: [guid]);
+    batch.delete('voucher_inventory_entries', where: 'voucher_guid = ?', whereArgs: [guid]);
+    batch.delete('voucher_batch_allocations', where: 'voucher_guid = ?', whereArgs: [guid]);
   }
+  await batch.commit(noResult: true);
+  print('✅ Deleted ${guids.length} vouchers locally');
+
+  // Delete from AWS
+  try {
+    await AwsSyncService.instance.deleteVouchersByGuids(guids, companyGuid);
+  } catch (e) {
+    print('⚠️ Local delete succeeded but AWS delete failed: $e');
+  }
+}
 
   /// Get latest HSN detail
   Map<String, dynamic>? _getLatestHsn(List<HSNDetail> hsnDetails) {

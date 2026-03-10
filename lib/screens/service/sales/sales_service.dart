@@ -110,15 +110,26 @@ class SalesAnalyticsService {
     final to = dates['to']!;
     try {
       final db = await _db.database;
-      final result = await db.rawQuery('''
-        SELECT COALESCE(SUM(ABS(vie.gst_amount)), 0) as total
-        FROM voucher_inventory_entries vie
-        INNER JOIN vouchers v ON v.voucher_guid = vie.voucher_guid
-        WHERE v.company_guid = ? AND v.voucher_type = 'Sales'
-          AND v.is_deleted = 0 AND v.is_cancelled = 0 AND v.is_optional = 0
+
+      final salesGST = await db.rawQuery('''
+      SELECT 
+        SUM(cgst_amount) as total_cgst,
+        SUM(sgst_amount) as total_sgst,
+        SUM(igst_amount) as total_igst
+      FROM voucher_inventory_entries vie
+      INNER JOIN vouchers v ON vie.voucher_guid = v.voucher_guid
+      WHERE v.company_guid = ?
+        AND v.voucher_type = 'Sales'
+        AND v.is_deleted = 0 AND v.is_cancelled = 0 AND v.is_optional = 0
           AND v.date >= ? AND v.date <= ?
-      ''', [companyGuid, from, to]);
-      final v = (result.first['total'] as num?)?.toDouble() ?? 0.0;
+    ''', [companyGuid, from, to]);
+
+        final outputCGST = (salesGST.first['total_cgst'] as num?)?.toDouble() ?? 0.0;
+    final outputSGST = (salesGST.first['total_sgst'] as num?)?.toDouble() ?? 0.0;
+    final outputIGST = (salesGST.first['total_igst'] as num?)?.toDouble() ?? 0.0;
+    
+
+      final v = outputCGST + outputSGST + outputIGST;
       return _toReportValue(v, 'GST');
     } catch (_) {
       return _toReportValue(0, 'GST');
@@ -723,18 +734,30 @@ Future<ReportChartData> getGSTTrend({
   final to = dates['to']!;
   try {
     final db = await _db.database;
+
     final rows = await db.rawQuery('''
-      SELECT 
-        SUBSTR(v.date, 1, 6) as month,
-        COALESCE(SUM(ABS(vie.gst_amount)), 0) as total
-      FROM voucher_inventory_entries vie
-      INNER JOIN vouchers v ON v.voucher_guid = vie.voucher_guid
-      WHERE v.company_guid = ?
-        AND v.voucher_type = 'Sales'
-        AND v.is_deleted = 0 AND v.is_cancelled = 0 AND v.is_optional = 0
-        AND v.date >= ? AND v.date <= ?
-      GROUP BY month ORDER BY month
-    ''', [companyGuid, from, to]);
+  SELECT 
+    SUBSTR(v.date, 1, 6) as month,
+    COALESCE(SUM(vie.cgst_amount), 0) as total_cgst,
+    COALESCE(SUM(vie.sgst_amount), 0) as total_sgst,
+    COALESCE(SUM(vie.igst_amount), 0) as total_igst,
+    COALESCE(
+      SUM(vie.cgst_amount + vie.sgst_amount + vie.igst_amount), 
+      0
+    ) as total
+  FROM voucher_inventory_entries vie
+  INNER JOIN vouchers v 
+    ON v.voucher_guid = vie.voucher_guid
+  WHERE v.company_guid = ?
+    AND v.voucher_type = 'Sales'
+    AND v.is_deleted = 0
+    AND v.is_cancelled = 0
+    AND v.is_optional = 0
+    AND v.date >= ?
+    AND v.date <= ?
+  GROUP BY month
+  ORDER BY month
+''', [companyGuid, from, to]);
 
     return ReportChartData(
       dataPoints: rows.map((r) => ChartDataPoint(
@@ -1229,18 +1252,38 @@ Future<List<TopSellingItem>> getTopItems(
 
       case ReportMetric.gst:
         rows = await db.rawQuery('''
-          SELECT vie.stock_item_name as name,
-            COALESCE(SUM(ABS(vie.gst_amount)), 0) as total
-          FROM voucher_inventory_entries vie
-          INNER JOIN vouchers v ON v.voucher_guid = vie.voucher_guid
-          WHERE v.company_guid = ?
-            AND v.voucher_type = 'Sales'
-            AND v.is_deleted = 0 AND v.is_cancelled = 0 AND v.is_optional = 0
-            AND v.date >= ? AND v.date <= ?
-          GROUP BY vie.stock_item_name
-          HAVING total > 0
-          ORDER BY total DESC LIMIT ?
-        ''', [companyGuid, from, to, limit]);
+  SELECT 
+    vie.stock_item_name as name,
+
+    COALESCE(SUM(vie.cgst_amount), 0) as total_cgst,
+    COALESCE(SUM(vie.sgst_amount), 0) as total_sgst,
+    COALESCE(SUM(vie.igst_amount), 0) as total_igst,
+
+    COALESCE(
+      SUM(vie.cgst_amount + vie.sgst_amount + vie.igst_amount),
+      0
+    ) as total
+
+  FROM voucher_inventory_entries vie
+  INNER JOIN vouchers v 
+    ON v.voucher_guid = vie.voucher_guid
+
+  WHERE v.company_guid = ?
+    AND v.voucher_type = 'Sales'
+    AND v.is_deleted = 0
+    AND v.is_cancelled = 0
+    AND v.is_optional = 0
+    AND v.date >= ?
+    AND v.date <= ?
+
+  GROUP BY vie.stock_item_name
+
+  HAVING total > 0
+
+  ORDER BY total DESC
+
+  LIMIT ?
+''', [companyGuid, from, to, limit]);
         break;
 
       case ReportMetric.stock:

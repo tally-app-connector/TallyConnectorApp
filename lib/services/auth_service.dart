@@ -1,11 +1,333 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
-import '../config/api_config.dart';
-import '../models/user_model.dart';
-import '../utils/secure_storage.dart';
+// import 'dart:convert';
+// import 'package:http/http.dart' as http;
+// import '../config/api_config.dart';
+// import '../models/user_model.dart';
+// import '../utils/secure_storage.dart';
 
+// class AuthService {
+//   // Signup
+//   static Future<Map<String, dynamic>> signup({
+//     required String fullName,
+//     required String email,
+//     required String password,
+//     String? phone,
+//   }) async {
+//     try {
+//       final response = await http
+//           .post(
+//             Uri.parse(ApiConfig.signup),
+//             headers: {'Content-Type': 'application/json'},
+//             body: jsonEncode({
+//               'full_name': fullName,
+//               'email': email,
+//               'password': password,
+//               'phone': phone,
+//             }),
+//           )
+//           .timeout(ApiConfig.timeout);
+
+//       final data = jsonDecode(response.body);
+
+//       if (response.statusCode == 200) {
+//         // Save token
+//         await SecureStorage.saveToken(data['access_token']);
+        
+//         // Save user
+//         await SecureStorage.saveUser(jsonEncode(data['user']));
+
+//         return {'success': true, 'user': User.fromJson(data['user'])};
+//       } else {
+//         return {
+//           'success': false,
+//           'message': data['detail'] ?? 'Signup failed'
+//         };
+//       }
+//     } catch (e) {
+//       return {'success': false, 'message': 'Connection error: $e'};
+//     }
+//   }
+
+//  // Login
+// static Future<Map<String, dynamic>> login({
+//   required String email,
+//   required String password,
+// }) async {
+//   try {
+//     final response = await http
+//         .post(
+//           Uri.parse(ApiConfig.login),
+//           headers: {'Content-Type': 'application/json'},
+//           body: jsonEncode({
+//             'email': email,
+//             'password': password,
+//           }),
+//         )
+//         .timeout(ApiConfig.timeout);
+
+//     print('Response status: ${response.statusCode}');
+//     print('Response body: ${response.body}');  // Debug print
+
+//     final data = jsonDecode(response.body);
+
+//     if (response.statusCode == 200) {
+//       // Save token
+//       await SecureStorage.saveToken(data['access_token'] as String);
+      
+//       // Make sure user data is not null
+//       if (data['user'] != null) {
+//         await SecureStorage.saveUser(jsonEncode(data['user']));
+        
+//         return {
+//           'success': true,
+//           'user': data['user'] as Map<String, dynamic>,
+//         };
+//       } else {
+//         return {
+//           'success': false,
+//           'message': 'User data not received from server'
+//         };
+//       }
+//     } else {
+//       return {
+//         'success': false,
+//         'message': data['detail'] ?? 'Login failed'
+//       };
+//     }
+//   } catch (e) {
+//     print('Login error: $e');  // Debug print
+//     return {'success': false, 'message': 'Connection error: $e'};
+//   }
+// }
+//   // Forgot Password
+//   static Future<Map<String, dynamic>> forgotPassword(String email) async {
+//     try {
+//       final response = await http
+//           .post(
+//             Uri.parse(ApiConfig.forgotPassword),
+//             headers: {'Content-Type': 'application/json'},
+//             body: jsonEncode({'email': email}),
+//           )
+//           .timeout(ApiConfig.timeout);
+
+//       final data = jsonDecode(response.body);
+
+//       if (response.statusCode == 200) {
+//         return {'success': true, 'message': data['message']};
+//       } else {
+//         return {
+//           'success': false,
+//           'message': data['detail'] ?? 'Request failed'
+//         };
+//       }
+//     } catch (e) {
+//       return {'success': false, 'message': 'Connection error: $e'};
+//     }
+//   }
+
+//   // Reset Password
+//   static Future<Map<String, dynamic>> resetPassword({
+//     required String token,
+//     required String newPassword,
+//   }) async {
+//     try {
+//       final response = await http
+//           .post(
+//             Uri.parse(ApiConfig.resetPassword),
+//             headers: {'Content-Type': 'application/json'},
+//             body: jsonEncode({
+//               'token': token,
+//               'new_password': newPassword,
+//             }),
+//           )
+//           .timeout(ApiConfig.timeout);
+
+//       final data = jsonDecode(response.body);
+
+//       if (response.statusCode == 200) {
+//         return {'success': true, 'message': data['message']};
+//       } else {
+//         return {
+//           'success': false,
+//           'message': data['detail'] ?? 'Reset failed'
+//         };
+//       }
+//     } catch (e) {
+//       return {'success': false, 'message': 'Connection error: $e'};
+//     }
+//   }
+
+//   // Get Current User
+//   static Future<User?> getCurrentUser() async {
+//     try {
+//       final token = await SecureStorage.getToken();
+//       if (token == null) return null;
+
+//       final response = await http
+//           .get(
+//             Uri.parse(ApiConfig.getCurrentUser),
+//             headers: {
+//               'Content-Type': 'application/json',
+//               'Authorization': 'Bearer $token',
+//             },
+//           )
+//           .timeout(ApiConfig.timeout);
+
+//       if (response.statusCode == 200) {
+//         final data = jsonDecode(response.body);
+//         return User.fromJson(data);
+//       }
+//       return null;
+//     } catch (e) {
+//       return null;
+//     }
+//   }
+
+//   // Logout
+//   static Future<void> logout() async {
+//     try {
+//       final token = await SecureStorage.getToken();
+//       if (token != null) {
+//         await http.post(
+//           Uri.parse(ApiConfig.logout),
+//           headers: {
+//             'Content-Type': 'application/json',
+//             'Authorization': 'Bearer $token',
+//           },
+//         );
+//       }
+//     } catch (e) {
+//       // Ignore errors on logout
+//     } finally {
+//       await SecureStorage.clearAll();
+//     }
+//   }
+
+//   // Add to existing auth_service.dart file
+
+// // Resend Verification Email
+// static Future<Map<String, dynamic>> resendVerification(String email) async {
+//   try {
+//     final response = await http
+//         .post(
+//           Uri.parse('${ApiConfig.resendVerification}?email=$email'),
+//           headers: {'Content-Type': 'application/json'},
+//         )
+//         .timeout(ApiConfig.timeout);
+
+//     final data = jsonDecode(response.body);
+
+//     if (response.statusCode == 200) {
+//       return {'success': true, 'message': data['message']};
+//     } else {
+//       return {
+//         'success': false,
+//         'message': data['detail'] ?? 'Failed to resend verification'
+//       };
+//     }
+//   } catch (e) {
+//     return {'success': false, 'message': 'Connection error: $e'};
+//   }
+// }
+
+// // Send OTP
+// static Future<Map<String, dynamic>> sendOtp(String email) async {
+//   try {
+//     final response = await http
+//         .post(
+//           Uri.parse('${ApiConfig.sendOtp}?email=$email'),
+//           headers: {'Content-Type': 'application/json'},
+//         )
+//         .timeout(ApiConfig.timeout);
+
+//     final data = jsonDecode(response.body);
+
+//     if (response.statusCode == 200) {
+//       return {'success': true, 'message': data['message']};
+//     } else {
+//       return {
+//         'success': false,
+//         'message': data['detail'] ?? 'Failed to send OTP'
+//       };
+//     }
+//   } catch (e) {
+//     return {'success': false, 'message': 'Connection error: $e'};
+//   }
+// }
+
+// // Verify OTP
+// static Future<Map<String, dynamic>> verifyOtp({
+//   required String email,
+//   required String otp,
+// }) async {
+//   try {
+//     final response = await http
+//         .post(
+//           Uri.parse('${ApiConfig.verifyOtp}?email=$email&otp=$otp'),
+//           headers: {'Content-Type': 'application/json'},
+//         )
+//         .timeout(ApiConfig.timeout);
+
+//     final data = jsonDecode(response.body);
+
+//     if (response.statusCode == 200) {
+//       return {'success': true, 'message': data['message']};
+//     } else {
+//       return {
+//         'success': false,
+//         'message': data['detail'] ?? 'Invalid OTP'
+//       };
+//     }
+//   } catch (e) {
+//     return {'success': false, 'message': 'Connection error: $e'};
+//   }
+// }
+// }
+  // static const String _userPoolId = 'ap-south-1_TJZfocZgL';     // ← Replace
+  // static const String _clientId   = '2ts5mv8rhapub6lhqnsns0eue5'; // ← Replace
+
+import 'package:amazon_cognito_identity_dart_2/cognito.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+// ─── Persistent Storage ───────────────────────────────────────────────────────
+class _CognitoStorage extends CognitoStorage {
+  final SharedPreferences _prefs;
+  _CognitoStorage(this._prefs);
+
+  @override
+  Future<String?> getItem(String key) async => _prefs.getString(key);
+
+  @override
+  Future<void> setItem(String key, dynamic value) async =>
+      await _prefs.setString(key, value.toString());
+
+  @override
+  Future<void> removeItem(String key) async => await _prefs.remove(key);
+
+  @override
+  Future<void> clear() async => await _prefs.clear();
+}
+
+// ─── AuthService ──────────────────────────────────────────────────────────────
 class AuthService {
-  // Signup
+  static const String _userPoolId = 'ap-south-1_TJZfocZgL';     // ← Replace
+  static const String _clientId   = '2ts5mv8rhapub6lhqnsns0eue5'; // ← Replace
+
+  static CognitoUserPool? _userPool;
+  static CognitoUser? _currentCognitoUser;
+
+  // ── Init ──────────────────────────────────────────────────────────────────
+  static Future<void> init() async {
+    final prefs = await SharedPreferences.getInstance();
+    _userPool = CognitoUserPool(_userPoolId, _clientId, storage: _CognitoStorage(prefs));
+  }
+
+  static CognitoUserPool get _pool {
+    if (_userPool == null) throw Exception('Call AuthService.init() in main().');
+    return _userPool!;
+  }
+
+  // ── SIGN UP ───────────────────────────────────────────────────────────────
+  // Returns: { 'success': bool, 'message': String }
   static Future<Map<String, dynamic>> signup({
     required String fullName,
     required String email,
@@ -13,272 +335,211 @@ class AuthService {
     String? phone,
   }) async {
     try {
-      final response = await http
-          .post(
-            Uri.parse(ApiConfig.signup),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'full_name': fullName,
-              'email': email,
-              'password': password,
-              'phone': phone,
-            }),
-          )
-          .timeout(ApiConfig.timeout);
+      final userAttributes = [
+        AttributeArg(name: 'name', value: fullName),
+        if (phone != null && phone.isNotEmpty)
+          AttributeArg(name: 'phone_number', value: _formatPhone(phone)),
+      ];
 
-      final data = jsonDecode(response.body);
+      // Email is used directly as username (works after pool recreated with email-only sign-in)
+      await _pool.signUp(email, password, userAttributes: userAttributes);
 
-      if (response.statusCode == 200) {
-        // Save token
-        await SecureStorage.saveToken(data['access_token']);
-        
-        // Save user
-        await SecureStorage.saveUser(jsonEncode(data['user']));
-
-        return {'success': true, 'user': User.fromJson(data['user'])};
-      } else {
-        return {
-          'success': false,
-          'message': data['detail'] ?? 'Signup failed'
-        };
-      }
+      return {'success': true, 'message': 'Account created successfully!'};
+    } on CognitoClientException catch (e) {
+      return {'success': false, 'message': _cognitoErrorMessage(e)};
     } catch (e) {
-      return {'success': false, 'message': 'Connection error: $e'};
+      return {'success': false, 'message': e.toString()};
     }
   }
 
- // Login
-static Future<Map<String, dynamic>> login({
-  required String email,
-  required String password,
-}) async {
-  try {
-    final response = await http
-        .post(
-          Uri.parse(ApiConfig.login),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            'email': email,
-            'password': password,
-          }),
-        )
-        .timeout(ApiConfig.timeout);
+  // ── LOGIN ─────────────────────────────────────────────────────────────────
+  // Returns: { 'success': bool, 'message': String, 'user': Map? }
+  static Future<Map<String, dynamic>> login({
+    required String email,
+    required String password,
+  }) async {
+    try {
+      _currentCognitoUser = CognitoUser(email, _pool);
+      final session = await _currentCognitoUser!.authenticateUser(
+        AuthenticationDetails(username: email, password: password),
+      );
 
-    print('Response status: ${response.statusCode}');
-    print('Response body: ${response.body}');  // Debug print
-
-    final data = jsonDecode(response.body);
-
-    if (response.statusCode == 200) {
-      // Save token
-      await SecureStorage.saveToken(data['access_token'] as String);
-      
-      // Make sure user data is not null
-      if (data['user'] != null) {
-        await SecureStorage.saveUser(jsonEncode(data['user']));
-        
-        return {
-          'success': true,
-          'user': data['user'] as Map<String, dynamic>,
-        };
-      } else {
-        return {
-          'success': false,
-          'message': 'User data not received from server'
-        };
+      if (session == null || !session.isValid()) {
+        return {'success': false, 'message': 'Login failed. Please try again.'};
       }
-    } else {
+
+      final attributes = await _currentCognitoUser!.getUserAttributes();
+
+      final isVerified = attributes
+              ?.firstWhere(
+                (a) => a.name == 'email_verified',
+                orElse: () => CognitoUserAttribute(name: 'email_verified', value: 'false'),
+              )
+              .value == 'true';
+
+      final name = attributes
+              ?.firstWhere(
+                (a) => a.name == 'name',
+                orElse: () => CognitoUserAttribute(name: 'name', value: ''),
+              )
+              .value ?? '';
+
+      // Get sub (Cognito's unique user ID) to use as user_id
+      final sub = attributes
+              ?.firstWhere(
+                (a) => a.name == 'sub',
+                orElse: () => CognitoUserAttribute(name: 'sub', value: '0'),
+              )
+              .value ?? '0';
+
+      final phone = attributes
+              ?.firstWhere(
+                (a) => a.name == 'phone_number',
+                orElse: () => CognitoUserAttribute(name: 'phone_number', value: ''),
+              )
+              .value;
+
       return {
-        'success': false,
-        'message': data['detail'] ?? 'Login failed'
+        'success': true,
+        'message': 'Login successful!',
+        'user': {
+          // Mapped to match your User model fields exactly
+          'user_id':    sub.hashCode.abs(),
+          'email':      email,
+          'full_name':  name,
+          'phone':      (phone == null || phone.isEmpty) ? null : phone,
+          'is_verified': isVerified,
+          'created_at': DateTime.now().toIso8601String(),
+          'last_login': DateTime.now().toIso8601String(),
+          // Also keep 'name' for login_screen is_verified check
+          'name':       name,
+        },
       };
+    } on CognitoClientException catch (e) {
+      return {'success': false, 'message': _cognitoErrorMessage(e)};
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
     }
-  } catch (e) {
-    print('Login error: $e');  // Debug print
-    return {'success': false, 'message': 'Connection error: $e'};
   }
-}
-  // Forgot Password
+
+  // ── SEND OTP ──────────────────────────────────────────────────────────────
+  static Future<Map<String, dynamic>> sendOtp(String email) async {
+    try {
+      await CognitoUser(email, _pool).resendConfirmationCode();
+      return {'success': true, 'message': 'OTP sent to $email'};
+    } on CognitoClientException catch (e) {
+      return {'success': false, 'message': _cognitoErrorMessage(e)};
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  // ── VERIFY OTP ────────────────────────────────────────────────────────────
+  static Future<Map<String, dynamic>> verifyOtp({
+    required String email,
+    required String otp,
+  }) async {
+    try {
+      final confirmed = await CognitoUser(email, _pool).confirmRegistration(otp);
+      return confirmed
+          ? {'success': true,  'message': 'Email verified successfully!'}
+          : {'success': false, 'message': 'Verification failed. Please try again.'};
+    } on CognitoClientException catch (e) {
+      return {'success': false, 'message': _cognitoErrorMessage(e)};
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  // ── RESEND VERIFICATION ───────────────────────────────────────────────────
+  static Future<Map<String, dynamic>> resendVerification(String email) async =>
+      sendOtp(email);
+
+  // ── FORGOT PASSWORD ───────────────────────────────────────────────────────
   static Future<Map<String, dynamic>> forgotPassword(String email) async {
     try {
-      final response = await http
-          .post(
-            Uri.parse(ApiConfig.forgotPassword),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'email': email}),
-          )
-          .timeout(ApiConfig.timeout);
-
-      final data = jsonDecode(response.body);
-
-      if (response.statusCode == 200) {
-        return {'success': true, 'message': data['message']};
-      } else {
-        return {
-          'success': false,
-          'message': data['detail'] ?? 'Request failed'
-        };
-      }
+      _currentCognitoUser = CognitoUser(email, _pool);
+      await _currentCognitoUser!.forgotPassword();
+      return {'success': true, 'message': 'Reset code sent to $email'};
+    } on CognitoClientException catch (e) {
+      return {'success': false, 'message': _cognitoErrorMessage(e)};
     } catch (e) {
-      return {'success': false, 'message': 'Connection error: $e'};
+      return {'success': false, 'message': e.toString()};
     }
   }
 
-  // Reset Password
+  // ── RESET PASSWORD ────────────────────────────────────────────────────────
   static Future<Map<String, dynamic>> resetPassword({
     required String token,
     required String newPassword,
   }) async {
     try {
-      final response = await http
-          .post(
-            Uri.parse(ApiConfig.resetPassword),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'token': token,
-              'new_password': newPassword,
-            }),
-          )
-          .timeout(ApiConfig.timeout);
-
-      final data = jsonDecode(response.body);
-
-      if (response.statusCode == 200) {
-        return {'success': true, 'message': data['message']};
-      } else {
-        return {
-          'success': false,
-          'message': data['detail'] ?? 'Reset failed'
-        };
+      if (_currentCognitoUser == null) {
+        return {'success': false, 'message': 'Session expired. Please restart.'};
       }
+      final confirmed = await _currentCognitoUser!.confirmPassword(token, newPassword);
+      return confirmed
+          ? {'success': true,  'message': 'Password reset successful!'}
+          : {'success': false, 'message': 'Reset failed. Please try again.'};
+    } on CognitoClientException catch (e) {
+      return {'success': false, 'message': _cognitoErrorMessage(e)};
     } catch (e) {
-      return {'success': false, 'message': 'Connection error: $e'};
+      return {'success': false, 'message': e.toString()};
     }
   }
 
-  // Get Current User
-  static Future<User?> getCurrentUser() async {
-    try {
-      final token = await SecureStorage.getToken();
-      if (token == null) return null;
-
-      final response = await http
-          .get(
-            Uri.parse(ApiConfig.getCurrentUser),
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer $token',
-            },
-          )
-          .timeout(ApiConfig.timeout);
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return User.fromJson(data);
-      }
-      return null;
-    } catch (e) {
-      return null;
-    }
-  }
-
-  // Logout
+  // ── LOGOUT ────────────────────────────────────────────────────────────────
   static Future<void> logout() async {
+    await _currentCognitoUser?.signOut();
+    _currentCognitoUser = null;
+  }
+
+  // ── IS LOGGED IN ──────────────────────────────────────────────────────────
+  static Future<bool> isLoggedIn() async {
     try {
-      final token = await SecureStorage.getToken();
-      if (token != null) {
-        await http.post(
-          Uri.parse(ApiConfig.logout),
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer $token',
-          },
-        );
-      }
-    } catch (e) {
-      // Ignore errors on logout
-    } finally {
-      await SecureStorage.clearAll();
+      final user = await _pool.getCurrentUser();
+      if (user == null) return false;
+      final session = await user.getSession();
+      return session?.isValid() ?? false;
+    } catch (_) {
+      return false;
     }
   }
 
-  // Add to existing auth_service.dart file
-
-// Resend Verification Email
-static Future<Map<String, dynamic>> resendVerification(String email) async {
-  try {
-    final response = await http
-        .post(
-          Uri.parse('${ApiConfig.resendVerification}?email=$email'),
-          headers: {'Content-Type': 'application/json'},
-        )
-        .timeout(ApiConfig.timeout);
-
-    final data = jsonDecode(response.body);
-
-    if (response.statusCode == 200) {
-      return {'success': true, 'message': data['message']};
-    } else {
-      return {
-        'success': false,
-        'message': data['detail'] ?? 'Failed to resend verification'
-      };
+  // ── GET ACCESS TOKEN ──────────────────────────────────────────────────────
+  static Future<String?> getAccessToken() async {
+    try {
+      final user = await _pool.getCurrentUser();
+      final session = await user?.getSession();
+      return session?.accessToken.jwtToken;
+    } catch (_) {
+      return null;
     }
-  } catch (e) {
-    return {'success': false, 'message': 'Connection error: $e'};
   }
-}
 
-// Send OTP
-static Future<Map<String, dynamic>> sendOtp(String email) async {
-  try {
-    final response = await http
-        .post(
-          Uri.parse('${ApiConfig.sendOtp}?email=$email'),
-          headers: {'Content-Type': 'application/json'},
-        )
-        .timeout(ApiConfig.timeout);
+  // ── FORMAT PHONE (E.164) ──────────────────────────────────────────────────
+  static String _formatPhone(String phone) {
+    final digits = phone.replaceAll(RegExp(r'\D'), '');
+    if (digits.length == 12 && digits.startsWith('91')) return '+$digits';
+    if (digits.length == 10) return '+91$digits';
+    if (phone.startsWith('+')) return '+$digits';
+    return '+91$digits';
+  }
 
-    final data = jsonDecode(response.body);
-
-    if (response.statusCode == 200) {
-      return {'success': true, 'message': data['message']};
-    } else {
-      return {
-        'success': false,
-        'message': data['detail'] ?? 'Failed to send OTP'
-      };
+  // ── ERROR MESSAGES ────────────────────────────────────────────────────────
+  static String _cognitoErrorMessage(CognitoClientException e) {
+    switch (e.code) {
+      case 'UsernameExistsException':    return 'An account with this email already exists.';
+      case 'UserNotFoundException':      return 'No account found with this email.';
+      case 'NotAuthorizedException':     return 'Incorrect email or password.';
+      case 'CodeMismatchException':      return 'Invalid verification code. Please try again.';
+      case 'ExpiredCodeException':       return 'Code has expired. Please request a new one.';
+      case 'InvalidPasswordException':   return 'Password must be at least 8 characters with uppercase, lowercase, and numbers.';
+      case 'TooManyRequestsException':   return 'Too many attempts. Please wait and try again.';
+      case 'LimitExceededException':     return 'Attempt limit exceeded. Please try again later.';
+      case 'UserNotConfirmedException':  return 'Email not verified. Please verify your email first.';
+      case 'InvalidParameterException':  return 'Invalid input. Please check your details.';
+      default: return e.message ?? 'An error occurred. Please try again.';
     }
-  } catch (e) {
-    return {'success': false, 'message': 'Connection error: $e'};
   }
-}
-
-// Verify OTP
-static Future<Map<String, dynamic>> verifyOtp({
-  required String email,
-  required String otp,
-}) async {
-  try {
-    final response = await http
-        .post(
-          Uri.parse('${ApiConfig.verifyOtp}?email=$email&otp=$otp'),
-          headers: {'Content-Type': 'application/json'},
-        )
-        .timeout(ApiConfig.timeout);
-
-    final data = jsonDecode(response.body);
-
-    if (response.statusCode == 200) {
-      return {'success': true, 'message': data['message']};
-    } else {
-      return {
-        'success': false,
-        'message': data['detail'] ?? 'Invalid OTP'
-      };
-    }
-  } catch (e) {
-    return {'success': false, 'message': 'Connection error: $e'};
-  }
-}
 }

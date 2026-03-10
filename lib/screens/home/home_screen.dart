@@ -109,7 +109,29 @@ Future<void> _openAnalysisScreen() async {
 }
 
 Future<void> _syncAllData() async {
-  await _syncService.syncMasterData(neonSync: true);
+  await _syncService.syncAllData(neonSync: true);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(
+      content: Text('✅ All data Sync successfully'),
+      backgroundColor: Colors.green,
+    ),
+  );
+}
+
+Future<void> _removeDeletedVoucherData() async {
+  await _syncService.detectAndDeleteMissingVouchers();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(
+      content: Text('✅ All data Sync successfully'),
+      backgroundColor: Colors.green,
+    ),
+  );
+}
+
+Future<void> _syncIncrementalData() async {
+  await _syncService.syncIncrementalData(neonSync: true);
 
     ScaffoldMessenger.of(context).showSnackBar(
     const SnackBar(
@@ -343,12 +365,30 @@ Future<void> _openSyncServiceScreen() async {
                     const SizedBox(height: 16),
                     _buildFeatureCard(
                       icon: Icons.sync,
-                      title: 'Sync Data',
+                      title: 'Sync Incremental Data',
                       description: 'Sync your Tally data',
                       color: Colors.green,
                       onTap: () {
                         
+                       _syncIncrementalData();
+                      },
+                    ),
+                    const SizedBox(height: 16),_buildFeatureCard(
+                      icon: Icons.sync,
+                      title: 'Sync Data',
+                      description: 'Sync your Tally data',
+                      color: Colors.green,
+                      onTap: () {
                        _syncAllData();
+                      },
+                    ),
+                    const SizedBox(height: 16),_buildFeatureCard(
+                      icon: Icons.sync,
+                      title: 'Remove deleted voucher',
+                      description: 'Remove Deleted Voucher',
+                      color: Colors.green,
+                      onTap: () {
+                       _removeDeletedVoucherData();
                       },
                     ),
                     const SizedBox(height: 16),

@@ -51,7 +51,7 @@ class AwsAuroraConfig {
 
   // Your password from AWS Secrets Manager
   // TODO: Replace with your actual password or load from secure storage => rHa_m6uUnA)$3c)b:?M6Y7]sLLH$ 1[SI|pxOO1_J9x|auAzt$R9)F0Uv
-  static const String password = '1[SI|pxOO1_J9x|auAzt\$R9)F0Uv';
+  static const String password = 'Breathing199';
 
   // Port (default PostgreSQL)
   static const int port = 5432;

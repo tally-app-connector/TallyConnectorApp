@@ -682,10 +682,9 @@ List<MonthEntry> _buildLastTwoFYMonths() {
       final yr = ym[0];
       final mo = ym[1];
       final lastDay = DateTime(yr, mo + 1, 0).day;
-      final monthEnd = DateTime(yr, mo, lastDay);
-
       // ✅ Skip future months
-      if (monthEnd.isAfter(today)) continue;
+final monthStart = DateTime(yr, mo, 1);
+if (monthStart.isAfter(today)) continue;
 
       entries.add(MonthEntry(
         fy:       'FY $fy-${(fy + 1).toString().substring(2)}',
@@ -895,6 +894,82 @@ Future<String> getAllLedgers(String companyName, int lastAlterId) async {
   return result;
 }
 
+
+
+Future<String> getNewVouchers(String companyName, int lastAlterId) async {
+  print('📥 Fetching vouchers from Tally...');
+  
+  final xml = '''
+<ENVELOPE>
+  <HEADER>
+    <VERSION>1</VERSION>
+    <TALLYREQUEST>Export</TALLYREQUEST>
+    <TYPE>Collection</TYPE>
+    <ID>AllVouchers</ID>
+  </HEADER>
+  <BODY>
+    <DESC>
+      <STATICVARIABLES>
+        <SVEXPORTFORMAT>\$\$SysName:XML</SVEXPORTFORMAT>
+        <SVCURRENTCOMPANY>$companyName</SVCURRENTCOMPANY>
+      </STATICVARIABLES>
+      <TDL>
+        <TDLMESSAGE>
+          <COLLECTION NAME="AllVouchers">
+            <TYPE>Voucher</TYPE>
+            ${lastAlterId > 0 ? '<FILTER>ModifiedVouchers</FILTER>' : ''}
+            
+            <!-- Voucher Header -->
+            <FETCH>GUID, DATE, EFFECTIVEDATE, VOUCHERTYPENAME, VOUCHERNUMBER</FETCH>
+            <FETCH>PARTYLEDGERNAME, PARTYGSTIN, NARRATION, REFERENCE</FETCH>
+            <FETCH>MASTERID, ALTERID, VOUCHERKEY, VOUCHERRETAINKEY</FETCH>
+            <FETCH>PERSISTEDVIEW, VOUCHERNUMBERSERIES</FETCH>
+            <FETCH>ISDELETED, ISCANCELLED, ISINVOICE, ISOPTIONAL, ISDEEMEDPOSITIVE</FETCH>
+            <FETCH>HASDISCOUNTS</FETCH>
+            
+            <!-- GST Fields -->
+            <FETCH>GSTREGISTRATIONTYPE, PLACEOFSUPPLY, STATENAME, COUNTRYOFRESIDENCE</FETCH>
+            
+            <!-- ALL Ledger Entries -->
+            <FETCH>ALLLEDGERENTRIES</FETCH>
+            
+            
+            <!-- Bill Allocations -->
+            <FETCH>ALLLEDGERENTRIES.BILLALLOCATIONS</FETCH>
+            
+            
+            <!-- Bank Allocations -->
+            <FETCH>ALLLEDGERENTRIES.BANKALLOCATIONS</FETCH>
+           
+            
+            <!-- ALL Inventory Entries -->
+            <FETCH>ALLINVENTORYENTRIES</FETCH>
+                        
+            <!-- Batch Allocations -->
+            <FETCH>ALLINVENTORYENTRIES.BATCHALLOCATIONS</FETCH>
+            
+          </COLLECTION>
+          
+          ${lastAlterId > 0 ? '''
+          <SYSTEM TYPE="Formulae" NAME="ModifiedVouchers">
+            \$AlterID > $lastAlterId
+          </SYSTEM>
+          ''' : ''}
+        </TDLMESSAGE>
+      </TDL>
+    </DESC>
+  </BODY>
+</ENVELOPE>
+''';
+  
+  final result = await getTallyData(xml);
+  // print(result);
+  print('✅ Vouchers fetched!');
+  return result;
+}
+
+
+
 Future<String> getAllVouchers(String companyName, int lastAlterId, String fromDate, String toDate) async {
   print('📥 Fetching vouchers from Tally...');
   
@@ -971,7 +1046,7 @@ Future<String> getAllVouchers(String companyName, int lastAlterId, String fromDa
 
 /// Step 1: Get all GUIDs (your existing working function)
 Future<List<String>> fetchVoucherGUIDs(
-  String companyName, String fromDate, String toDate, int lastAlterId,
+  String companyName, String fromDate, String toDate
 ) async {
   print('📋 Fetching voucher GUIDs...');
 
@@ -997,11 +1072,6 @@ Future<List<String>> fetchVoucherGUIDs(
             <TYPE>Voucher</TYPE>
             <FETCH>GUID</FETCH>
           </COLLECTION>
-          ${lastAlterId > 0 ? '''
-          <SYSTEM TYPE="Formulae" NAME="ModifiedFilter">
-            \$AlterID > $lastAlterId
-          </SYSTEM>
-          ''' : ''}
         </TDLMESSAGE>
       </TDL>
     </DESC>
@@ -1089,10 +1159,10 @@ Future<String> fetchVoucherBatch(
 
 /// Main function - fetch all vouchers in batches
 Future<List<String>> getAllVouchersBatched(
-  String companyName, int lastAlterId, String fromDate, String toDate,
+  String companyName, String fromDate, String toDate,
   {int batchSize = 150, Function(int fetched, int total)? onProgress}
 ) async {
-  final guids = await fetchVoucherGUIDs(companyName, fromDate, toDate, lastAlterId);
+  final guids = await fetchVoucherGUIDs(companyName, fromDate, toDate);
   if (guids.isEmpty) return [];
 
   final totalBatches = (guids.length / batchSize).ceil();
@@ -1120,7 +1190,7 @@ Future<List<String>> getAllVouchersBatched(
   return allResults;
 }
 
-Future<String> getAllVouchersGuid(String companyName) async {
+Future<String> getAllVouchersGuid(String companyName, String fromDate, String toDate) async {
   print('📥 Fetching vouchers GUID from Tally...');
   
   final xml = '''
@@ -1136,6 +1206,8 @@ Future<String> getAllVouchersGuid(String companyName) async {
       <STATICVARIABLES>
         <SVEXPORTFORMAT>\$\$SysName:XML</SVEXPORTFORMAT>
         <SVCURRENTCOMPANY>$companyName</SVCURRENTCOMPANY>
+        <SVFROMDATE TYPE="Date">$fromDate</SVFROMDATE>
+        <SVTODATE TYPE="Date">$toDate</SVTODATE>
       </STATICVARIABLES>
       <TDL>
         <TDLMESSAGE>

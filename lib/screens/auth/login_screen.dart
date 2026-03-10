@@ -1,9 +1,11 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:tally_connector/screens/mobile/dashboard_screen.dart';
 import '../../services/auth_service.dart';
 import '../../utils/validators.dart';
 import '../../utils/message_helper.dart';
+import '../../utils/secure_storage.dart';
 import '../../widgets/custom_text_field.dart';
 import 'signup_screen.dart';
 import 'forgot_password_screen.dart';
@@ -34,60 +36,55 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _handleLogin() async {
-   if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) return;
 
-  setState(() => _isLoading = true);
+    setState(() => _isLoading = true);
 
-  final result = await AuthService.login(
-    email: _emailController.text.trim(),
-    password: _passwordController.text,
-  );
+    final result = await AuthService.login(
+      email: _emailController.text.trim(),
+      password: _passwordController.text,
+    );
 
-  // Debug print
-  print('Login result: $result');
-  print('Success: ${result['success']}');
-  print('User data: ${result['user']}');
+    setState(() => _isLoading = false);
 
-  setState(() => _isLoading = false);
+    if (result['success'] == true) {
+      final userMap = result['user'] as Map<String, dynamic>?;
 
-  if (result['success'] == true) {
-    // Safely get user data
-    final user = result['user'] as Map<String, dynamic>?;
-    
-    if (user == null) {
-      MessageHelper.showError(context, "Failed to load user data");
-      return;
-    }
-    
-    final isVerified = user['is_verified'] as bool? ?? false;
+      if (userMap == null) {
+        MessageHelper.showError(context, "Failed to load user data");
+        return;
+      }
 
-    MessageHelper.showSuccess(context, "Login successful!");
+      // ✅ Save JWT token — isLoggedIn() in SplashScreen checks this
+      final token = await AuthService.getAccessToken();
+      if (token != null) await SecureStorage.saveToken(token);
 
-    // Wait a moment for the message to show
-    await Future.delayed(const Duration(milliseconds: 500));
+      // ✅ Save full user JSON — matches User model fields
+      await SecureStorage.saveUser(jsonEncode(userMap));
 
-    if (!mounted) return;
+      final isVerified = userMap['is_verified'] as bool? ?? false;
 
-    if (!isVerified) {
-      // Show verification prompt
-      _showVerificationPrompt();
+      MessageHelper.showSuccess(context, "Login successful!");
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (!mounted) return;
+
+      if (!isVerified) {
+        _showVerificationPrompt();
+      } else {
+        final Widget homeScreen = _isMobile ? const DashboardScreen() : const HomeScreen();
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => homeScreen),
+          (route) => false,
+        );
+      }
     } else {
-      // Go to home (mobile or desktop)
-      Navigator.pushAndRemoveUntil(
+      MessageHelper.showError(
         context,
-        MaterialPageRoute(
-          builder: (_) => _isMobile ? const DashboardScreen() : const HomeScreen(),
-        ),
-        (route) => false,
+        result['message'] as String? ?? 'Login failed',
       );
     }
-  } else {
-    MessageHelper.showError(
-      context,
-      result['message'] as String? ?? 'Login failed',
-    );
   }
-}
 
   void _showVerificationPrompt() {
     showDialog(
@@ -106,12 +103,11 @@ class _LoginScreenState extends State<LoginScreen> {
         actions: [
           TextButton(
             onPressed: () {
-              Navigator.pop(context); // Close dialog
+              Navigator.pop(context);
+              final Widget homeScreen = _isMobile ? const DashboardScreen() : const HomeScreen();
               Navigator.pushAndRemoveUntil(
                 context,
-                MaterialPageRoute(
-                  builder: (_) => _isMobile ? const DashboardScreen() : const HomeScreen(),
-                ),
+                MaterialPageRoute(builder: (_) => homeScreen),
                 (route) => false,
               );
             },
@@ -119,7 +115,7 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
           ElevatedButton(
             onPressed: () {
-              Navigator.pop(context); // Close dialog
+              Navigator.pop(context);
               Navigator.pushAndRemoveUntil(
                 context,
                 MaterialPageRoute(
@@ -150,36 +146,20 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Logo
-                  Icon(
-                    Icons.account_balance_wallet,
-                    size: 80,
-                    color: Colors.blue.shade700,
-                  ),
+                  Icon(Icons.account_balance_wallet, size: 80, color: Colors.blue.shade700),
                   const SizedBox(height: 16),
-
-                  // Title
                   Text(
                     'Tally Connector',
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.blue.shade700,
-                    ),
+                    style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.blue.shade700),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     'Welcome back! Login to continue',
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey.shade600,
-                    ),
+                    style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
                   ),
                   const SizedBox(height: 40),
-
-                  // Email field
                   CustomTextField(
                     controller: _emailController,
                     label: 'Email',
@@ -189,8 +169,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     validator: Validators.validateEmail,
                   ),
                   const SizedBox(height: 16),
-
-                  // Password field
                   CustomTextField(
                     controller: _passwordController,
                     label: 'Password',
@@ -199,74 +177,47 @@ class _LoginScreenState extends State<LoginScreen> {
                     obscureText: _obscurePassword,
                     validator: Validators.validatePassword,
                     suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscurePassword
-                            ? Icons.visibility_outlined
-                            : Icons.visibility_off_outlined,
-                      ),
-                      onPressed: () {
-                        setState(() => _obscurePassword = !_obscurePassword);
-                      },
+                      icon: Icon(_obscurePassword
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined),
+                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                     ),
                   ),
                   const SizedBox(height: 8),
-
-                  // Forgot password
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const ForgotPasswordScreen(),
-                          ),
-                        );
-                      },
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()),
+                      ),
                       child: const Text('Forgot Password?'),
                     ),
                   ),
                   const SizedBox(height: 24),
-
-                  // Login button
                   ElevatedButton(
                     onPressed: _isLoading ? null : _handleLogin,
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                     child: _isLoading
                         ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
+                            height: 20, width: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                           )
-                        : const Text(
-                            'Login',
-                            style: TextStyle(fontSize: 16),
-                          ),
+                        : const Text('Login', style: TextStyle(fontSize: 16)),
                   ),
                   const SizedBox(height: 16),
-
-                  // Signup link
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const Text("Don't have an account? "),
                       TextButton(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const SignupScreen(),
-                            ),
-                          );
-                        },
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const SignupScreen()),
+                        ),
                         child: const Text('Sign Up'),
                       ),
                     ],

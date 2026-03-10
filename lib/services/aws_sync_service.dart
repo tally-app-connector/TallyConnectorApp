@@ -194,6 +194,44 @@ class AwsSyncService {
     }
   }
 
+  Future<void> deleteVouchersByGuids(List<String> guids, String companyGuid) async {
+  if (guids.isEmpty) return;
+  await _ensureConnection();
+
+  final schemaName = _getSchemaName(companyGuid);
+
+  try {
+    // Build placeholders: $1, $2, $3...
+    final placeholders = List.generate(guids.length, (i) => '\$${i + 1}').join(', ');
+
+    // Delete child tables first, then vouchers
+    await _connection!.execute(
+      'DELETE FROM $schemaName.voucher_batch_allocations WHERE voucher_guid IN ($placeholders)',
+      parameters: guids,
+    );
+
+    await _connection!.execute(
+      'DELETE FROM $schemaName.voucher_inventory_entries WHERE voucher_guid IN ($placeholders)',
+      parameters: guids,
+    );
+
+    await _connection!.execute(
+      'DELETE FROM $schemaName.voucher_ledger_entries WHERE voucher_guid IN ($placeholders)',
+      parameters: guids,
+    );
+
+    await _connection!.execute(
+      'DELETE FROM $schemaName.vouchers WHERE voucher_guid IN ($placeholders)',
+      parameters: guids,
+    );
+
+    print('☁️ Deleted ${guids.length} vouchers and related entries from AWS Aurora');
+  } catch (e) {
+    print('❌ Error deleting vouchers from AWS: $e');
+    rethrow;
+  }
+}
+
   // ============================================
   // CREATE COMPANIES TABLE IN USER_DATA SCHEMA
   // This is NOT company-specific, it's a global table

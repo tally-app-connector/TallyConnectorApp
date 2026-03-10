@@ -33,6 +33,7 @@ class _DatabaseViewerScreenState extends State<DatabaseViewerScreen> {
     'stock_item_hsn_history',
     'stock_item_batch_allocation',
     'stock_item_gst_history',
+    'stock_item_closing_balance',
     'voucher_types',
     'vouchers',
     'voucher_ledger_entries',
