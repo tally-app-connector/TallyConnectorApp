@@ -84,13 +84,6 @@ class Company {
   final bool isSecurityEnabled;
   final bool isBookInUse;
 
-  // Sync tracking
-  final int lastSyncedGroupsAlterId;
-  final int lastSyncedLedgersAlterId;
-  final int lastSyncedStockItemsAlterId;
-  final int lastSyncedVouchersAlterId;
-  final int lastSyncedVoucherTypeAlterId;
-
   // Metadata
   final bool isSelected;
   final String createdAt;
@@ -161,11 +154,6 @@ class Company {
     this.isSecurityEnabled = false,
     this.isBookInUse = false,
     // Sync tracking
-    this.lastSyncedGroupsAlterId = 0,
-    this.lastSyncedLedgersAlterId = 0,
-    this.lastSyncedStockItemsAlterId = 0,
-    this.lastSyncedVouchersAlterId = 0,
-    this.lastSyncedVoucherTypeAlterId = 0,
     this.isSelected = false,
     required this.createdAt,
     required this.updatedAt,
@@ -238,11 +226,6 @@ class Company {
       'is_security_enabled': isSecurityEnabled ? 1 : 0,
       'is_book_in_use': isBookInUse ? 1 : 0,
       // Sync tracking
-      'last_synced_groups_alter_id': lastSyncedGroupsAlterId,
-      'last_synced_ledgers_alter_id': lastSyncedLedgersAlterId,
-      'last_synced_stock_items_alter_id': lastSyncedStockItemsAlterId,
-      'last_synced_vouchers_alter_id': lastSyncedVouchersAlterId,
-      'last_synced_voucher_types_alter_id': lastSyncedVoucherTypeAlterId,
       'is_selected': isSelected ? 1 : 0,
       'created_at': createdAt,
       'updated_at': updatedAt,
@@ -315,12 +298,6 @@ class Company {
       isAudited: map['is_audited'] == 1,
       isSecurityEnabled: map['is_security_enabled'] == 1,
       isBookInUse: map['is_book_in_use'] == 1,
-      // Sync tracking
-      lastSyncedGroupsAlterId: map['last_synced_groups_alter_id'] ?? 0,
-      lastSyncedLedgersAlterId: map['last_synced_ledgers_alter_id'] ?? 0,
-      lastSyncedStockItemsAlterId: map['last_synced_stock_items_alter_id'] ?? 0,
-      lastSyncedVouchersAlterId: map['last_synced_vouchers_alter_id'] ?? 0,
-      lastSyncedVoucherTypeAlterId: map['last_synced_voucher_types_alter_id'] ?? 0,
       isSelected: map['is_selected'] == 1,
       createdAt: map['created_at'] ?? DateTime.now().toIso8601String(),
       updatedAt: map['updated_at'] ?? DateTime.now().toIso8601String(),
@@ -1167,7 +1144,7 @@ class VoucherType {
     name: map['name'] as String,
     companyGuid: map['company_guid'] as String,
     reservedName: map['reserved_name'] as String? ?? '',
-    guid: map['guid'] as String,
+    guid: map['voucher_type_guid'] as String,
     parent: map['parent'] as String? ?? '',
     parentGuid: map['parent_guid'] as String? ?? '',
     alterId: map['alter_id'] as int,
@@ -1193,7 +1170,7 @@ class VoucherType {
       'company_guid': companyGuid,
       'name': name,
       'reserved_name': reservedName,
-      'guid': guid,
+      'voucher_type_guid': guid,
       'parent_guid': parentGuid,
       'alter_id': alterId,
       'master_id': masterId,

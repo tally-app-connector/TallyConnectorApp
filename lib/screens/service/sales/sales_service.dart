@@ -14,12 +14,15 @@ class SalesAnalyticsService {
   // ── Helper: get company date range ────────────────────────────
   Future<Map<String, String>> _getCompanyDates() async {
     final company = await _db.getSelectedCompanyByGuid();
-
-    
     return {
-      'from': (company?['starting_from'] as String? ?? '20250401').replaceAll('-', ''),
-      'to': (company?['ending_at'] as String? ?? '20260331').replaceAll('-', ''),
-    };
+          'from': '20250401',
+          'to': '20260331',
+        };
+    
+    // return {
+    //   'from': (company?['starting_from'] as String? ?? '20250401').replaceAll('-', ''),
+    //   'to': (company?['ending_at'] as String? ?? '20260331').replaceAll('-', ''),
+    // };
   }
 
   // ── Helper: wrap a double into a ReportValue ─────────────────
@@ -199,7 +202,7 @@ class SalesAnalyticsService {
   Future<double> _getNetSales(String companyGuid, String fromDate, String toDate) async {
     try {
       final db = await _db.database;
-      final salesResult = await db.rawQuery('''
+    final salesResult = await db.rawQuery('''
       WITH RECURSIVE group_tree AS (
         SELECT group_guid, name
         FROM groups
@@ -232,7 +235,7 @@ class SalesAnalyticsService {
       FROM voucher_ledger_entries vle
       INNER JOIN vouchers v ON v.voucher_guid = vle.voucher_guid
       INNER JOIN ledgers l ON l.name = vle.ledger_name AND l.company_guid = v.company_guid
-      INNER JOIN group_tree gt ON l.parent = gt.name
+      INNER JOIN group_tree gt ON l.parent_guid = gt.group_guid
       WHERE v.company_guid = ?
         AND v.is_deleted = 0
         AND v.is_cancelled = 0
@@ -248,6 +251,28 @@ class SalesAnalyticsService {
     final netSales =
         (salesResult.first['net_sales'] as num?)?.toDouble() ?? 0.0;
     final salesVouchers = salesResult.first['vouchers'] as int? ?? 0;
+
+// // Query to run in your app's debug SQL runner
+// final results = await db.rawQuery('''
+//   SELECT 
+//     vle.voucher_guid,
+//     vle.ledger_name,
+//     vle.amount,
+//     vle.is_deemed_positive,
+//     v.voucher_type,
+//     v.date
+//   FROM voucher_ledger_entries vle
+//   LEFT JOIN vouchers v ON v.voucher_guid = vle.voucher_guid
+//   WHERE vle.company_guid = '51359d47-7c3b-46e8-af44-fa3095fe9e5c'
+//   AND v.voucher_type = 'RECEIPT TPR'
+//   ORDER BY v.date DESC
+// ''');
+
+// for (final row in results) {
+//   print('VLE | ${row['voucher_guid']} | ${row['voucher_type']} | ${row['ledger_name']} | ${row['amount']} | ${row['date']}');
+// }
+// print('Total RECEIPT TPR VLE rows: ${results.length}');
+
 
       return netSales;
     } catch (_) {

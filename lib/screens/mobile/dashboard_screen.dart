@@ -8,7 +8,7 @@ import '../widgets/dashboard_widgets.dart';
 import '../models/kpi_metric.dart';
 import '../models/report_data.dart';
 import '../service/sales/sales_service.dart';
-import '../service/aws_sync_service.dart';
+import '../../services/aws_sync_service.dart';
 import '../service/data_sync_service.dart';
 import '../utils/secure_storage.dart';
 import '../models/company_model.dart';
@@ -476,8 +476,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     });
                     // Persist for offline fallback
                     await SecureStorage.saveCompanyGuid(company.guid);
-                    final schema = AwsSyncService.instance.getSchemaName(company.guid);
-                    await AwsSyncService.instance.createViewsIfNeeded(schema);
                     // Sync this company's data to local SQLite (fire and forget)
                     // DataSyncService.instance.syncCompany(company.guid).catchError((e) {
                     //   developer.log('⚠️ Background sync failed: $e', name: 'Dashboard');

@@ -9,6 +9,8 @@ import '../auth/email_verification_screen.dart';
 import '../sync_screen.dart';
 import 'dart:convert';
 
+import 'database_overview_screen.dart';
+
 class MobileProfileTab extends StatefulWidget {
   const MobileProfileTab({Key? key}) : super(key: key);
 
@@ -22,6 +24,8 @@ class _MobileProfileTabState extends State<MobileProfileTab> {
   bool _isLoading = true;
   List<Map<String, dynamic>> _companies = [];
   Map<String, dynamic>? _selectedCompany;
+  String _selectedCompanyID = '';
+  bool _deletingData = false;
 
   @override
   void initState() {
@@ -31,6 +35,7 @@ class _MobileProfileTabState extends State<MobileProfileTab> {
 
   Future<void> _loadData() async {
     final userData = await SecureStorage.getUser();
+    _selectedCompanyID = await SecureStorage.getSelectedCompanyGuid() ?? '';
     if (userData != null) {
       _currentUser = User.fromJson(jsonDecode(userData));
     }
@@ -64,6 +69,69 @@ class _MobileProfileTabState extends State<MobileProfileTab> {
     setState(() => _selectedCompany = company);
     if (mounted) {
       MessageHelper.showSuccess(context, 'Selected: ${company['company_name']}');
+    }
+  }
+
+
+  Future<void> _clearAllData() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.warning, color: Colors.red),
+            SizedBox(width: 12),
+            Text('Clear All Data?'),
+          ],
+        ),
+        content: const Text(
+          'This will delete ALL data from the local database of current company'
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete All'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _deletingData = true);
+
+    try {
+      await _db.clearAllData(_selectedCompanyID);
+      await SecureStorage.clearAll();
+      setState(() {
+        _selectedCompany = null;
+        _companies = [];
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ All data cleared successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Error clearing data: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      setState(() => _deletingData = false);
     }
   }
 
@@ -365,11 +433,29 @@ class _MobileProfileTabState extends State<MobileProfileTab> {
                       _loadCompanies();
                     },
                   ),
+                   _buildActionTile(
+                    icon: Icons.sync,
+                    title: 'Database Overview',
+                    color: Colors.blue,
+                    onTap: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => DatabaseOverviewScreen()),
+                      );
+                      _loadCompanies();
+                    },
+                  ),
                   _buildActionTile(
                     icon: Icons.logout,
                     title: 'Logout',
                     color: Colors.red,
                     onTap: _handleLogout,
+                  ),
+                   _buildActionTile(
+                    icon: Icons.logout,
+                    title: 'Delete All Data',
+                    color: Colors.red,
+                    onTap: _clearAllData,
                   ),
                 ],
               ),

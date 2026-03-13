@@ -242,6 +242,7 @@ class AwsSyncService {
 
     await _connection!.execute('''
       CREATE TABLE IF NOT EXISTS user_data.companies (
+      id SERIAL,
         company_guid TEXT PRIMARY KEY,
         user_id TEXT,
         master_id INTEGER NOT NULL,
@@ -324,13 +325,6 @@ class AwsSyncService {
         is_security_enabled INTEGER DEFAULT 0,
         is_book_in_use INTEGER DEFAULT 0,
 
-        -- Sync tracking
-        last_synced_groups_alter_id INTEGER DEFAULT 0,
-        last_synced_ledgers_alter_id INTEGER DEFAULT 0,
-        last_synced_stock_items_alter_id INTEGER DEFAULT 0,
-        last_synced_vouchers_alter_id INTEGER DEFAULT 0,
-        last_synced_voucher_types_alter_id INTEGER DEFAULT 0,
-
         -- Metadata
         is_selected INTEGER DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -361,6 +355,7 @@ Future<void> _createTablesInSchema(String schemaName) async {
     // ============================================
     await _connection!.execute('''
       CREATE TABLE IF NOT EXISTS $schemaName.groups (
+        id SERIAL,
         group_guid TEXT PRIMARY KEY,
         company_guid TEXT NOT NULL,
         name TEXT NOT NULL,
@@ -406,10 +401,10 @@ Future<void> _createTablesInSchema(String schemaName) async {
     // ============================================
     await _connection!.execute('''
       CREATE TABLE IF NOT EXISTS $schemaName.voucher_types (
-        id SERIAL PRIMARY KEY,
+        id SERIAL,
         company_guid TEXT NOT NULL,
         name TEXT NOT NULL,
-        guid TEXT NOT NULL,
+        voucher_type_guid TEXT PRIMARY KEY,
         reserved_name TEXT,
         parent_guid TEXT,
         alter_id INTEGER NOT NULL,
@@ -428,7 +423,7 @@ Future<void> _createTablesInSchema(String schemaName) async {
         print_after_save INTEGER NOT NULL DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(company_guid, guid)
+        UNIQUE(company_guid, voucher_type_guid)
       )
     ''');
 
@@ -437,7 +432,7 @@ Future<void> _createTablesInSchema(String schemaName) async {
     await _connection!.execute(
         'CREATE INDEX IF NOT EXISTS idx_voucher_types_name ON $schemaName.voucher_types(company_guid, name)');
     await _connection!.execute(
-        'CREATE INDEX IF NOT EXISTS idx_voucher_types_guid ON $schemaName.voucher_types(guid)');
+        'CREATE INDEX IF NOT EXISTS idx_voucher_types_guid ON $schemaName.voucher_types(voucher_type_guid)');
     await _connection!.execute(
         'CREATE INDEX IF NOT EXISTS idx_voucher_types_alter_id ON $schemaName.voucher_types(company_guid, alter_id)');
     await _connection!.execute(
@@ -452,6 +447,7 @@ Future<void> _createTablesInSchema(String schemaName) async {
     // ============================================
     await _connection!.execute('''
       CREATE TABLE IF NOT EXISTS $schemaName.ledgers (
+      id SERIAL,
         ledger_guid TEXT PRIMARY KEY,
         company_guid TEXT NOT NULL,
         name TEXT NOT NULL,
@@ -534,6 +530,7 @@ Future<void> _createTablesInSchema(String schemaName) async {
     // ============================================
     await _connection!.execute('''
       CREATE TABLE IF NOT EXISTS $schemaName.ledger_contacts (
+      id SERIAL PRIMARY KEY,
         ledger_guid TEXT NOT NULL,
         company_guid TEXT NOT NULL,
         name TEXT NOT NULL,
@@ -556,6 +553,7 @@ Future<void> _createTablesInSchema(String schemaName) async {
     // ============================================
     await _connection!.execute('''
       CREATE TABLE IF NOT EXISTS $schemaName.ledger_mailing_details (
+      id SERIAL PRIMARY KEY,
         ledger_guid TEXT NOT NULL,
         company_guid TEXT NOT NULL,
         applicable_from TEXT NOT NULL,
@@ -580,6 +578,7 @@ Future<void> _createTablesInSchema(String schemaName) async {
     // ============================================
     await _connection!.execute('''
       CREATE TABLE IF NOT EXISTS $schemaName.ledger_gst_registrations (
+      id SERIAL PRIMARY KEY,
         ledger_guid TEXT NOT NULL,
         company_guid TEXT NOT NULL,
         applicable_from TEXT NOT NULL,
@@ -608,6 +607,7 @@ Future<void> _createTablesInSchema(String schemaName) async {
     // ============================================
     await _connection!.execute('''
       CREATE TABLE IF NOT EXISTS $schemaName.ledger_closing_balances (
+      id SERIAL PRIMARY KEY,
         ledger_guid TEXT NOT NULL,
         company_guid TEXT NOT NULL,
         closing_date TEXT NOT NULL,
@@ -630,6 +630,7 @@ Future<void> _createTablesInSchema(String schemaName) async {
     // ============================================
     await _connection!.execute('''
       CREATE TABLE IF NOT EXISTS $schemaName.stock_items (
+      id SERIAL,
         stock_item_guid TEXT PRIMARY KEY,
         company_guid TEXT NOT NULL,
         name TEXT NOT NULL,
@@ -694,6 +695,7 @@ Future<void> _createTablesInSchema(String schemaName) async {
     // ============================================
     await _connection!.execute('''
       CREATE TABLE IF NOT EXISTS $schemaName.stock_item_hsn_history (
+      id SERIAL PRIMARY KEY,
         company_guid TEXT NOT NULL,
         applicable_from TEXT,
         hsn_code TEXT,
@@ -716,6 +718,7 @@ Future<void> _createTablesInSchema(String schemaName) async {
     // ============================================
     await _connection!.execute('''
       CREATE TABLE IF NOT EXISTS $schemaName.stock_item_batch_allocation (
+      id SERIAL PRIMARY KEY,
         company_guid TEXT NOT NULL,
         stock_item_guid TEXT,
         godown_name TEXT,
@@ -738,6 +741,7 @@ Future<void> _createTablesInSchema(String schemaName) async {
     // ============================================
     await _connection!.execute('''
       CREATE TABLE IF NOT EXISTS $schemaName.stock_item_closing_balance (
+      id SERIAL PRIMARY KEY,
         company_guid TEXT NOT NULL,
         stock_item_guid TEXT,
         closing_balance REAL DEFAULT 0,
@@ -763,6 +767,7 @@ Future<void> _createTablesInSchema(String schemaName) async {
     // ============================================
     await _connection!.execute('''
       CREATE TABLE IF NOT EXISTS $schemaName.stock_item_gst_history (
+      id SERIAL PRIMARY KEY,
         company_guid TEXT NOT NULL,
         applicable_from TEXT,
         stock_item_guid TEXT,
@@ -792,6 +797,7 @@ Future<void> _createTablesInSchema(String schemaName) async {
     // ============================================
     await _connection!.execute('''
       CREATE TABLE IF NOT EXISTS $schemaName.vouchers (
+      id SERIAL,
         voucher_guid TEXT PRIMARY KEY,
         company_guid TEXT NOT NULL,
         master_id INTEGER NOT NULL,
@@ -852,6 +858,7 @@ Future<void> _createTablesInSchema(String schemaName) async {
     // ============================================
     await _connection!.execute('''
       CREATE TABLE IF NOT EXISTS $schemaName.voucher_ledger_entries (
+      id SERIAL PRIMARY KEY,
         voucher_guid TEXT NOT NULL,
         company_guid TEXT NOT NULL,
         ledger_name TEXT NOT NULL,
@@ -886,6 +893,7 @@ Future<void> _createTablesInSchema(String schemaName) async {
     // ============================================
     await _connection!.execute('''
       CREATE TABLE IF NOT EXISTS $schemaName.voucher_inventory_entries (
+      id SERIAL PRIMARY KEY,
         voucher_guid TEXT NOT NULL,
         company_guid TEXT NOT NULL,
         stock_item_name TEXT NOT NULL,
@@ -927,6 +935,7 @@ Future<void> _createTablesInSchema(String schemaName) async {
     // ============================================
     await _connection!.execute('''
       CREATE TABLE IF NOT EXISTS $schemaName.voucher_batch_allocations (
+      id SERIAL PRIMARY KEY,
         voucher_guid TEXT NOT NULL,
         company_guid TEXT NOT NULL,
         godown_name TEXT NOT NULL,
@@ -1051,11 +1060,6 @@ Future<void> _createTablesInSchema(String schemaName) async {
           is_audited,
           is_security_enabled,
           is_book_in_use,
-          last_synced_groups_alter_id,
-          last_synced_ledgers_alter_id,
-          last_synced_stock_items_alter_id,
-          last_synced_vouchers_alter_id,
-          last_synced_voucher_types_alter_id,
           is_selected,
           created_at,
           updated_at
@@ -1066,8 +1070,7 @@ Future<void> _createTablesInSchema(String schemaName) async {
           \$21, \$22, \$23, \$24, \$25, \$26, \$27, \$28, \$29, \$30,
           \$31, \$32, \$33, \$34, \$35, \$36, \$37, \$38, \$39, \$40,
           \$41, \$42, \$43, \$44, \$45, \$46, \$47, \$48, \$49, \$50,
-          \$51, \$52, \$53, \$54, \$55, \$56, \$57, \$58, \$59, \$60,
-          \$61, \$62, \$63, \$64, \$65
+          \$51, \$52, \$53, \$54, \$55, \$56, \$57, \$58, \$59, \$60
         )
         ON CONFLICT (company_guid) 
         DO UPDATE SET
@@ -1127,11 +1130,6 @@ Future<void> _createTablesInSchema(String schemaName) async {
           is_audited = EXCLUDED.is_audited,
           is_security_enabled = EXCLUDED.is_security_enabled,
           is_book_in_use = EXCLUDED.is_book_in_use,
-          last_synced_groups_alter_id = EXCLUDED.last_synced_groups_alter_id,
-          last_synced_ledgers_alter_id = EXCLUDED.last_synced_ledgers_alter_id,
-          last_synced_stock_items_alter_id = EXCLUDED.last_synced_stock_items_alter_id,
-          last_synced_vouchers_alter_id = EXCLUDED.last_synced_vouchers_alter_id,
-          last_synced_voucher_types_alter_id = EXCLUDED.last_synced_voucher_types_alter_id,
           is_selected = EXCLUDED.is_selected,
           updated_at = EXCLUDED.updated_at
         ''',
@@ -1193,11 +1191,6 @@ Future<void> _createTablesInSchema(String schemaName) async {
           company['is_audited'] ?? 0,                                 // $55
           company['is_security_enabled'] ?? 0,                        // $56
           company['is_book_in_use'] ?? 0,                             // $57
-          company['last_synced_groups_alter_id'] ?? 0,                // $58
-          company['last_synced_ledgers_alter_id'] ?? 0,               // $59
-          company['last_synced_stock_items_alter_id'] ?? 0,           // $60
-          company['last_synced_vouchers_alter_id'] ?? 0,              // $61
-          company['last_synced_voucher_types_alter_id'] ?? 0,          // $62
           company['is_selected'] ?? 0,                                // $63
           company['created_at'],                                      // $64
           company['updated_at'],                                      // $65
@@ -1210,46 +1203,7 @@ Future<void> _createTablesInSchema(String schemaName) async {
       rethrow;
     }
   }
-
-  Future<void> updateCompanySyncStatus(
-      String companyGuid, String fieldName, int alterId) async {
-    await _ensureConnection();
-
-    try {
-      // Validate field name to prevent SQL injection
-      final validFields = [
-        'last_synced_groups_alter_id',
-        'last_synced_ledgers_alter_id',
-        'last_synced_stock_items_alter_id',
-        'last_synced_vouchers_alter_id',
-      ];
-
-      if (!validFields.contains(fieldName)) {
-        throw ArgumentError('Invalid field name: $fieldName');
-      }
-
-      await _connection!.execute(
-        'UPDATE user_data.companies SET $fieldName = \$1, updated_at = \$2 WHERE company_guid = \$3',
-        parameters: [
-          alterId,
-          DateTime.now().toIso8601String(),
-          companyGuid,
-        ],
-      );
-
-      print('✅ Updated $fieldName to: $alterId for company: $companyGuid');
-    } catch (e) {
-      print('❌ Error updating company sync status: $e');
-      rethrow;
-    }
-  }
-
-  // Legacy method for backward compatibility
-  @Deprecated('Use updateCompanySyncStatus instead')
-  Future<void> updateCompany(
-      String companyGuid, String keyName, int alterId) async {
-    return updateCompanySyncStatus(companyGuid, keyName, alterId);
-  }
+  
 
   // ============================================
   // GROUPS SYNC - ALL 24 FIELDS
@@ -1718,7 +1672,7 @@ Future<void> _syncVoucherTypeBatch(
     allParameters.addAll([
       voucherType['company_guid'],
       voucherType['name'],
-      voucherType['guid'],
+      voucherType['voucher_type_guid'],
       voucherType['parent_guid'],
       parseInt(voucherType['alter_id']),
       parseInt(voucherType['master_id']),
@@ -1741,13 +1695,13 @@ Future<void> _syncVoucherTypeBatch(
 
   final sql = '''
     INSERT INTO $schemaName.voucher_types (
-      company_guid, name, guid, parent_guid, alter_id, master_id,
+      company_guid, name, voucher_type_guid, parent_guid, alter_id, master_id,
       is_deemed_positive, affects_stock, is_optional, is_active, is_deleted,
       numbering_method, prevent_duplicates, current_prefix, current_suffix,
       restart_period, is_tax_invoice, print_after_save, created_at, updated_at
     )
     VALUES ${valueClauses.join(', ')}
-    ON CONFLICT (company_guid, guid) DO UPDATE SET
+    ON CONFLICT (company_guid, voucher_type_guid) DO UPDATE SET
       name = EXCLUDED.name,
       parent_guid = EXCLUDED.parent_guid,
       alter_id = EXCLUDED.alter_id,

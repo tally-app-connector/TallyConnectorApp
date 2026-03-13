@@ -42,12 +42,12 @@ class DatabaseHelper {
   Future _createDB(Database db, int version) async {
     await db.execute('''
   CREATE TABLE voucher_types (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER,
     company_guid TEXT NOT NULL,
     
     -- Core Identification
     name TEXT NOT NULL,
-    guid TEXT NOT NULL,
+    voucher_type_guid TEXT PRIMARY KEY,
     reserved_name TEXT,
     parent_guid TEXT,
     alter_id INTEGER NOT NULL,
@@ -80,7 +80,7 @@ class DatabaseHelper {
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
     
     FOREIGN KEY (company_guid) REFERENCES companies(company_guid) ON DELETE CASCADE,
-    UNIQUE(company_guid, guid)
+    UNIQUE(company_guid, voucher_type_guid)
   )
 ''');
 
@@ -89,7 +89,7 @@ class DatabaseHelper {
     await db.execute(
         'CREATE INDEX idx_voucher_types_name ON voucher_types(company_guid, name)');
     await db
-        .execute('CREATE INDEX idx_voucher_types_guid ON voucher_types(guid)');
+        .execute('CREATE INDEX idx_voucher_types_guid ON voucher_types(voucher_type_guid)');
     await db.execute(
         'CREATE INDEX idx_voucher_types_deleted ON voucher_types(is_deleted)');
     await db.execute(
@@ -97,6 +97,7 @@ class DatabaseHelper {
 
     await db.execute('''
           CREATE TABLE groups (
+          id INTEGER,
             group_guid TEXT PRIMARY KEY,
             company_guid TEXT NOT NULL,
             name TEXT NOT NULL,
@@ -140,6 +141,7 @@ class DatabaseHelper {
 
     await db.execute('''
         CREATE TABLE ledgers (
+        id INTEGER,
           ledger_guid TEXT PRIMARY KEY,
           company_guid TEXT NOT NULL,
           name TEXT NOT NULL,
@@ -204,6 +206,7 @@ class DatabaseHelper {
     // ============================================
     await db.execute('''
         CREATE TABLE ledger_contacts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
           ledger_guid TEXT NOT NULL,
           company_guid TEXT NOT NULL,
           name TEXT NOT NULL,
@@ -222,6 +225,7 @@ class DatabaseHelper {
     // ============================================
     await db.execute('''
         CREATE TABLE ledger_mailing_details (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
           ledger_guid TEXT NOT NULL,
           company_guid TEXT NOT NULL,
           applicable_from TEXT NOT NULL,
@@ -242,6 +246,7 @@ class DatabaseHelper {
     // ============================================
     await db.execute('''
         CREATE TABLE ledger_gst_registrations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
           ledger_guid TEXT NOT NULL,
           company_guid TEXT NOT NULL,
           applicable_from TEXT NOT NULL,
@@ -264,6 +269,7 @@ class DatabaseHelper {
 // ============================================
     await db.execute('''
   CREATE TABLE ledger_closing_balances (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
     ledger_guid TEXT NOT NULL,
     company_guid TEXT NOT NULL,
     closing_date TEXT NOT NULL,
@@ -326,6 +332,7 @@ class DatabaseHelper {
 
     await db.execute('''
           CREATE TABLE stock_items (
+          id INTEGER,
             stock_item_guid TEXT PRIMARY KEY,
             company_guid TEXT NOT NULL,
             name TEXT NOT NULL,
@@ -372,6 +379,7 @@ class DatabaseHelper {
     // ============================================
     await db.execute('''
       CREATE TABLE stock_item_hsn_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
         company_guid TEXT NOT NULL,
         applicable_from TEXT,
         hsn_code TEXT,
@@ -386,6 +394,7 @@ class DatabaseHelper {
 
     await db.execute('''
       CREATE TABLE stock_item_batch_allocation (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
         company_guid TEXT NOT NULL,
         stock_item_guid TEXT,
         godown_name TEXT,
@@ -402,6 +411,7 @@ class DatabaseHelper {
 
     await db.execute('''
       CREATE TABLE stock_item_closing_balance (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
         company_guid TEXT NOT NULL,
         stock_item_guid TEXT,
         closing_balance REAL DEFAULT 0,
@@ -418,6 +428,7 @@ class DatabaseHelper {
     // ============================================
     await db.execute('''
       CREATE TABLE stock_item_gst_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
         company_guid TEXT NOT NULL,
         applicable_from,
         stock_item_guid TEXT,
@@ -478,6 +489,7 @@ class DatabaseHelper {
 // ============================================
     await db.execute('''
   CREATE TABLE vouchers (
+  id INTEGER,
     voucher_guid TEXT PRIMARY KEY,
     company_guid TEXT NOT NULL,
     
@@ -538,6 +550,7 @@ class DatabaseHelper {
 // ============================================
     await db.execute('''
   CREATE TABLE voucher_ledger_entries (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
     voucher_guid TEXT NOT NULL,
     company_guid TEXT NOT NULL,
     
@@ -575,6 +588,7 @@ class DatabaseHelper {
 // ============================================
     await db.execute('''
   CREATE TABLE voucher_inventory_entries (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
     voucher_guid TEXT NOT NULL,
     company_guid TEXT NOT NULL,
     
@@ -622,6 +636,7 @@ class DatabaseHelper {
 // ============================================
     await db.execute('''
   CREATE TABLE voucher_batch_allocations (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
     voucher_guid TEXT NOT NULL,
     company_guid TEXT NOT NULL,
     godown_name TEXT NOT NULL,
@@ -703,6 +718,7 @@ class DatabaseHelper {
     await db.execute('''
   CREATE TABLE companies (    
     -- Primary identifiers
+    id INTEGER,
     company_guid TEXT PRIMARY KEY,
     master_id INTEGER NOT NULL,
     alter_id INTEGER,
@@ -783,13 +799,6 @@ class DatabaseHelper {
     is_audited INTEGER DEFAULT 0,
     is_security_enabled INTEGER DEFAULT 0,
     is_book_in_use INTEGER DEFAULT 0,
-    
-    -- Sync tracking
-    last_synced_groups_alter_id INTEGER DEFAULT 0,
-    last_synced_ledgers_alter_id INTEGER DEFAULT 0,
-    last_synced_stock_items_alter_id INTEGER DEFAULT 0,
-    last_synced_vouchers_alter_id INTEGER DEFAULT 0,
-    last_synced_voucher_types_alter_id INTEGER DEFAULT 0,
     
     -- Metadata
     is_selected INTEGER DEFAULT 0,
@@ -900,6 +909,8 @@ class DatabaseHelper {
       await txn.delete('stock_item_hsn_history',
           where: 'company_guid = ?', whereArgs: [companyId]);
       await txn.delete('stock_items',
+          where: 'company_guid = ?', whereArgs: [companyId]);
+      await txn.delete('stock_item_closing_balance',
           where: 'company_guid = ?', whereArgs: [companyId]);
 
       // 3. Delete ledger related data
@@ -1021,49 +1032,6 @@ class DatabaseHelper {
     print('✅ Selected company: $guid');
   }
 
-  /// Update sync tracking for a company
-  Future<void> updateSyncTracking(
-    String companyGuid, {
-    int? lastSyncedGroupsAlterId,
-    int? lastSyncedLedgersAlterId,
-    int? lastSyncedStockItemsAlterId,
-    int? lastSyncedVouchersAlterId,
-    int? lastSyncedVoucherTypesAlterId,
-  }) async {
-    final db = await database;
-
-    final updateData = <String, dynamic>{
-      'updated_at': DateTime.now().toIso8601String(),
-    };
-
-    if (lastSyncedGroupsAlterId != null) {
-      updateData['last_synced_groups_alter_id'] = lastSyncedGroupsAlterId;
-    }
-    if (lastSyncedLedgersAlterId != null) {
-      updateData['last_synced_ledgers_alter_id'] = lastSyncedLedgersAlterId;
-    }
-    if (lastSyncedStockItemsAlterId != null) {
-      updateData['last_synced_stock_items_alter_id'] =
-          lastSyncedStockItemsAlterId;
-    }
-    if (lastSyncedVouchersAlterId != null) {
-      updateData['last_synced_vouchers_alter_id'] = lastSyncedVouchersAlterId;
-    
-    }
-    
-    if (lastSyncedVoucherTypesAlterId != null) {
-      updateData['last_synced_voucher_types_alter_id'] = lastSyncedVoucherTypesAlterId;
-    }
-
-    await db.update(
-      'companies',
-      updateData,
-      where: 'company_guid = ?',
-      whereArgs: [companyGuid],
-    );
-
-    print('✅ Updated sync tracking for: $companyGuid');
-  }
 
   /// Delete company
   Future<void> deleteCompany(String guid) async {
@@ -1146,10 +1114,6 @@ class DatabaseHelper {
         'is_payroll_enabled': company.isPayrollEnabled ? 1 : 0,
         'is_deleted': company.isDeleted ? 1 : 0,
         'is_security_enabled': company.isSecurityEnabled ? 1 : 0,
-        'last_synced_groups_alter_id': company.lastSyncedGroupsAlterId,
-        'last_synced_ledgers_alter_id': company.lastSyncedLedgersAlterId,
-        'last_synced_stock_items_alter_id': company.lastSyncedStockItemsAlterId,
-        'last_synced_vouchers_alter_id': company.lastSyncedVouchersAlterId,
         'is_selected': company.isSelected ? 1 : 0,
         'created_at': company.createdAt,
         'updated_at': company.updatedAt,
@@ -1209,11 +1173,6 @@ class DatabaseHelper {
             'is_payroll_enabled': company.isPayrollEnabled ? 1 : 0,
             'is_deleted': company.isDeleted ? 1 : 0,
             'is_security_enabled': company.isSecurityEnabled ? 1 : 0,
-            'last_synced_groups_alter_id': company.lastSyncedGroupsAlterId,
-            'last_synced_ledgers_alter_id': company.lastSyncedLedgersAlterId,
-            'last_synced_stock_items_alter_id':
-                company.lastSyncedStockItemsAlterId,
-            'last_synced_vouchers_alter_id': company.lastSyncedVouchersAlterId,
             'is_selected': company.isSelected ? 1 : 0,
             'created_at': company.createdAt,
             'updated_at': company.updatedAt,
@@ -2188,14 +2147,14 @@ Future<String?> resolveVoucherTypeParentGuid(
   // If not in memory, check database
   final List<Map<String, dynamic>> maps = await db.query(
     'voucher_types',
-    columns: ['guid'],
+    columns: ['voucher_type_guid'],
     where: 'company_guid = ? AND name = ?',
     whereArgs: [companyGuid, parentName],
     limit: 1,
   );
 
   if (maps.isEmpty) return null;
-  return maps.first['guid'] as String?;
+  return maps.first['voucher_type_guid'] as String?;
 }
 
 // Process and insert new voucher types (handles parent resolution)
@@ -2913,7 +2872,23 @@ Future<Map<String, dynamic>> _convertVoucherToMap(
   //   await batch.commit(noResult: true);
   //   print('✅ Deleted ${guids.length} vouchers and related entries');
   // }
+Future<int> getLastAlterId(
+  String companyGuid,
+  String tableName,
+) async {
+      final db = await database;
 
+  try {
+    final result = await db.rawQuery(
+      'SELECT MAX(alter_id) as max_alter_id FROM $tableName WHERE company_guid = ?',
+      [companyGuid],
+    );
+    if (result.isNotEmpty) {
+      return (result.first['max_alter_id'] as int?) ?? 0;
+    }
+  } catch (_) {}
+  return 0;
+}
   Future<void> deleteVouchersByGuids(List<String> guids, String companyGuid) async {
   // Delete locally
   final db = await database;

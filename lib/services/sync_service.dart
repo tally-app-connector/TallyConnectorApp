@@ -130,15 +130,21 @@ class SyncService {
       //   await _neonSync.initialize();
       // }
 
-      await _syncGroups(companyName, companyId, company?['last_synced_groups_alter_id'] ?? 0);
+      final voucher_types_last_alter_id = await _db.getLastAlterId(companyId, 'voucher_types');
+      final groups_last_alter_id = await _db.getLastAlterId(companyId, 'groups');
+      final ledgers_last_alter_id = await _db.getLastAlterId(companyId, 'ledgers');
+      final stock_items_last_alter_id = await _db.getLastAlterId(companyId, 'stock_items');
+      final vouchers_last_alter_id = await _db.getLastAlterId(companyId, 'vouchers');
 
-      await _syncLedgers(companyName, companyId, company?['last_synced_ledgers_alter_id'] ?? 0);
+      await _syncGroups(companyName, companyId, groups_last_alter_id);
 
-      await _syncStockItems(companyName, companyId, company?['last_synced_stock_items_alter_id'] ?? 0);
+      await _syncLedgers(companyName, companyId, ledgers_last_alter_id);
 
-      await _syncVoucherTypes(companyName, companyId, company?['last_synced_voucher_types_alter_id'] ?? 0);
+      await _syncStockItems(companyName, companyId, stock_items_last_alter_id);
 
-      await _syncVouchers(companyName, companyId, companyStart, company?['last_synced_vouchers_alter_id'] ?? 0);
+      await _syncVoucherTypes(companyName, companyId, voucher_types_last_alter_id);
+
+      await _syncVouchers(companyName, companyId, companyStart, vouchers_last_alter_id);
 
       print("all data synced");
 
@@ -306,7 +312,7 @@ class SyncService {
 
       await _syncVoucherTypes(companyName, companyId, 0);
 
-      await _syncAllVouchers(companyName, companyId, companyStart, 0);
+      await _syncAllVouchers(companyName, companyId, companyStart);
 
       print("all data synced");
 
@@ -625,19 +631,9 @@ class SyncService {
     final stockItems = TallyXmlParser.parseStockItems(xml);
     // final stockItemMonthWiseClosingData = closingBalanceXmlArray.map((monthXml) => TallyXmlParser.parseStockItemClosingBalances(monthXml));
   // ✅ Flatten all months into one big list
-  
 
     if (stockItems.isNotEmpty) {
       await _db.saveStockItemBatch(stockItems, allClosingData, companyId);
-
-      // Get max alterId from synced vouchers
-      final maxAlterId =
-          stockItems.map((s) => s.alterid).reduce((a, b) => a > b ? a : b);
-
-      if (maxAlterId > 0) {
-        await _db.updateSyncTracking(companyId,
-            lastSyncedStockItemsAlterId: maxAlterId);
-      }
     }
   }
 
@@ -650,15 +646,6 @@ class SyncService {
 
     if (groups.isNotEmpty) {
       await _db.processNewGroups(groups, companyId);
-
-      // Get max alterId from synced vouchers
-      final maxAlterId =
-          groups.map((g) => g.alterId).reduce((a, b) => a > b ? a : b);
-
-      if (maxAlterId > 0) {
-        await _db.updateSyncTracking(companyId,
-            lastSyncedGroupsAlterId: maxAlterId);
-      }
     }
   }
 
@@ -669,15 +656,6 @@ class SyncService {
 
     if (ledgers.isNotEmpty) {
       await _db.saveLedgerBatch(ledgers, companyId);
-
-      // Get max alterId from synced vouchers
-      final maxAlterId =
-          ledgers.map((l) => l.alterid).reduce((a, b) => a > b ? a : b);
-
-      if (maxAlterId > 0) {
-        await _db.updateSyncTracking(companyId,
-            lastSyncedLedgersAlterId: maxAlterId);
-      }
     }
   }
 
@@ -686,15 +664,7 @@ class SyncService {
     final vouchers = TallyXmlParser.parseVouchers(xml);
 
     if (vouchers.isNotEmpty){
-      await _db.saveVoucherBatch(vouchers, companyId);
-
-      final maxAlterId = vouchers.map((v) => v.alterId).reduce((a, b) => a > b ? a : b);
-      if (maxAlterId > lastAlterId) {
-        await _db.updateSyncTracking(
-          companyId,
-          lastSyncedVouchersAlterId: maxAlterId,
-        );
-      }
+      await _db.saveVoucherBatch(vouchers, companyId);      
     }
 
     // await detectAndDeleteMissingVouchers(companyName, companyId);
@@ -709,21 +679,12 @@ class SyncService {
 
     if (voucherTypes.isNotEmpty) {
       await _db.processNewVoucherTypes(voucherTypes, companyId);
-
-      // Get max alterId from synced vouchers
-      final maxAlterId =
-          voucherTypes.map((g) => g.alterId).reduce((a, b) => a > b ? a : b);
-
-      if (maxAlterId > 0) {
-        await _db.updateSyncTracking(companyId,
-            lastSyncedVoucherTypesAlterId: maxAlterId);
-      }
     }
   }
 
 
   Future _syncAllVouchers(String companyName, String companyId,
-      String companyStartDate, int lastAlterId) async {
+      String companyStartDate) async {
     final startDate = DateTime.parse(companyStartDate);
     
 
@@ -775,32 +736,8 @@ class SyncService {
       if (vouchers.isNotEmpty) {
         await _db.saveVoucherBatch(vouchers, companyId);
 
-        final maxAlterId =
-            vouchers.map((v) => v.alterId).reduce((a, b) => a > b ? a : b);
-        if (maxAlterId > lastAlterId) {
-          lastAlterId = maxAlterId;
-          await _db.updateSyncTracking(
-            companyId,
-            lastSyncedVouchersAlterId: maxAlterId,
-          );
-        }
       }
 
-      // for (final xml in results){
-      //     final vouchers = TallyXmlParser.parseVouchers(xml);
-      //     if (vouchers.isNotEmpty) {
-      //       await _db.saveVoucherBatch(vouchers, companyId);
-
-      //       final maxAlterId = vouchers.map((v) => v.alterId).reduce((a, b) => a > b ? a : b);
-      //       if (maxAlterId > lastAlterId) {
-      //         lastAlterId = maxAlterId;
-      //         await _db.updateSyncTracking(
-      //           companyId,
-      //           lastSyncedVouchersAlterId: maxAlterId,
-      //         );
-      //       }
-      //     }
-      // }
     }
 
     // await detectAndDeleteMissingVouchers(companyName, companyId);

@@ -94,7 +94,7 @@ Future<List<String>> getAllChildVoucherTypes(String companyGuid, String voucherT
 
   final result = await db.rawQuery('''
     WITH RECURSIVE voucher_type_tree AS (
-      SELECT guid, name
+      SELECT voucher_type_guid, name
       FROM voucher_types
       WHERE company_guid = ?
         AND (name = ? OR reserved_name = ?)
@@ -102,12 +102,12 @@ Future<List<String>> getAllChildVoucherTypes(String companyGuid, String voucherT
       
       UNION ALL
       
-      SELECT vt.guid, vt.name
+      SELECT vt.voucher_type_guid, vt.name
       FROM voucher_types vt
-      INNER JOIN voucher_type_tree vtt ON vt.parent_guid = vtt.guid
+      INNER JOIN voucher_type_tree vtt ON vt.parent_guid = vtt.voucher_type_guid
       WHERE vt.company_guid = ?
         AND vt.is_deleted = 0
-        AND vt.guid != vt.parent_guid  -- Prevent self-referencing loop
+        AND vt.voucher_type_guid != vt.parent_guid  -- Prevent self-referencing loop
     )
     SELECT name FROM voucher_type_tree ORDER BY name
   ''', [companyGuid, voucherTypeName, voucherTypeName, companyGuid]);
@@ -1752,7 +1752,7 @@ Future<AverageCostResult> calculateAvgCost({
       FROM voucher_ledger_entries vle
       INNER JOIN vouchers v ON v.voucher_guid = vle.voucher_guid
       INNER JOIN ledgers l ON l.name = vle.ledger_name AND l.company_guid = v.company_guid
-      INNER JOIN group_tree gt ON l.parent = gt.name
+      INNER JOIN group_tree gt ON l.parent_guid = gt.group_guid
       WHERE v.company_guid = ?
         AND v.is_deleted = 0
         AND v.is_cancelled = 0
@@ -1768,6 +1768,28 @@ Future<AverageCostResult> calculateAvgCost({
     final netSales =
         (salesResult.first['net_sales'] as num?)?.toDouble() ?? 0.0;
     final salesVouchers = salesResult.first['vouchers'] as int? ?? 0;
+
+
+// Query to run in your app's debug SQL runner
+final results = await db.rawQuery('''
+  SELECT 
+    vle.voucher_guid,
+    vle.ledger_name,
+    vle.amount,
+    vle.is_deemed_positive,
+    v.voucher_type,
+    v.date
+  FROM voucher_ledger_entries vle
+  LEFT JOIN vouchers v ON v.voucher_guid = vle.voucher_guid
+  WHERE vle.company_guid = '51359d47-7c3b-46e8-af44-fa3095fe9e5c'
+  AND v.voucher_type = 'RECEIPT TPR'
+  ORDER BY v.date DESC
+''');
+
+for (final row in results) {
+  print('VLE | ${row['voucher_guid']} | ${row['voucher_type']} | ${row['ledger_name']} | ${row['amount']} | ${row['date']}');
+}
+print('Total RECEIPT TPR VLE rows: ${results.length}');
 
     final directExpenses = await db.rawQuery('''
   WITH RECURSIVE group_tree AS (

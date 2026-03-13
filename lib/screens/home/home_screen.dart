@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:tally_connector/screens/desktop/database_viewer_screen.dart';
 import 'package:tally_connector/screens/home/analytics_dashboard.dart';
+import 'package:tally_connector/screens/mobile/database_overview_screen.dart';
 import '../../services/auth_service.dart';
 import '../../utils/secure_storage.dart';
 import '../../models/user_model.dart';
@@ -94,7 +95,7 @@ Future<void> _openDatabaseViewerScreen() async {
   Navigator.push(
     context,
     MaterialPageRoute(
-      builder: (context) => const DatabaseViewerScreen(),
+      builder: (context) => const DatabaseOverviewScreen(),
     ),
   );
 }
