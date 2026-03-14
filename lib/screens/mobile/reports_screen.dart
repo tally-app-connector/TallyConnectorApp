@@ -243,35 +243,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
       final guid = _companyGuid!;
       final now = DateTime.now();
 
-      // M/Q/Y = zoom level: M uses selected range, Q expands to quarter, Y expands to year
-      // late DateTime start;
-      // late DateTime end;
-      // switch (period) {
-      //   case ChartPeriod.quarterly:
-      //     // Always show full current quarter (monthly grouping)
-      //     final qStart = ((now.month - 1) ~/ 3) * 3 + 1;
-      //     start = DateTime(now.year, qStart, 1);
-      //     end = DateTime(now.year, qStart + 3, 0);
-      //     break;
-      //   case ChartPeriod.yearly:
-      //     // Always show full year (monthly grouping)
-      //     start = DateTime(now.year, 1, 1);
-      //     end = DateTime(now.year, 12, 31);
-      //     break;
-      //   case ChartPeriod.monthly:
-      //     // Use selected date range as-is
-      //     // For Quarter type, expand M to full quarter so all 3 months show
-      //     if (_dateRange.type == DateRangeType.quarter) {
-      //       final qStart = ((now.month - 1) ~/ 3) * 3 + 1;
-      //       start = DateTime(now.year, qStart, 1);
-      //       end = DateTime(now.year, qStart + 3, 0);
-      //     } else {
-      //       start = _dateRange.startDate;
-      //       end = _dateRange.endDate;
-      //     }
-      //     break;
-      // }
-
       late DateTime start;
       late DateTime end;
 
