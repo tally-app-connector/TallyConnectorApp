@@ -663,12 +663,86 @@ class CloudToLocalSyncService {
         isFullSync: isFullSync,
         orderBy: 'id');
 
+    
+
     counts['voucher_ledger_entries']    = vle;
     counts['voucher_inventory_entries'] = vie;
     counts['voucher_batch_allocations'] = vba;
 
+    if (!isFullSync && vie > 0) {
+    await _resyncClosingBalancesForAffectedStockItems(
+      localDb, schema, companyGuid, syncResult.updatedGuids);
+  }
+
     return counts;
   }
+
+  Future<void> _resyncClosingBalancesForAffectedStockItems(
+  Database localDb,
+  String schema,
+  String companyGuid,
+  List<String> voucherGuids,
+) async {
+  if (voucherGuids.isEmpty) return;
+
+  // Step 1: Get distinct stock_item_guids from local inventory entries
+  // for the vouchers we just synced
+  final inList = voucherGuids.map((g) => "'$g'").join(',');
+  final rows = await localDb.rawQuery('''
+    SELECT DISTINCT stock_item_guid
+    FROM voucher_inventory_entries
+    WHERE voucher_guid IN ($inList)
+      AND stock_item_guid IS NOT NULL
+      AND stock_item_guid != ''
+  ''');
+
+  if (rows.isEmpty) return;
+
+  final stockItemGuids = rows
+      .map((r) => r['stock_item_guid'] as String?)
+      .whereType<String>()
+      .toList();
+
+  print('  🔄 Re-syncing closing balances for ${stockItemGuids.length} stock items...');
+
+  // Step 2: Fetch closing balances from cloud for those stock item guids
+  // Process in batches of 500
+  int totalSynced = 0;
+  for (int i = 0; i < stockItemGuids.length; i += 500) {
+    final guidBatch = stockItemGuids.sublist(
+        i, (i + 500).clamp(0, stockItemGuids.length));
+    final guidInList = guidBatch.map((g) => "'$g'").join(',');
+
+    final cloudRows = await _fetchAllRowsById(
+      schema, 'stock_item_closing_balance',
+      whereClause: "stock_item_guid IN ($guidInList)",
+      stripTableName: null,
+    );
+
+    // Step 3: Delete + insert locally
+    await localDb.transaction((txn) async {
+      await txn.rawDelete('''
+        DELETE FROM stock_item_closing_balance
+        WHERE stock_item_guid IN ($guidInList)
+      ''');
+
+      const batchSize = 200;
+      for (int k = 0; k < cloudRows.length; k += batchSize) {
+        final batch = txn.batch();
+        final end = (k + batchSize).clamp(0, cloudRows.length);
+        for (int j = k; j < end; j++) {
+          batch.insert('stock_item_closing_balance', cloudRows[j],
+              conflictAlgorithm: ConflictAlgorithm.replace);
+        }
+        await batch.commit(noResult: true);
+      }
+    });
+
+    totalSynced += cloudRows.length;
+  }
+
+  print('  ✅ stock_item_closing_balance: $totalSynced rows re-synced after voucher update');
+}
 
   // ============================================================
   // CORE: PARENT SYNC BY ALTER_ID

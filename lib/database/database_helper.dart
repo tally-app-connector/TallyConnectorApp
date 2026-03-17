@@ -1584,6 +1584,81 @@ Future<void> saveStockItemBatch(
       // NOTE: created_at is handled by database DEFAULT
     };
   }
+  // UPDATED WITH AWS SYNC
+Future<void> saveStockItemClosingInBatch(
+    Set<String> stockItemGuids,
+    List<StockItemClosingData> allClosingData,
+    String companyGuid,
+    {bool syncToAws = true}) async {
+
+  int successCount = 0;
+  int failCount = 0;
+final allClosingBalances = <Map<String, dynamic>>[];
+
+  for (final guid in stockItemGuids) {
+    try {
+      if (guid.isNotEmpty) {
+        final closingData =
+            allClosingData.where((e) => e.guid == guid).toList();        
+           for (final closing in closingData) {
+            allClosingBalances.add({
+              'company_guid': companyGuid,
+              'stock_item_guid': guid,
+              'closing_balance': closing.closingQty,
+              'closing_value': closing.closingValue,
+              'closing_rate': closing.closingRate,
+              'closing_date': closing.date,
+            });
+          }
+        await saveStockItemClosing(guid, closingData, companyGuid);
+        successCount++;
+      }
+    } catch (e) {
+      print('❌ Error saving ${guid}: $e');
+      failCount++;
+    }
+  }
+
+  print('✅ Local save complete! Success: $successCount, Failed: $failCount');
+
+   if (syncToAws && allClosingBalances.isNotEmpty) {
+    try {
+      
+        await AwsSyncService.instance
+            .syncStockItemClosingBalance(allClosingBalances, companyGuid);
+        print(
+            '☁️ Synced ${allClosingBalances.length} stock closing balances to AWS');      
+    } catch (e) {
+      print('⚠️ AWS sync failed for stock items: $e');
+    }
+  }
+
+}
+
+
+Future<void> saveStockItemClosing(String stockItemGuid, List<StockItemClosingData> stockItemClosingData, String companyGuid) async {
+    final db = await database;
+
+    await db.transaction((txn) async {
+      // Extract latest details
+
+      if (stockItemClosingData.isNotEmpty) {
+        await txn.delete('stock_item_closing_balance',
+            where: 'stock_item_guid = ?', whereArgs: [stockItemGuid]);
+        for (final closingData in stockItemClosingData) {
+          await txn.insert('stock_item_closing_balance', {
+            'company_guid': companyGuid,
+            'stock_item_guid': stockItemGuid,
+            'closing_balance': closingData.closingQty,
+            'closing_value': closingData.closingValue,
+            'closing_rate': closingData.closingRate,
+            'closing_date': closingData.date
+          });
+        }
+      }
+     
+    });
+  }
 
   // ============================================
   // GROUPS
@@ -2889,6 +2964,7 @@ Future<int> getLastAlterId(
   } catch (_) {}
   return 0;
 }
+  
   Future<void> deleteVouchersByGuids(List<String> guids, String companyGuid) async {
   // Delete locally
   final db = await database;

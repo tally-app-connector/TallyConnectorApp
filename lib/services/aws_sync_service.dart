@@ -1850,92 +1850,98 @@ Future<void> _syncVoucherTypeBatch(
     await _connection!.execute(sql, parameters: allParameters);
   }
 
-  // ============================================
-  // VOUCHER LEDGER ENTRIES SYNC - ALL 15 FIELDS
-  // ============================================
-  Future<void> syncVoucherLedgerEntries(
-      List<Map<String, dynamic>> entries, String companyGuid) async {
-    await _ensureConnection();
-    final schemaName = _getSchemaName(companyGuid);
-    await checkSchemaExists(schemaName);
+// ============================================
+// VOUCHER LEDGER ENTRIES SYNC
+// ============================================
+Future<void> syncVoucherLedgerEntries(
+    List<Map<String, dynamic>> entries, String companyGuid) async {
+  await _ensureConnection();
+  final schemaName = _getSchemaName(companyGuid);
+  await checkSchemaExists(schemaName);
+  if (entries.isEmpty) return;
 
-    if (entries.isEmpty) return;
+  final guids = entries.map((e) => e['voucher_guid'] as String).toSet().toList();
+  final placeholders = List.generate(guids.length, (i) => '\$${i + 1}').join(', ');
+  await _connection!.execute(
+    'DELETE FROM $schemaName.voucher_ledger_entries WHERE voucher_guid IN ($placeholders)',
+    parameters: guids,
+  );
 
-    const batchSize = 100;
-    int successCount = 0;
-
-    for (int i = 0; i < entries.length; i += batchSize) {
-      final batch = entries.skip(i).take(batchSize).toList();
-
-      try {
-        await _syncVoucherLedgerEntriesBatch(batch, schemaName);
-        successCount += batch.length;
-      } catch (e) {
-        print('❌ Error syncing ledger entries batch at index $i: $e');
-      }
+  const batchSize = 100;
+  int successCount = 0;
+  for (int i = 0; i < entries.length; i += batchSize) {
+    final batch = entries.skip(i).take(batchSize).toList();
+    try {
+      await _syncVoucherLedgerEntriesBatch(batch, schemaName);
+      successCount += batch.length;
+    } catch (e) {
+      print('❌ Error syncing ledger entries batch at index $i: $e');
     }
-
-    print(
-        '✅ Synced $successCount/${entries.length} voucher ledger entries to AWS Aurora');
   }
+  print('✅ Synced $successCount/${entries.length} voucher ledger entries to AWS Aurora');
+}
 
-  // ============================================
-  // VOUCHER INVENTORY ENTRIES SYNC - ALL 22 FIELDS
-  // ============================================
-  Future<void> syncVoucherInventoryEntries(
-      List<Map<String, dynamic>> entries, String companyGuid) async {
-    await _ensureConnection();
-    final schemaName = _getSchemaName(companyGuid);
-    await checkSchemaExists(schemaName);
+// ============================================
+// VOUCHER INVENTORY ENTRIES SYNC
+// ============================================
+Future<void> syncVoucherInventoryEntries(
+    List<Map<String, dynamic>> entries, String companyGuid) async {
+  await _ensureConnection();
+  final schemaName = _getSchemaName(companyGuid);
+  await checkSchemaExists(schemaName);
+  if (entries.isEmpty) return;
 
-    if (entries.isEmpty) return;
+  final guids = entries.map((e) => e['voucher_guid'] as String).toSet().toList();
+  final placeholders = List.generate(guids.length, (i) => '\$${i + 1}').join(', ');
+  await _connection!.execute(
+    'DELETE FROM $schemaName.voucher_inventory_entries WHERE voucher_guid IN ($placeholders)',
+    parameters: guids,
+  );
 
-    const batchSize = 100;
-    int successCount = 0;
-
-    for (int i = 0; i < entries.length; i += batchSize) {
-      final batch = entries.skip(i).take(batchSize).toList();
-
-      try {
-        await _syncVoucherInventoryEntriesBatch(batch, schemaName);
-        successCount += batch.length;
-      } catch (e) {
-        print('❌ Error syncing inventory entries batch at index $i: $e');
-      }
+  const batchSize = 100;
+  int successCount = 0;
+  for (int i = 0; i < entries.length; i += batchSize) {
+    final batch = entries.skip(i).take(batchSize).toList();
+    try {
+      await _syncVoucherInventoryEntriesBatch(batch, schemaName);
+      successCount += batch.length;
+    } catch (e) {
+      print('❌ Error syncing inventory entries batch at index $i: $e');
     }
-
-    print(
-        '✅ Synced $successCount/${entries.length} voucher inventory entries to AWS Aurora');
   }
+  print('✅ Synced $successCount/${entries.length} voucher inventory entries to AWS Aurora');
+}
 
-  // ============================================
-  // VOUCHER BATCH ALLOCATIONS SYNC - ALL 14 FIELDS
-  // ============================================
-  Future<void> syncVoucherBatchAllocations(
-      List<Map<String, dynamic>> allocations, String companyGuid) async {
-    await _ensureConnection();
-    final schemaName = _getSchemaName(companyGuid);
-    await checkSchemaExists(schemaName);
+// ============================================
+// VOUCHER BATCH ALLOCATIONS SYNC
+// ============================================
+Future<void> syncVoucherBatchAllocations(
+    List<Map<String, dynamic>> allocations, String companyGuid) async {
+  await _ensureConnection();
+  final schemaName = _getSchemaName(companyGuid);
+  await checkSchemaExists(schemaName);
+  if (allocations.isEmpty) return;
 
-    if (allocations.isEmpty) return;
+  final guids = allocations.map((a) => a['voucher_guid'] as String).toSet().toList();
+  final placeholders = List.generate(guids.length, (i) => '\$${i + 1}').join(', ');
+  await _connection!.execute(
+    'DELETE FROM $schemaName.voucher_batch_allocations WHERE voucher_guid IN ($placeholders)',
+    parameters: guids,
+  );
 
-    const batchSize = 100;
-    int successCount = 0;
-
-    for (int i = 0; i < allocations.length; i += batchSize) {
-      final batch = allocations.skip(i).take(batchSize).toList();
-
-      try {
-        await _syncVoucherBatchAllocationsBatch(batch, schemaName);
-        successCount += batch.length;
-      } catch (e) {
-        print('❌ Error syncing batch allocations batch at index $i: $e');
-      }
+  const batchSize = 100;
+  int successCount = 0;
+  for (int i = 0; i < allocations.length; i += batchSize) {
+    final batch = allocations.skip(i).take(batchSize).toList();
+    try {
+      await _syncVoucherBatchAllocationsBatch(batch, schemaName);
+      successCount += batch.length;
+    } catch (e) {
+      print('❌ Error syncing batch allocations batch at index $i: $e');
     }
-
-    print(
-        '✅ Synced $successCount/${allocations.length} voucher batch allocations to AWS Aurora');
   }
+  print('✅ Synced $successCount/${allocations.length} voucher batch allocations to AWS Aurora');
+}
 
   // ============================================
   // UTILITY FUNCTIONS
@@ -1952,11 +1958,7 @@ Future<void> _syncVoucherTypeBatch(
     return null;
   }
 
-  // ============================================================
-// ADD THESE METHODS INSIDE AwsSyncService CLASS
-// ============================================================
-
-// ============================================
+  // ============================================
 // LEDGER CONTACTS SYNC
 // ============================================
 Future<void> syncLedgerContacts(
@@ -1964,12 +1966,17 @@ Future<void> syncLedgerContacts(
   await _ensureConnection();
   final schemaName = _getSchemaName(companyGuid);
   await checkSchemaExists(schemaName);
-
   if (contacts.isEmpty) return;
+
+  final guids = contacts.map((c) => c['ledger_guid'] as String).toSet().toList();
+  final placeholders = List.generate(guids.length, (i) => '\$${i + 1}').join(', ');
+  await _connection!.execute(
+    'DELETE FROM $schemaName.ledger_contacts WHERE ledger_guid IN ($placeholders)',
+    parameters: guids,
+  );
 
   const batchSize = 100;
   int successCount = 0;
-
   for (int i = 0; i < contacts.length; i += batchSize) {
     final batch = contacts.skip(i).take(batchSize).toList();
     try {
@@ -1979,9 +1986,71 @@ Future<void> syncLedgerContacts(
       print('❌ Error syncing ledger contacts batch at index $i: $e');
     }
   }
-
   print('✅ Synced $successCount/${contacts.length} ledger contacts to AWS Aurora');
 }
+
+// ============================================
+// LEDGER MAILING DETAILS SYNC
+// ============================================
+Future<void> syncLedgerMailingDetails(
+    List<Map<String, dynamic>> mailingDetails, String companyGuid) async {
+  await _ensureConnection();
+  final schemaName = _getSchemaName(companyGuid);
+  await checkSchemaExists(schemaName);
+  if (mailingDetails.isEmpty) return;
+
+  final guids = mailingDetails.map((m) => m['ledger_guid'] as String).toSet().toList();
+  final placeholders = List.generate(guids.length, (i) => '\$${i + 1}').join(', ');
+  await _connection!.execute(
+    'DELETE FROM $schemaName.ledger_mailing_details WHERE ledger_guid IN ($placeholders)',
+    parameters: guids,
+  );
+
+  const batchSize = 100;
+  int successCount = 0;
+  for (int i = 0; i < mailingDetails.length; i += batchSize) {
+    final batch = mailingDetails.skip(i).take(batchSize).toList();
+    try {
+      await _syncLedgerMailingDetailsBatch(batch, schemaName);
+      successCount += batch.length;
+    } catch (e) {
+      print('❌ Error syncing ledger mailing details batch at index $i: $e');
+    }
+  }
+  print('✅ Synced $successCount/${mailingDetails.length} ledger mailing details to AWS Aurora');
+}
+
+// ============================================
+// LEDGER GST REGISTRATIONS SYNC
+// ============================================
+Future<void> syncLedgerGstRegistrations(
+    List<Map<String, dynamic>> registrations, String companyGuid) async {
+  await _ensureConnection();
+  final schemaName = _getSchemaName(companyGuid);
+  await checkSchemaExists(schemaName);
+  if (registrations.isEmpty) return;
+
+  final guids = registrations.map((r) => r['ledger_guid'] as String).toSet().toList();
+  final placeholders = List.generate(guids.length, (i) => '\$${i + 1}').join(', ');
+  await _connection!.execute(
+    'DELETE FROM $schemaName.ledger_gst_registrations WHERE ledger_guid IN ($placeholders)',
+    parameters: guids,
+  );
+
+  const batchSize = 100;
+  int successCount = 0;
+  for (int i = 0; i < registrations.length; i += batchSize) {
+    final batch = registrations.skip(i).take(batchSize).toList();
+    try {
+      await _syncLedgerGstRegistrationsBatch(batch, schemaName);
+      successCount += batch.length;
+    } catch (e) {
+      print('❌ Error syncing ledger GST registrations batch at index $i: $e');
+    }
+  }
+  print('✅ Synced $successCount/${registrations.length} ledger GST registrations to AWS Aurora');
+}
+
 
 Future<void> _syncLedgerContactsBatch(
     List<Map<String, dynamic>> contacts, String schemaName) async {
@@ -2019,32 +2088,6 @@ Future<void> _syncLedgerContactsBatch(
   await _connection!.execute(sql, parameters: allParameters);
 }
 
-// ============================================
-// LEDGER MAILING DETAILS SYNC
-// ============================================
-Future<void> syncLedgerMailingDetails(
-    List<Map<String, dynamic>> mailingDetails, String companyGuid) async {
-  await _ensureConnection();
-  final schemaName = _getSchemaName(companyGuid);
-  await checkSchemaExists(schemaName);
-
-  if (mailingDetails.isEmpty) return;
-
-  const batchSize = 100;
-  int successCount = 0;
-
-  for (int i = 0; i < mailingDetails.length; i += batchSize) {
-    final batch = mailingDetails.skip(i).take(batchSize).toList();
-    try {
-      await _syncLedgerMailingDetailsBatch(batch, schemaName);
-      successCount += batch.length;
-    } catch (e) {
-      print('❌ Error syncing ledger mailing details batch at index $i: $e');
-    }
-  }
-
-  print('✅ Synced $successCount/${mailingDetails.length} ledger mailing details to AWS Aurora');
-}
 
 Future<void> _syncLedgerMailingDetailsBatch(
     List<Map<String, dynamic>> mailingDetails, String schemaName) async {
@@ -2084,32 +2127,6 @@ Future<void> _syncLedgerMailingDetailsBatch(
   await _connection!.execute(sql, parameters: allParameters);
 }
 
-// ============================================
-// LEDGER GST REGISTRATIONS SYNC
-// ============================================
-Future<void> syncLedgerGstRegistrations(
-    List<Map<String, dynamic>> registrations, String companyGuid) async {
-  await _ensureConnection();
-  final schemaName = _getSchemaName(companyGuid);
-  await checkSchemaExists(schemaName);
-
-  if (registrations.isEmpty) return;
-
-  const batchSize = 100;
-  int successCount = 0;
-
-  for (int i = 0; i < registrations.length; i += batchSize) {
-    final batch = registrations.skip(i).take(batchSize).toList();
-    try {
-      await _syncLedgerGstRegistrationsBatch(batch, schemaName);
-      successCount += batch.length;
-    } catch (e) {
-      print('❌ Error syncing ledger GST registrations batch at index $i: $e');
-    }
-  }
-
-  print('✅ Synced $successCount/${registrations.length} ledger GST registrations to AWS Aurora');
-}
 
 Future<void> _syncLedgerGstRegistrationsBatch(
     List<Map<String, dynamic>> registrations, String schemaName) async {
@@ -2213,20 +2230,22 @@ Future<void> _syncLedgerClosingBalancesBatch(
   await _connection!.execute(sql, parameters: allParameters);
 }
 
-// ============================================
-// STOCK ITEM HSN HISTORY SYNC
-// ============================================
 Future<void> syncStockItemHsnHistory(
     List<Map<String, dynamic>> hsnHistory, String companyGuid) async {
   await _ensureConnection();
   final schemaName = _getSchemaName(companyGuid);
   await checkSchemaExists(schemaName);
-
   if (hsnHistory.isEmpty) return;
+
+  final guids = hsnHistory.map((h) => h['stock_item_guid'] as String).toSet().toList();
+  final placeholders = List.generate(guids.length, (i) => '\$${i + 1}').join(', ');
+  await _connection!.execute(
+    'DELETE FROM $schemaName.stock_item_hsn_history WHERE stock_item_guid IN ($placeholders)',
+    parameters: guids,
+  );
 
   const batchSize = 100;
   int successCount = 0;
-
   for (int i = 0; i < hsnHistory.length; i += batchSize) {
     final batch = hsnHistory.skip(i).take(batchSize).toList();
     try {
@@ -2236,8 +2255,100 @@ Future<void> syncStockItemHsnHistory(
       print('❌ Error syncing stock item HSN history batch at index $i: $e');
     }
   }
-
   print('✅ Synced $successCount/${hsnHistory.length} stock item HSN history to AWS Aurora');
+}
+
+// ============================================
+// STOCK ITEM BATCH ALLOCATION SYNC
+// ============================================
+Future<void> syncStockItemBatchAllocation(
+    List<Map<String, dynamic>> allocations, String companyGuid) async {
+  await _ensureConnection();
+  final schemaName = _getSchemaName(companyGuid);
+  await checkSchemaExists(schemaName);
+  if (allocations.isEmpty) return;
+
+  final guids = allocations.map((a) => a['stock_item_guid'] as String).toSet().toList();
+  final placeholders = List.generate(guids.length, (i) => '\$${i + 1}').join(', ');
+  await _connection!.execute(
+    'DELETE FROM $schemaName.stock_item_batch_allocation WHERE stock_item_guid IN ($placeholders)',
+    parameters: guids,
+  );
+
+  const batchSize = 100;
+  int successCount = 0;
+  for (int i = 0; i < allocations.length; i += batchSize) {
+    final batch = allocations.skip(i).take(batchSize).toList();
+    try {
+      await _syncStockItemBatchAllocationBatch(batch, schemaName);
+      successCount += batch.length;
+    } catch (e) {
+      print('❌ Error syncing stock item batch allocation batch at index $i: $e');
+    }
+  }
+  print('✅ Synced $successCount/${allocations.length} stock item batch allocations to AWS Aurora');
+}
+
+// ============================================
+// STOCK ITEM CLOSING BALANCE SYNC
+// ============================================
+Future<void> syncStockItemClosingBalance(
+    List<Map<String, dynamic>> closingBalances, String companyGuid) async {
+  await _ensureConnection();
+  final schemaName = _getSchemaName(companyGuid);
+  await checkSchemaExists(schemaName);
+  if (closingBalances.isEmpty) return;
+
+  final guids = closingBalances.map((b) => b['stock_item_guid'] as String).toSet().toList();
+  final placeholders = List.generate(guids.length, (i) => '\$${i + 1}').join(', ');
+  await _connection!.execute(
+    'DELETE FROM $schemaName.stock_item_closing_balance WHERE stock_item_guid IN ($placeholders)',
+    parameters: guids,
+  );
+
+  const batchSize = 200;
+  int successCount = 0;
+  for (int i = 0; i < closingBalances.length; i += batchSize) {
+    final batch = closingBalances.skip(i).take(batchSize).toList();
+    try {
+      await _syncStockItemClosingBalanceBatch(batch, schemaName);
+      successCount += batch.length;
+    } catch (e) {
+      print('❌ Error syncing stock item closing balance batch at index $i: $e');
+    }
+  }
+  print('✅ Synced $successCount/${closingBalances.length} stock item closing balances to AWS Aurora');
+}
+
+// ============================================
+// STOCK ITEM GST HISTORY SYNC
+// ============================================
+Future<void> syncStockItemGstHistory(
+    List<Map<String, dynamic>> gstHistory, String companyGuid) async {
+  await _ensureConnection();
+  final schemaName = _getSchemaName(companyGuid);
+  await checkSchemaExists(schemaName);
+  if (gstHistory.isEmpty) return;
+
+  final guids = gstHistory.map((g) => g['stock_item_guid'] as String).toSet().toList();
+  final placeholders = List.generate(guids.length, (i) => '\$${i + 1}').join(', ');
+  await _connection!.execute(
+    'DELETE FROM $schemaName.stock_item_gst_history WHERE stock_item_guid IN ($placeholders)',
+    parameters: guids,
+  );
+
+  const batchSize = 100;
+  int successCount = 0;
+  for (int i = 0; i < gstHistory.length; i += batchSize) {
+    final batch = gstHistory.skip(i).take(batchSize).toList();
+    try {
+      await _syncStockItemGstHistoryBatch(batch, schemaName);
+      successCount += batch.length;
+    } catch (e) {
+      print('❌ Error syncing stock item GST history batch at index $i: $e');
+    }
+  }
+  print('✅ Synced $successCount/${gstHistory.length} stock item GST history to AWS Aurora');
 }
 
 Future<void> _syncStockItemHsnHistoryBatch(
@@ -2276,32 +2387,6 @@ Future<void> _syncStockItemHsnHistoryBatch(
   await _connection!.execute(sql, parameters: allParameters);
 }
 
-// ============================================
-// STOCK ITEM BATCH ALLOCATION SYNC
-// ============================================
-Future<void> syncStockItemBatchAllocation(
-    List<Map<String, dynamic>> allocations, String companyGuid) async {
-  await _ensureConnection();
-  final schemaName = _getSchemaName(companyGuid);
-  await checkSchemaExists(schemaName);
-
-  if (allocations.isEmpty) return;
-
-  const batchSize = 100;
-  int successCount = 0;
-
-  for (int i = 0; i < allocations.length; i += batchSize) {
-    final batch = allocations.skip(i).take(batchSize).toList();
-    try {
-      await _syncStockItemBatchAllocationBatch(batch, schemaName);
-      successCount += batch.length;
-    } catch (e) {
-      print('❌ Error syncing stock item batch allocation batch at index $i: $e');
-    }
-  }
-
-  print('✅ Synced $successCount/${allocations.length} stock item batch allocations to AWS Aurora');
-}
 
 Future<void> _syncStockItemBatchAllocationBatch(
     List<Map<String, dynamic>> allocations, String schemaName) async {
@@ -2341,33 +2426,6 @@ Future<void> _syncStockItemBatchAllocationBatch(
   await _connection!.execute(sql, parameters: allParameters);
 }
 
-// ============================================
-// STOCK ITEM CLOSING BALANCE SYNC
-// ============================================
-Future<void> syncStockItemClosingBalance(
-    List<Map<String, dynamic>> closingBalances, String companyGuid) async {
-  await _ensureConnection();
-  final schemaName = _getSchemaName(companyGuid);
-  await checkSchemaExists(schemaName);
-
-  if (closingBalances.isEmpty) return;
-
-  const batchSize = 200;
-  int successCount = 0;
-
-  for (int i = 0; i < closingBalances.length; i += batchSize) {
-    final batch = closingBalances.skip(i).take(batchSize).toList();
-    try {
-      await _syncStockItemClosingBalanceBatch(batch, schemaName);
-      successCount += batch.length;
-    } catch (e) {
-      print('❌ Error syncing stock item closing balance batch at index $i: $e');
-    }
-  }
-
-  print('✅ Synced $successCount/${closingBalances.length} stock item closing balances to AWS Aurora');
-}
-
 Future<void> _syncStockItemClosingBalanceBatch(
     List<Map<String, dynamic>> closingBalances, String schemaName) async {
   if (closingBalances.isEmpty) return;
@@ -2403,33 +2461,6 @@ Future<void> _syncStockItemClosingBalanceBatch(
   ''';
 
   await _connection!.execute(sql, parameters: allParameters);
-}
-
-// ============================================
-// STOCK ITEM GST HISTORY SYNC
-// ============================================
-Future<void> syncStockItemGstHistory(
-    List<Map<String, dynamic>> gstHistory, String companyGuid) async {
-  await _ensureConnection();
-  final schemaName = _getSchemaName(companyGuid);
-  await checkSchemaExists(schemaName);
-
-  if (gstHistory.isEmpty) return;
-
-  const batchSize = 100;
-  int successCount = 0;
-
-  for (int i = 0; i < gstHistory.length; i += batchSize) {
-    final batch = gstHistory.skip(i).take(batchSize).toList();
-    try {
-      await _syncStockItemGstHistoryBatch(batch, schemaName);
-      successCount += batch.length;
-    } catch (e) {
-      print('❌ Error syncing stock item GST history batch at index $i: $e');
-    }
-  }
-
-  print('✅ Synced $successCount/${gstHistory.length} stock item GST history to AWS Aurora');
 }
 
 Future<void> _syncStockItemGstHistoryBatch(

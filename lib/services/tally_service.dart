@@ -666,7 +666,7 @@ List<MonthEntry> _buildLastTwoFYMonths() {
   final currentFYStart = today.month >= 4 ? today.year : today.year - 1;
 
   // Start from 2 FYs ago, include current FY
-  final fromFY = currentFYStart - 2;
+  final fromFY = currentFYStart - 1;
 
   final entries = <MonthEntry>[];
 
@@ -726,8 +726,9 @@ Future<List<StockItemClosingData>> getStockClosingBalances(String companyName) a
     print('✅ Batch ${(i ~/ batchSize) + 1}/${(months.length / batchSize).ceil()} done');
   }
 
-  print('✅ All monthly stock closing balances fetched!');
-  return results;
+    final filterdResult = results.where((r) => r.guid.isNotEmpty).toList();
+    print('✅ All monthly stock closing balances fetched!');
+    return filterdResult;
 }
 
 // ── Fetch single month ─────────────────────────────────────────
@@ -772,6 +773,99 @@ Future<List<StockItemClosingData>> _fetchSingleMonth(
     final rawXml = await getTallyData(xml);
     final document = TallyXmlParser.parseStockItemClosingBalances(rawXml);
     return document.map((data) => StockItemClosingData(guid: data.guid, closingRate: data.closingRate, closingQty: data.closingQty, closingValue: data.closingValue, date: m.toDate)).toList();
+  } catch (e) {
+    print('⚠️ Error for ${m.label}: $e');
+    return [];
+  }
+}
+
+Future<List<StockItemClosingData>> getStockClosingBalancesByGuids(
+  String companyName,
+  Set<String> stockItemGuids,
+) async {
+  if (stockItemGuids.isEmpty) return [];
+
+  print('📥 Fetching closing balances for ${stockItemGuids.length} GUIDs...');
+
+  final months = _buildLastTwoFYMonths();
+  List<StockItemClosingData> results = [];
+
+  const batchSize = 6;
+  for (int i = 0; i < months.length; i += batchSize) {
+    final batch = months.sublist(i, (i + batchSize).clamp(0, months.length));
+
+    final batchResults = await Future.wait(
+      batch.map((m) => _fetchSingleMonthByGuids(companyName, m, stockItemGuids)),
+    );
+
+    results.addAll(batchResults.expand((list) => list));
+    print('✅ Batch ${(i ~/ batchSize) + 1}/${(months.length / batchSize).ceil()} done');
+  }
+
+  final filterdResult = results.where((r) => r.guid.isNotEmpty).toList();
+
+  print('✅ Done. ${results.length} records fetched.');
+  return filterdResult;
+}
+
+Future<List<StockItemClosingData>> _fetchSingleMonthByGuids(
+  String companyName,
+  MonthEntry m,
+  Set<String> stockItemGuids,
+) async {
+  // Build: $$IsEqual:$GUID:"guid1" OR $$IsEqual:$GUID:"guid2" ...
+  final guidFilter = stockItemGuids
+      .map((g) => '\$\$IsEqual:\$GUID:"$g"')
+      .join(' OR ');
+
+  final xml = '''
+<ENVELOPE>
+  <HEADER>
+    <VERSION>1</VERSION>
+    <TALLYREQUEST>Export</TALLYREQUEST>
+    <TYPE>Collection</TYPE>
+    <ID>StockClosing</ID>
+  </HEADER>
+  <BODY>
+    <DESC>
+      <STATICVARIABLES>
+        <SVEXPORTFORMAT>\$\$SysName:XML</SVEXPORTFORMAT>
+        <SVCURRENTCOMPANY>$companyName</SVCURRENTCOMPANY>
+        <SVFROMDATE TYPE="Date">${m.fromDate}</SVFROMDATE>
+        <SVTODATE TYPE="Date">${m.toDate}</SVTODATE>
+      </STATICVARIABLES>
+      <TDL>
+        <TDLMESSAGE>
+          <COLLECTION NAME="StockClosing" ISMODIFY="No">
+            <TYPE>StockItem</TYPE>
+            <NATIVEMETHOD>NAME</NATIVEMETHOD>
+            <NATIVEMETHOD>GUID</NATIVEMETHOD>
+            <NATIVEMETHOD>CLOSINGBALANCE</NATIVEMETHOD>
+            <NATIVEMETHOD>CLOSINGVALUE</NATIVEMETHOD>
+            <NATIVEMETHOD>CLOSINGRATE</NATIVEMETHOD>
+            <FILTER>GuidFilter</FILTER>
+          </COLLECTION>
+          <SYSTEM TYPE="Formulae" NAME="GuidFilter">$guidFilter</SYSTEM>
+        </TDLMESSAGE>
+      </TDL>
+    </DESC>
+  </BODY>
+</ENVELOPE>
+''';
+
+  try {
+    final rawXml = await getTallyData(xml);
+    final parsed = TallyXmlParser.parseStockItemClosingBalances(rawXml);
+
+    return parsed
+        .map((data) => StockItemClosingData(
+              guid: data.guid,
+              closingRate: data.closingRate,
+              closingQty: data.closingQty,
+              closingValue: data.closingValue,
+              date: m.toDate,
+            ))
+        .toList();
   } catch (e) {
     print('⚠️ Error for ${m.label}: $e');
     return [];

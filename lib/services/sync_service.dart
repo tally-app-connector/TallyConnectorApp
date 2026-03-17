@@ -130,21 +130,24 @@ class SyncService {
       //   await _neonSync.initialize();
       // }
 
-      final voucher_types_last_alter_id = await _db.getLastAlterId(companyId, 'voucher_types');
-      final groups_last_alter_id = await _db.getLastAlterId(companyId, 'groups');
-      final ledgers_last_alter_id = await _db.getLastAlterId(companyId, 'ledgers');
-      final stock_items_last_alter_id = await _db.getLastAlterId(companyId, 'stock_items');
-      final vouchers_last_alter_id = await _db.getLastAlterId(companyId, 'vouchers');
+      final voucherTypesLastAlterId = await _db.getLastAlterId(companyId, 'voucher_types');
+      final groupsLastAlterId = await _db.getLastAlterId(companyId, 'groups');
+      final ledgersLastAlterId = await _db.getLastAlterId(companyId, 'ledgers');
+      final stockItemsLastAlterId = await _db.getLastAlterId(companyId, 'stock_items');
+      final vouchersLastAlterId = await _db.getLastAlterId(companyId, 'vouchers');
 
-      await _syncGroups(companyName, companyId, groups_last_alter_id);
+      await _syncGroups(companyName, companyId, groupsLastAlterId);
 
-      await _syncLedgers(companyName, companyId, ledgers_last_alter_id);
+      await _syncLedgers(companyName, companyId, ledgersLastAlterId);
 
-      await _syncStockItems(companyName, companyId, stock_items_last_alter_id);
+      await _syncStockItems(companyName, companyId, stockItemsLastAlterId);
 
-      await _syncVoucherTypes(companyName, companyId, voucher_types_last_alter_id);
+      await _syncVoucherTypes(companyName, companyId, voucherTypesLastAlterId);
 
-      await _syncVouchers(companyName, companyId, companyStart, vouchers_last_alter_id);
+      final stockItemsGuids = await _syncVouchers(companyName, companyId, companyStart, vouchersLastAlterId);
+
+      await _syncStockItemsClosing(companyName, companyId, stockItemsGuids);
+
 
       print("all data synced");
 
@@ -631,9 +634,16 @@ class SyncService {
     final stockItems = TallyXmlParser.parseStockItems(xml);
     // final stockItemMonthWiseClosingData = closingBalanceXmlArray.map((monthXml) => TallyXmlParser.parseStockItemClosingBalances(monthXml));
   // ✅ Flatten all months into one big list
-
     if (stockItems.isNotEmpty) {
       await _db.saveStockItemBatch(stockItems, allClosingData, companyId);
+    }
+
+  }
+
+  Future _syncStockItemsClosing( String companyName, String companyId, Set<String> stock_item_guids) async {
+    final allClosingData = await _tallyService.getStockClosingBalancesByGuids(companyName, stock_item_guids);
+    if (allClosingData.isNotEmpty) {
+      await _db.saveStockItemClosingInBatch(stock_item_guids, allClosingData, companyId);
     }
   }
 
@@ -659,14 +669,38 @@ class SyncService {
     }
   }
 
-  Future _syncVouchers(String companyName, String companyId, String companyStartDate, int lastAlterId) async {
+  Future <Set<String>> _syncVouchers(String companyName, String companyId, String companyStartDate, int lastAlterId) async {
     final xml = await _tallyService.getNewVouchers(companyName, lastAlterId);
     final vouchers = TallyXmlParser.parseVouchers(xml);
+    Set<String> stock_item_guids = {};
 
     if (vouchers.isNotEmpty){
+
+      List<InventoryEntry> allInventoryEntries = vouchers.expand((v) => v.inventoryEntries).toList();
+
+      if (allInventoryEntries.isNotEmpty){
+    
+    final db = await _db.database;
+
+    final items = await db.rawQuery('''
+  SELECT name, stock_item_guid
+  FROM stock_items
+  WHERE company_guid = ? AND is_deleted = 0
+''', [companyId]);
+
+    final stockItemList = Map.fromEntries(items.map(
+        (i) => MapEntry(i['name'] as String, i['stock_item_guid'] as String)));
+
+  
+stock_item_guids = allInventoryEntries
+    .map((i) => stockItemList[i.stockItemName])
+    .whereType<String>()
+    .toSet();
+      }
       await _db.saveVoucherBatch(vouchers, companyId);      
     }
 
+    return stock_item_guids;
     // await detectAndDeleteMissingVouchers(companyName, companyId);
 
   }
@@ -687,7 +721,6 @@ class SyncService {
       String companyStartDate) async {
     final startDate = DateTime.parse(companyStartDate);
     
-
     final now = DateTime.now();
 
     // Generate financial year ranges
