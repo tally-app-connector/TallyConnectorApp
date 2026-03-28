@@ -125,7 +125,7 @@ class _GroupOutstandingDetailScreenState
         children: [
           GestureDetector(
             onTap: () => Navigator.of(context).pop(),
-            child: const SizedBox(
+            child: SizedBox(
               width: 36,
               height: 36,
               child: Center(
@@ -262,7 +262,7 @@ class _GroupOutstandingDetailScreenState
                   child: Divider(
                     height: 1,
                     thickness: 0.5,
-                    color: Colors.grey.shade200,
+                    color: AppColors.divider,
                   ),
                 ),
               ),

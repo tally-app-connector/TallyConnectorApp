@@ -539,6 +539,8 @@ import '../auth/email_verification_screen.dart';
 import 'dart:convert';
 import '../../utils/message_helper.dart';
 import '../../services/sync_service.dart';
+import './ai_queries_screen.dart';
+
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -616,6 +618,40 @@ class _HomeScreenState extends State<HomeScreen>
     await _syncService.detectAndDeleteMissingVouchers();
     _snack('Deleted vouchers removed');
   }
+  Future<void> _openAIQueriesScreen() async {
+  // Get required data from secure storage
+  final companyGuid = await SecureStorage.getSelectedCompanyGuid();
+  final token = await SecureStorage.getToken();
+
+  if (!mounted) return;
+
+  if (companyGuid == null || companyGuid.isEmpty) {
+    MessageHelper.showError(context, 'Please select a company first from Settings');
+    return;
+  }
+
+  if (token == null || token.isEmpty) {
+    MessageHelper.showError(context, 'Authentication token not found. Please login again.');
+    return;
+  }
+
+  if (_currentUser == null) {
+    MessageHelper.showError(context, 'User data not found. Please login again.');
+    return;
+  }
+
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => AIQueriesScreen(
+        companyGuid: companyGuid,
+        userId: _currentUser!.userId.toString(),
+        token: token,
+      ),
+    ),
+  );
+}
+  
 
   void _snack(String msg, {bool loading = false}) {
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
@@ -719,31 +755,17 @@ class _HomeScreenState extends State<HomeScreen>
                   _buildSyncGrid(),
                   const SizedBox(height: 28),
 
-                  // Features
-                  _buildSectionHeader('Features'),
-                  const SizedBox(height: 14),
-                  _buildFeatureTile(
-                    icon: Icons.business_center_rounded,
-                    title: 'Companies',
-                    subtitle: 'Manage your Tally companies',
-                    gradient: const LinearGradient(
-                        colors: [Color(0xFF1A6FD8), Color(0xFF4898F0)]),
-                    onTap: () => MessageHelper.showInfo(
-                        context, 'Companies feature coming soon!'),
-                  ),
-                  _buildFeatureTile(
-                    icon: Icons.bar_chart_rounded,
-                    title: 'Reports & Analytics',
-                    subtitle: 'View analytics and reports',
-                    gradient: const LinearGradient(
-                        colors: [Color(0xFF7B2FBE), Color(0xFFAB5CF5)]),
-                    onTap: () => MessageHelper.showInfo(
-                        context, 'Reports feature coming soon!'),
-                  ),
-                  const SizedBox(height: 32),
-
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    // AI Queries - New Feature!
+                    _buildFeatureCard(
+                      icon: Icons.auto_awesome,
+                      title: 'ASK ANYTHING TO AI',
+                      description: 'Get instant answers about your financial data',
+                      color: Colors.teal,
+                      onTap: _openAIQueriesScreen,
+                    ),
+                    const SizedBox(height: 16),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 24),
                     child: Text(
                       'Companies will appear once you sync from the Windows app',
                       textAlign: TextAlign.center,
@@ -1065,6 +1087,70 @@ class _HomeScreenState extends State<HomeScreen>
       ),
     );
   }
+
+
+  Widget _buildFeatureCard({
+    required IconData icon,
+    required String title,
+    required String description,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: color, size: 28),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      description,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.arrow_forward_ios,
+                size: 16,
+                color: Colors.grey.shade400,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
 
   Widget _syncCardWidget(_SyncCard c) {
     return GestureDetector(

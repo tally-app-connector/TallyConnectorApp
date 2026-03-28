@@ -52,6 +52,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
   // Chart settings
   late ReportChartType _chartType;
   int _chartPeriodIndex = 0; // 0=Monthly, 1=Quarterly, 2=YoY
+  bool _isChartLoading = true;
 
   // Data
   ReportValue _reportValue = ReportValue(
@@ -208,7 +209,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(
+            colorScheme: ColorScheme.light(
               primary: AppColors.blue,
               onPrimary: Colors.white,
               onSurface: AppColors.textPrimary,
@@ -224,6 +225,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
   }
 
   Future<void> _loadReportData() async {
+    setState(() => _isChartLoading = true);
     final period = ChartPeriodExtension.fromIndex(_chartPeriodIndex);
 
     debugPrint('');
@@ -310,22 +312,39 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
       switch (_selectedMetric) {
         case ReportMetric.sales:
-          final realChart = await _salesAnalyticsService.getSalesTrend(
-            companyGuid: guid,
-            chartType: _chartType,
-            period: period,
+          // Fetch sales & purchase trends in one parallel call, then derive combo & revExp
+          final salesTrendFuture = _salesAnalyticsService.getSalesTrend(
+            companyGuid: guid, chartType: _chartType, period: period,
+          );
+          final purchaseTrendFuture = _salesAnalyticsService.getPurchaseTrend(
+            companyGuid: guid, chartType: _chartType, period: period,
+          );
+          final realChart = await salesTrendFuture;
+          final purchaseChart = await purchaseTrendFuture;
+
+          // Derive combo from already-fetched data (no extra DB call)
+          final comboPoints = <SalesPurchaseDataPoint>[];
+          for (var i = 0; i < realChart.dataPoints.length; i++) {
+            final pVal = i < purchaseChart.dataPoints.length
+                ? purchaseChart.dataPoints[i].value : 0.0;
+            comboPoints.add(SalesPurchaseDataPoint(
+              label: realChart.dataPoints[i].label,
+              salesValue: realChart.dataPoints[i].value,
+              purchaseValue: pVal.toDouble(),
+            ));
+          }
+          final realCombo = SalesPurchaseChartData(
+            dataPoints: comboPoints, title: 'Sales vs Purchase',
           );
 
-          // 2️⃣ SALES vs PURCHASE COMBO (unchanged)
-          final realCombo = await _salesAnalyticsService.getSalesPurchaseTrend(
-            companyGuid: guid,
-            period: period,
+          // Derive revExpProfit from chart totals (no extra DB call)
+          final totalSalesSum = realChart.dataPoints.fold<double>(0, (s, dp) => s + dp.value);
+          final totalPurchaseSum = purchaseChart.dataPoints.fold<double>(0, (s, dp) => s + dp.value);
+          final revExpProfit = RevenueExpenseProfitData(
+            revenue: totalSalesSum,
+            expense: totalPurchaseSum,
+            profit: totalSalesSum - totalPurchaseSum,
           );
-
-          // 3️⃣ REVENUE / EXPENSE / PROFIT for bar chart
-          final revExpProfit =
-              await _salesAnalyticsService.getRevenueExpenseProfit(
-                  companyGuid: guid);
 
           // 4️⃣ DERIVE SUMMARY VALUE FROM CHART DATA
           final totalSales = realChart.dataPoints.fold<double>(
@@ -360,176 +379,213 @@ class _ReportsScreenState extends State<ReportsScreen> {
           break;
 
         case ReportMetric.purchase:
-          final realValue = await _salesAnalyticsService.getTotalPurchase(
-              companyGuid: guid);
-          final realChart = await _salesAnalyticsService.getPurchaseTrend(
-              companyGuid: guid,
-              
-              chartType: _chartType,
-              period: period);
-
-          debugPrint(
-              '  Value: ${realValue.primaryValue}${realValue.primaryUnit}');
-          debugPrint('  Chart points: ${realChart.dataPoints.length}');
-          for (final dp in realChart.dataPoints) {
-            debugPrint('    [${dp.label}] = ${dp.value.toStringAsFixed(0)}');
+          final purchaseChart = await _salesAnalyticsService.getPurchaseTrend(
+            companyGuid: guid, chartType: _chartType, period: period,
+          );
+          final salesChartForCombo = await _salesAnalyticsService.getSalesTrend(
+            companyGuid: guid, chartType: _chartType, period: period,
+          );
+          // Derive value from chart data
+          final totalPurchase = purchaseChart.dataPoints.fold<double>(0, (s, dp) => s + dp.value);
+          final purchaseFormatted = AmountFormatter.format(totalPurchase);
+          // Derive combo from already-fetched data
+          final purchaseComboPoints = <SalesPurchaseDataPoint>[];
+          for (var i = 0; i < salesChartForCombo.dataPoints.length; i++) {
+            final pVal = i < purchaseChart.dataPoints.length
+                ? purchaseChart.dataPoints[i].value : 0.0;
+            purchaseComboPoints.add(SalesPurchaseDataPoint(
+              label: salesChartForCombo.dataPoints[i].label,
+              salesValue: salesChartForCombo.dataPoints[i].value,
+              purchaseValue: pVal.toDouble(),
+            ));
           }
-
-          final purchaseCombo = await _salesAnalyticsService.getSalesPurchaseTrend(
-              companyGuid: guid, period: period);
-
           setState(() {
-            _reportValue = realValue;
-            _chartData = realChart;
-            _salesPurchaseData = purchaseCombo;
+            _reportValue = ReportValue(
+              primaryValue: purchaseFormatted['value']!,
+              primaryUnit: purchaseFormatted['unit']!,
+              primaryLabel: 'TOTAL NET PURCHASE',
+              changePercent: '', isPositiveChange: true,
+              periodStart: start, periodEnd: end,
+            );
+            _chartData = purchaseChart;
+            _salesPurchaseData = SalesPurchaseChartData(
+              dataPoints: purchaseComboPoints, title: 'Sales vs Purchase',
+            );
           });
           break;
 
         case ReportMetric.profit:
-          final realValue = await _salesAnalyticsService.getTotalProfit(
-              companyGuid: guid);
-          final realChart = await _salesAnalyticsService.getProfitTrend(
-              companyGuid: guid,
-              
-              chartType: _chartType,
-              period: period);
-          final revExpProfit =
-              await _salesAnalyticsService.getRevenueExpenseProfit(
-                  companyGuid: guid);
+          // Fetch sales & purchase trends once, derive everything else
+          final profitSales = await _salesAnalyticsService.getSalesTrend(
+            companyGuid: guid, chartType: _chartType, period: period,
+          );
+          final profitPurchase = await _salesAnalyticsService.getPurchaseTrend(
+            companyGuid: guid, chartType: _chartType, period: period,
+          );
 
-          debugPrint(
-              '  Value: ${realValue.primaryValue}${realValue.primaryUnit}');
-          debugPrint('  Chart points: ${realChart.dataPoints.length}');
-          for (final dp in realChart.dataPoints) {
-            debugPrint('    [${dp.label}] = ${dp.value.toStringAsFixed(0)}');
+          // Derive profit trend chart
+          final profitPoints = <ChartDataPoint>[];
+          for (var i = 0; i < profitSales.dataPoints.length; i++) {
+            final pVal = i < profitPurchase.dataPoints.length
+                ? profitPurchase.dataPoints[i].value : 0.0;
+            profitPoints.add(ChartDataPoint(
+              label: profitSales.dataPoints[i].label,
+              value: profitSales.dataPoints[i].value - pVal,
+            ));
           }
+          final profitChart = ReportChartData(
+            dataPoints: profitPoints,
+            chartType: _chartType,
+            title: 'Profit Trend',
+          );
 
-          final profitComboData =
-              await _salesAnalyticsService.getSalesPurchaseTrend(
-                companyGuid: guid, period: period);
+          // Derive combo
+          final profitComboPoints = <SalesPurchaseDataPoint>[];
+          for (var i = 0; i < profitSales.dataPoints.length; i++) {
+            final pVal = i < profitPurchase.dataPoints.length
+                ? profitPurchase.dataPoints[i].value : 0.0;
+            profitComboPoints.add(SalesPurchaseDataPoint(
+              label: profitSales.dataPoints[i].label,
+              salesValue: profitSales.dataPoints[i].value,
+              purchaseValue: pVal.toDouble(),
+            ));
+          }
+          final profitCombo = SalesPurchaseChartData(
+            dataPoints: profitComboPoints, title: 'Sales vs Purchase',
+          );
 
-          final useRevExpProfitData =
-              revExpProfit.revenue != 0 || revExpProfit.expense != 0;
-          final finalRevExpProfitData = useRevExpProfitData
-              ? revExpProfit
-              : _deriveRevExpProfitFromCombo(profitComboData);
+          // Derive revExpProfit
+          final profitSalesTotal = profitSales.dataPoints.fold<double>(0, (s, dp) => s + dp.value);
+          final profitPurchaseTotal = profitPurchase.dataPoints.fold<double>(0, (s, dp) => s + dp.value);
+          final profitRevExp = RevenueExpenseProfitData(
+            revenue: profitSalesTotal,
+            expense: profitPurchaseTotal,
+            profit: profitSalesTotal - profitPurchaseTotal,
+          );
+
+          final profitFormatted = AmountFormatter.format(profitSalesTotal - profitPurchaseTotal);
 
           setState(() {
-            _reportValue = realValue;
-            _chartData = realChart;
-            _salesPurchaseData = profitComboData;
-            _revExpProfitData = finalRevExpProfitData;
+            _reportValue = ReportValue(
+              primaryValue: profitFormatted['value']!,
+              primaryUnit: profitFormatted['unit']!,
+              primaryLabel: 'GROSS PROFIT',
+              changePercent: '', isPositiveChange: true,
+              periodStart: start, periodEnd: end,
+            );
+            _chartData = profitChart;
+            _salesPurchaseData = profitCombo;
+            _revExpProfitData = profitRevExp;
           });
           break;
 
         case ReportMetric.gst:
-          final realValue = await _salesAnalyticsService.getTotalGST(
-              companyGuid: guid);
-          final realChart = await _salesAnalyticsService.getGSTTrend(
-              companyGuid: guid,
-              chartType: _chartType,
-              period: period);
-
-          final gstCombo = await _salesAnalyticsService.getSalesPurchaseTrend(
-              companyGuid: guid, period: period);
-
+          final gstResults = await Future.wait([
+            _salesAnalyticsService.getTotalGST(companyGuid: guid),
+            _salesAnalyticsService.getGSTTrend(
+              companyGuid: guid, chartType: _chartType, period: period,
+            ),
+            _salesAnalyticsService.getSalesPurchaseTrend(
+              companyGuid: guid, period: period,
+            ),
+          ]);
           setState(() {
-            _reportValue = realValue;
-            _chartData = realChart;
-            _salesPurchaseData = gstCombo;
+            _reportValue = gstResults[0] as ReportValue;
+            _chartData = gstResults[1] as ReportChartData;
+            _salesPurchaseData = gstResults[2] as SalesPurchaseChartData;
           });
           break;
 
         case ReportMetric.receivable:
-          final realValue = await _salesAnalyticsService.getTotalReceivable(
-              companyGuid: guid);
-          final realChart = await _salesAnalyticsService.getReceivableChart(
-              companyGuid: guid, chartType: _chartType);
-          final recvCombo = await _salesAnalyticsService.getSalesPurchaseTrend(
-              companyGuid: guid, period: period);
-          final creditParties = await _salesAnalyticsService.getCreditLimitExceeded(
-              companyGuid: guid);
-          final topPaying = await _salesAnalyticsService.getTopPayingParties(
-              companyGuid: guid);
-
+          final recvResults = await Future.wait([
+            _salesAnalyticsService.getTotalReceivable(companyGuid: guid),
+            _salesAnalyticsService.getReceivableChart(
+              companyGuid: guid, chartType: _chartType,
+            ),
+            _salesAnalyticsService.getSalesPurchaseTrend(
+              companyGuid: guid, period: period,
+            ),
+            _salesAnalyticsService.getCreditLimitExceeded(companyGuid: guid),
+            _salesAnalyticsService.getTopPayingParties(companyGuid: guid),
+          ]);
           setState(() {
-            _reportValue = realValue;
-            _chartData = realChart;
-            _salesPurchaseData = recvCombo;
-            _creditLimitParties = creditParties;
-            _topPayingParties = topPaying;
+            _reportValue = recvResults[0] as ReportValue;
+            _chartData = recvResults[1] as ReportChartData;
+            _salesPurchaseData = recvResults[2] as SalesPurchaseChartData;
+            _creditLimitParties = recvResults[3] as List<CreditLimitParty>;
+            _topPayingParties = recvResults[4] as List<TopPayingParty>;
           });
           break;
 
         case ReportMetric.payable:
-          final realValue =
-              await _salesAnalyticsService.getTotalPayable(companyGuid: guid);
-          final realChart = await _salesAnalyticsService.getPayableChart(
-              companyGuid: guid, chartType: _chartType);
-          final payCombo = await _salesAnalyticsService.getSalesPurchaseTrend(
-              companyGuid: guid, period: period);
-          final dueParties = await _salesAnalyticsService.getPaymentDueParties(
-              companyGuid: guid);
-          final topVendorsList = await _salesAnalyticsService.getTopVendors(
-              companyGuid: guid);
-
+          final payResults = await Future.wait([
+            _salesAnalyticsService.getTotalPayable(companyGuid: guid),
+            _salesAnalyticsService.getPayableChart(
+              companyGuid: guid, chartType: _chartType,
+            ),
+            _salesAnalyticsService.getSalesPurchaseTrend(
+              companyGuid: guid, period: period,
+            ),
+            _salesAnalyticsService.getPaymentDueParties(companyGuid: guid),
+            _salesAnalyticsService.getTopVendors(companyGuid: guid),
+          ]);
           setState(() {
-            _reportValue = realValue;
-            _chartData = realChart;
-            _salesPurchaseData = payCombo;
-            _paymentDueParties = dueParties;
-            _topVendors = topVendorsList;
+            _reportValue = payResults[0] as ReportValue;
+            _chartData = payResults[1] as ReportChartData;
+            _salesPurchaseData = payResults[2] as SalesPurchaseChartData;
+            _paymentDueParties = payResults[3] as List<PaymentDueParty>;
+            _topVendors = payResults[4] as List<TopVendorParty>;
           });
           break;
 
         case ReportMetric.stock:
-          final realValue =
-              await _salesAnalyticsService.getTotalStock(companyGuid: guid);
-          final realChart = await _salesAnalyticsService.getStockChart(
-              companyGuid: guid, chartType: _chartType);
-          final stockCombo = await _salesAnalyticsService.getSalesPurchaseTrend(
-              companyGuid: guid, period: period);
-
+          final stockResults = await Future.wait([
+            _salesAnalyticsService.getTotalStock(companyGuid: guid),
+            _salesAnalyticsService.getStockChart(
+              companyGuid: guid, chartType: _chartType,
+            ),
+            _salesAnalyticsService.getSalesPurchaseTrend(
+              companyGuid: guid, period: period,
+            ),
+          ]);
           setState(() {
-            _reportValue = realValue;
-            _chartData = realChart;
-            _salesPurchaseData = stockCombo;
+            _reportValue = stockResults[0] as ReportValue;
+            _chartData = stockResults[1] as ReportChartData;
+            _salesPurchaseData = stockResults[2] as SalesPurchaseChartData;
           });
           break;
 
         case ReportMetric.receipts:
-          final realValue = await _salesAnalyticsService.getTotalReceipts(
-              companyGuid: guid);
-          final realChart = await _salesAnalyticsService.getReceiptsTrend(
-              companyGuid: guid,
-              
-              chartType: _chartType,
-              period: period);
-          final rcptCombo = await _salesAnalyticsService.getSalesPurchaseTrend(
-              companyGuid: guid, period: period);
-
+          final rcptResults = await Future.wait([
+            _salesAnalyticsService.getTotalReceipts(companyGuid: guid),
+            _salesAnalyticsService.getReceiptsTrend(
+              companyGuid: guid, chartType: _chartType, period: period,
+            ),
+            _salesAnalyticsService.getSalesPurchaseTrend(
+              companyGuid: guid, period: period,
+            ),
+          ]);
           setState(() {
-            _reportValue = realValue;
-            _chartData = realChart;
-            _salesPurchaseData = rcptCombo;
+            _reportValue = rcptResults[0] as ReportValue;
+            _chartData = rcptResults[1] as ReportChartData;
+            _salesPurchaseData = rcptResults[2] as SalesPurchaseChartData;
           });
           break;
 
         case ReportMetric.payments:
-          final realValue = await _salesAnalyticsService.getTotalPayments(
-              companyGuid: guid);
-          final realChart = await _salesAnalyticsService.getPaymentsTrend(
-              companyGuid: guid,
-              
-              chartType: _chartType,
-              period: period);
-          final pmtCombo = await _salesAnalyticsService.getSalesPurchaseTrend(
-              companyGuid: guid, period: period);
-
+          final pmtResults = await Future.wait([
+            _salesAnalyticsService.getTotalPayments(companyGuid: guid),
+            _salesAnalyticsService.getPaymentsTrend(
+              companyGuid: guid, chartType: _chartType, period: period,
+            ),
+            _salesAnalyticsService.getSalesPurchaseTrend(
+              companyGuid: guid, period: period,
+            ),
+          ]);
           setState(() {
-            _reportValue = realValue;
-            _chartData = realChart;
-            _salesPurchaseData = pmtCombo;
+            _reportValue = pmtResults[0] as ReportValue;
+            _chartData = pmtResults[1] as ReportChartData;
+            _salesPurchaseData = pmtResults[2] as SalesPurchaseChartData;
           });
           break;
       }
@@ -538,6 +594,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
     } catch (e, stack) {
       debugPrint('Error loading real data: $e');
       debugPrint('$stack');
+    } finally {
+      if (mounted) setState(() => _isChartLoading = false);
     }
   }
 
@@ -1052,11 +1110,15 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
               // Scrollable content
               Expanded(
-                child: SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.only(bottom: 32),
-                  child: _buildReportContent(),
-                ),
+                child: _isChartLoading
+                    ? const Center(
+                        child: CircularProgressIndicator(color: AppColors.blue),
+                      )
+                    : SingleChildScrollView(
+                        physics: const BouncingScrollPhysics(),
+                        padding: const EdgeInsets.only(bottom: 32),
+                        child: _buildReportContent(),
+                      ),
               ),
             ],
           ),
@@ -1117,9 +1179,18 @@ class _ReportsScreenState extends State<ReportsScreen> {
             });
             _loadReportData();
           },
-          chart: ReportChart(
-            data: _chartData,
-            height: 200,
+          chart: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 300),
+            child: _isChartLoading
+                ? const ChartShimmerPlaceholder(
+                    key: ValueKey('shimmer-main'),
+                    height: 200,
+                  )
+                : ReportChart(
+                    key: ValueKey(_chartType),
+                    data: _chartData,
+                    height: 200,
+                  ),
           ),
           legends: _chartData.legends,
           showSelectors: !forPdf,
@@ -1147,26 +1218,37 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   style: AppTypography.cardLabel,
                 ),
                 const SizedBox(height: 16),
-                (_salesPurchaseData.dataPoints.isEmpty)
-                    ? SizedBox(
-                        height: 220,
-                        child: Center(
-                          child: Text(
-                            'No Data',
-                            style: Theme.of(context)
-                                    .textTheme
-                                    .bodyMedium
-                                    ?.copyWith(
-                                      color: AppColors.textSecondary,
-                                    ) ??
-                                TextStyle(color: AppColors.textSecondary),
-                          ),
-                        ),
-                      )
-                    : SalesPurchaseComboChart(
-                        data: _salesPurchaseData,
-                        height: 220,
-                      )
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 300),
+                  child: _isChartLoading
+                      ? const ChartShimmerPlaceholder(
+                          key: ValueKey('shimmer-combo'),
+                          height: 220,
+                        )
+                      : (_salesPurchaseData.dataPoints.isEmpty)
+                          ? SizedBox(
+                              key: const ValueKey('empty-combo'),
+                              height: 220,
+                              child: Center(
+                                child: Text(
+                                  'No Data',
+                                  style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium
+                                          ?.copyWith(
+                                            color: AppColors.textSecondary,
+                                          ) ??
+                                      TextStyle(color: AppColors.textSecondary),
+                                ),
+                              ),
+                            )
+                          : SalesPurchaseComboChart(
+                              key: ValueKey('combo-${_chartType}'),
+                              data: _salesPurchaseData,
+                              height: 220,
+                              chartType: _chartType,
+                            ),
+                )
               ],
             ),
           ),
@@ -1183,38 +1265,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
               boxShadow: AppShadows.card,
             ),
             child: SalesPurchaseProfitBarChart(
-              data: _revExpProfitData,
-            ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.pagePadding,
-          ),
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(AppRadius.card),
-              boxShadow: AppShadows.card,
-            ),
-            child: SalesPurchaseStackedBarChart(
-              data: _salesPurchaseData,
-            ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.pagePadding,
-          ),
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(AppRadius.card),
-              boxShadow: AppShadows.card,
-            ),
-            child: RevenueExpenseProfitGridChart(
               data: _revExpProfitData,
             ),
           ),
@@ -1283,22 +1333,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
               boxShadow: AppShadows.card,
             ),
             child: SalesPurchaseProfitBarChart(
-              data: _revExpProfitData,
-            ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.pagePadding,
-          ),
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(AppRadius.card),
-              boxShadow: AppShadows.card,
-            ),
-            child: RevenueExpenseProfitGridChart(
               data: _revExpProfitData,
             ),
           ),
@@ -1561,7 +1595,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   AppIcons.calendar,
                   width: 14,
                   height: 14,
-                  colorFilter: const ColorFilter.mode(
+                  colorFilter: ColorFilter.mode(
                     AppColors.textSecondary,
                     BlendMode.srcIn,
                   ),

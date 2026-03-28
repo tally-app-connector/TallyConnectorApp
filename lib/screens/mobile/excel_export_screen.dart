@@ -9,6 +9,7 @@ import '../models/report_data.dart';
 import '../service/pdf_export_service.dart';
 import '../service/xml_export_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/amount_formatter.dart';
 
 class ExcelExportScreen extends StatelessWidget {
   final String companyName;
@@ -31,11 +32,11 @@ class ExcelExportScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.surface,
       appBar: AppBar(
         title: Text(
           companyName,
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.textPrimary,
             fontWeight: FontWeight.w600,
             fontSize: 16,
@@ -44,10 +45,10 @@ class ExcelExportScreen extends StatelessWidget {
         ),
         backgroundColor: AppColors.surface,
         elevation: 0,
-        iconTheme: const IconThemeData(color: AppColors.textPrimary),
+        iconTheme: IconThemeData(color: AppColors.textPrimary),
       ),
       body: items.isEmpty
-          ? const Center(
+          ? Center(
               child: Text(
                 'No stock items found',
                 style: TextStyle(
@@ -67,9 +68,9 @@ class ExcelExportScreen extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
                     margin: const EdgeInsets.only(bottom: 12),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: AppColors.surface,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFE5E7EB)),
+                      border: Border.all(color: AppColors.divider),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withValues(alpha: 0.05),
@@ -114,7 +115,7 @@ class ExcelExportScreen extends StatelessWidget {
                         Text(
                           companyName,
                           textAlign: TextAlign.center,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.textPrimary,
                             fontWeight: FontWeight.w700,
                             fontSize: 17,
@@ -122,7 +123,7 @@ class ExcelExportScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 2),
                         // Report Title
-                        const Text(
+                        Text(
                           'Stock Items Report',
                           textAlign: TextAlign.center,
                           style: TextStyle(
@@ -137,7 +138,7 @@ class ExcelExportScreen extends StatelessWidget {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFF0F7FF),
+                              color: AppColors.pillBg,
                               borderRadius: BorderRadius.circular(20),
                               border: Border.all(color: const Color(0xFFBFDBFE)),
                             ),
@@ -166,7 +167,7 @@ class ExcelExportScreen extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                     fontSize: 12,
                   ),
-                  dataTextStyle: const TextStyle(
+                  dataTextStyle: TextStyle(
                     color: AppColors.textPrimary,
                     fontSize: 11,
                   ),
@@ -212,8 +213,8 @@ class ExcelExportScreen extends StatelessWidget {
                     return DataRow(
                       color: WidgetStateProperty.resolveWith((states) {
                         return i.isEven
-                            ? Colors.white
-                            : const Color(0xFFF9FAFB);
+                            ? AppColors.surface
+                            : AppColors.pillBg;
                       }),
                       cells: [
                         DataCell(Text('${i + 1}',
@@ -381,28 +382,7 @@ class ExcelExportScreen extends StatelessWidget {
   }
 
   String _formatAmount(double amount) {
-    final isNegative = amount < 0;
-    final abs = amount.abs();
-    final parts = abs.toStringAsFixed(2).split('.');
-    final intPart = parts[0];
-    final decPart = parts[1];
-
-    // Indian numbering format
-    String formatted = '';
-    if (intPart.length <= 3) {
-      formatted = intPart;
-    } else {
-      formatted = intPart.substring(intPart.length - 3);
-      var remaining = intPart.substring(0, intPart.length - 3);
-      while (remaining.length > 2) {
-        formatted = '${remaining.substring(remaining.length - 2)},$formatted';
-        remaining = remaining.substring(0, remaining.length - 2);
-      }
-      if (remaining.isNotEmpty) {
-        formatted = '$remaining,$formatted';
-      }
-    }
-    return '${isNegative ? '-' : ''}$formatted.$decPart';
+    return AmountFormatter.formatIndian(amount);
   }
 
   Future<void> _saveFile(BuildContext context) async {

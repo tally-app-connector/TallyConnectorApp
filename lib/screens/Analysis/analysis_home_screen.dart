@@ -1415,26 +1415,52 @@ class _AnalysisHomeScreenState extends State<AnalysisHomeScreen>
     ''', [companyGuid, companyGuid, companyGuid, fromDate, toDate]);
     final netPurchase = (purchaseResult.first['net_purchase'] as num?)?.toDouble() ?? 0.0;
 
-    final salesResult = await db.rawQuery('''
+       final salesResult = await db.rawQuery('''
       WITH RECURSIVE group_tree AS (
-        SELECT group_guid, name FROM groups
-        WHERE company_guid = ? AND reserved_name = 'Sales Accounts' AND is_deleted = 0
+        SELECT group_guid, name
+        FROM groups
+        WHERE company_guid = ?
+          AND reserved_name = 'Sales Accounts'
+          AND is_deleted = 0
+        
         UNION ALL
-        SELECT g.group_guid, g.name FROM groups g
+        
+        SELECT g.group_guid, g.name
+        FROM groups g
         INNER JOIN group_tree gt ON g.parent_guid = gt.group_guid
-        WHERE g.company_guid = ? AND g.is_deleted = 0
+        WHERE g.company_guid = ?
+          AND g.is_deleted = 0
       )
-      SELECT SUM(CASE WHEN vle.amount > 0 THEN vle.amount ELSE 0 END) as credit_total,
-             SUM(CASE WHEN vle.amount < 0 THEN ABS(vle.amount) ELSE 0 END) as debit_total,
-             (SUM(CASE WHEN vle.amount > 0 THEN vle.amount ELSE 0 END) - SUM(CASE WHEN vle.amount < 0 THEN ABS(vle.amount) ELSE 0 END)) as net_sales
+      SELECT 
+    -- Credit = deemed positive side (normal sales)
+    SUM(CASE WHEN vle.is_deemed_positive = 1 THEN ABS(vle.amount) ELSE 0 END) as credit_total,
+    
+    -- Debit = deemed negative side (sales returns)
+    SUM(CASE WHEN vle.is_deemed_positive = 0 THEN ABS(vle.amount) ELSE 0 END) as debit_total,
+    
+    -- Net = credit - debit
+    SUM(ABS(vle.amount)) as net_sales,
+    
+    COUNT(DISTINCT v.voucher_guid) as vouchers
       FROM voucher_ledger_entries vle
       INNER JOIN vouchers v ON v.voucher_guid = vle.voucher_guid
       INNER JOIN ledgers l ON l.name = vle.ledger_name AND l.company_guid = v.company_guid
-      INNER JOIN group_tree gt ON l.parent = gt.name
-      WHERE v.company_guid = ? AND v.is_deleted = 0 AND v.is_cancelled = 0 AND v.is_optional = 0
-        AND v.date >= ? AND v.date <= ?
+      INNER JOIN group_tree gt ON l.parent_guid = gt.group_guid
+      WHERE v.company_guid = ?
+        AND v.is_deleted = 0
+        AND v.is_cancelled = 0
+        AND v.is_optional = 0
+        AND v.date >= ?
+        AND v.date <= ?
     ''', [companyGuid, companyGuid, companyGuid, fromDate, toDate]);
-    final netSales = (salesResult.first['net_sales'] as num?)?.toDouble() ?? 0.0;
+
+    final salesCredit =
+        (salesResult.first['credit_total'] as num?)?.toDouble() ?? 0.0;
+    final salesDebit =
+        (salesResult.first['debit_total'] as num?)?.toDouble() ?? 0.0;
+    final netSales =
+        (salesResult.first['net_sales'] as num?)?.toDouble() ?? 0.0;
+    final salesVouchers = salesResult.first['vouchers'] as int? ?? 0;
 
     Future<List<Map<String, dynamic>>> expGroup(String name) => db.rawQuery('''
       WITH RECURSIVE group_tree AS (

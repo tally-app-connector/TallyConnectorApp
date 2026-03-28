@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../database/database_helper.dart';
+import '../utils/amount_formatter.dart';
 import '../../utils/secure_storage.dart';
 import '../../models/user_model.dart';
+import '../theme/app_theme.dart';
 import 'dart:convert';
 
 class MobileDashboardTab extends StatefulWidget {
@@ -71,9 +73,15 @@ class _MobileDashboardTabState extends State<MobileDashboardTab> {
         INNER JOIN group_tree gt ON g.parent_guid = gt.group_guid
         WHERE g.company_guid = ? AND g.is_deleted = 0
       )
+      -- OLD: used raw amount sign (ignores is_deemed_positive for credit notes/debit notes)
+      -- COALESCE(SUM(CASE WHEN vle.amount > 0 THEN vle.amount ELSE 0 END) -
+      -- SUM(CASE WHEN vle.amount < 0 THEN ABS(vle.amount) ELSE 0 END), 0) as net_sales
+      -- FIX: use is_deemed_positive to match sales_service.dart canonical formula
       SELECT
-        COALESCE(SUM(CASE WHEN vle.amount > 0 THEN vle.amount ELSE 0 END) -
-        SUM(CASE WHEN vle.amount < 0 THEN ABS(vle.amount) ELSE 0 END), 0) as net_sales
+        COALESCE(SUM(CASE
+          WHEN vle.is_deemed_positive = 1 THEN ABS(vle.amount)
+          ELSE -ABS(vle.amount)
+        END), 0) as net_sales
       FROM voucher_ledger_entries vle
       INNER JOIN vouchers v ON v.voucher_guid = vle.voucher_guid
       INNER JOIN ledgers l ON l.name = vle.ledger_name AND l.company_guid = v.company_guid
@@ -94,10 +102,16 @@ class _MobileDashboardTabState extends State<MobileDashboardTab> {
         INNER JOIN group_tree gt ON g.parent_guid = gt.group_guid
         WHERE g.company_guid = ? AND g.is_deleted = 0
       )
+      -- OLD: used raw amount sign (ignores is_deemed_positive for debit notes/purchase returns)
+      -- COALESCE(SUM(CASE WHEN vle.amount < 0 THEN ABS(vle.amount) ELSE 0 END) -
+      -- SUM(CASE WHEN vle.amount > 0 THEN vle.amount ELSE 0 END), 0) as net_purchase
+      -- FIX: use is_deemed_positive to match sales_service.dart canonical formula
       SELECT
         COUNT(DISTINCT v.voucher_guid) as vouchers,
-        COALESCE(SUM(CASE WHEN vle.amount < 0 THEN ABS(vle.amount) ELSE 0 END) -
-        SUM(CASE WHEN vle.amount > 0 THEN vle.amount ELSE 0 END), 0) as net_purchase
+        COALESCE(SUM(CASE
+          WHEN vle.is_deemed_positive = 1 THEN ABS(vle.amount)
+          ELSE -ABS(vle.amount)
+        END), 0) as net_purchase
       FROM voucher_ledger_entries vle
       INNER JOIN vouchers v ON v.voucher_guid = vle.voucher_guid
       INNER JOIN ledgers l ON l.name = vle.ledger_name AND l.company_guid = v.company_guid
@@ -205,19 +219,13 @@ class _MobileDashboardTabState extends State<MobileDashboardTab> {
   }
 
   String _formatCurrency(double amount) {
-    final isNegative = amount < 0;
-    final absAmount = amount.abs();
-    final formatted = absAmount.toStringAsFixed(2).replaceAllMapped(
-      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-      (Match m) => '${m[1]},',
-    );
-    return '${isNegative ? "-" : ""}₹$formatted';
+    return AmountFormatter.currencyIndian(amount);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -387,17 +395,17 @@ class _MobileDashboardTabState extends State<MobileDashboardTab> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.business_outlined, size: 80, color: Colors.grey[400]),
+            Icon(Icons.business_outlined, size: 80, color: AppColors.textSecondary),
             const SizedBox(height: 16),
             Text(
               'No Company Selected',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.grey[600]),
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
             ),
             const SizedBox(height: 8),
             Text(
               'Please sync your data from the Windows app and select a company in Profile settings.',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+              style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
             ),
           ],
         ),
@@ -409,7 +417,7 @@ class _MobileDashboardTabState extends State<MobileDashboardTab> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
@@ -433,7 +441,7 @@ class _MobileDashboardTabState extends State<MobileDashboardTab> {
           const SizedBox(height: 12),
           Text(
             title,
-            style: TextStyle(fontSize: 12, color: Colors.grey[600], fontWeight: FontWeight.w500),
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w500),
           ),
           const SizedBox(height: 4),
           FittedBox(
@@ -444,7 +452,7 @@ class _MobileDashboardTabState extends State<MobileDashboardTab> {
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
-                color: amount < 0 ? Colors.red : Colors.black87,
+                color: amount < 0 ? Colors.red : AppColors.textPrimary,
               ),
             ),
           ),

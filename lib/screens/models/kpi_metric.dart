@@ -72,7 +72,7 @@ class KpiConfig {
   );
 }
 
-const allKpiMetrics = <KpiMetric>[
+final allKpiMetrics = <KpiMetric>[
   KpiMetric(id: 'sales', name: 'Net Sales', category: 'Revenue', icon: AppIcons.barChart, iconBg: AppColors.iconBgBlue),
   KpiMetric(id: 'purchase', name: 'Net Purchase', category: 'Expenses', icon: AppIcons.receipt, iconBg: AppColors.iconBgAmber),
   KpiMetric(id: 'profit', name: 'Gross Profit', category: 'Revenue', icon: AppIcons.arrowUpCircle, iconBg: AppColors.iconBgGreen),

@@ -2140,26 +2140,21 @@
 //   }
 // }
 
-
-// screens/mobile/outstanding_detail_screen.dart
-//
-// Fixes from screenshot:
-// 1. KPI summary cards: amounts overflow → FittedBox + compact layout
-// 2. Chart type selector: Row overflow 52px → SingleChildScrollView horizontal
-// 3. Amount formatting: numbers split across lines → proper Indian comma format
-// 4. Tab bar: "Ledger" tab half-cut → scrollable tab bar
-
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../theme/app_theme.dart';
 import '../icons/app_icons.dart';
 import '../models/report_data.dart';
+import '../widgets/charts/report_chart.dart';
+import '../widgets/detail_widgets.dart';
 import '../service/sales/sales_service.dart';
 import '../main.dart';
-import '../widgets/charts/report_chart.dart';
+import '../utils/amount_formatter.dart';
+import 'group_outstanding_detail_screen.dart';
 
 class OutstandingDetailScreen extends StatefulWidget {
-  final ReportMetric metric; // ReportMetric.receivable or ReportMetric.payable
+  final ReportMetric metric;
 
   const OutstandingDetailScreen({super.key, required this.metric});
 
@@ -2168,658 +2163,2280 @@ class OutstandingDetailScreen extends StatefulWidget {
       _OutstandingDetailScreenState();
 }
 
-class _OutstandingDetailScreenState extends State<OutstandingDetailScreen>
-    with SingleTickerProviderStateMixin {
-  // ── Design tokens ─────────────────────────────────────────────────────────
-  static const Color _primary    = Color(0xFF1A6FD8);
-  static const Color _accent     = Color(0xFF00C9A7);
-  static const Color _bg         = Color(0xFFF4F6FB);
-  static const Color _cardBg     = Colors.white;
-  static const Color _textDark   = Color(0xFF1A2340);
-  static const Color _textMuted  = Color(0xFF8A94A6);
-  static const Color _positiveC  = Color(0xFF1B8A5A);
-  static const Color _positiveBg = Color(0xFFE8F5EE);
-  static const Color _negativeC  = Color(0xFFD32F2F);
-  static const Color _negativeBg = Color(0xFFFFEBEB);
-  static const Color _amberC     = Color(0xFFB45309);
-  static const Color _amberBg    = Color(0xFFFFF7E6);
+class _OutstandingDetailScreenState extends State<OutstandingDetailScreen> {
+  // ═══════════════════════════════════════════════════════════════════════════
+  //  STATE
+  // ═══════════════════════════════════════════════════════════════════════════
 
-  // ── State ─────────────────────────────────────────────────────────────────
-  final SalesAnalyticsService _service = SalesAnalyticsService();
+  int _viewMode = 1; // 0 = Ledger, 1 = Group
+
+  bool _isLoading = true;
+  bool _isChartLoading = false;
+
+  // Service & company
+  final SalesAnalyticsService _salesAnalyticsService = SalesAnalyticsService();
   String? _companyGuid;
 
-  bool _loading = true;
-
   // Summary values
-  double _totalReceivable  = 0;
-  double _totalPending     = 0;
-  double _totalAdvance     = 0;
+  String _mainValue = '—';
+  String _mainUnit = '';
+  String _pendingValue = '—';
+  String _pendingUnit = '';
+  String _advanceValue = '—';
+  String _advanceUnit = '';
 
-  // Selected period
-  String _selectedPeriod = 'MoM';
-  static const _periods = ['MoM', 'YTD', 'QTD', 'Custom'];
+  // Date range
+  DateRangeFilter _dateRange = DateRangeFilter.mom();
 
-  // Selected chart type (scrollable list)
-  String _selectedChartType = 'BAR';
-  static const _chartTypes = ['BAR', 'LINE', 'AREA', 'PIE', 'HORIBAR', 'ALBAR'];
+  // Chart type for aging analysis
+  late ReportChartType _chartType = widget.metric.defaultChartType;
+  ReportChartData _chartData = const ReportChartData(
+    dataPoints: [],
+    chartType: ReportChartType.horizontalBar,
+    title: '',
+    legends: [],
+  );
 
-  // Tab: 0 = Chart, 1 = Ledger list
-  late TabController _tabCtrl;
+  // Aging filter
+  int? _selectedDaysFilter; // null = All
+  int? _customDaysValue;
 
-  // Chart data — null until loaded
-  ReportChartData? _chartData;
+  // Fiscal year for Top Paying Parties
+  late FiscalYear _selectedFiscalYear = FiscalYear.current();
+  final List<FiscalYear> _fiscalYearOptions = FiscalYear.available();
 
-  // Party list
-  List<_PartyRow> _parties = [];
+  // Party & group data loaded from DB
+  List<CreditLimitParty> _creditLimitParties = [];
+  List<PaymentDueParty> _paymentDueParties = [];
+  List<TopPayingParty> _topPayingParties = [];
+  List<TopVendorParty> _topVendors = [];
+  List<GroupOutstanding> _receivableGroups = [];
+  List<GroupOutstanding> _payableGroups = [];
 
-  late AnimationController _fadeCtrl;
-  late Animation<double>   _fadeAnim;
+  // See More / See Less toggle for list sections
+  bool _agingPartyExpanded = false;
+  bool _valueWiseExpanded = false;
+  bool _ledgerWiseExpanded = false;
+  static const int _initialItemCount = 5;
 
   bool get _isReceivable => widget.metric == ReportMetric.receivable;
 
-  // ── Lifecycle ──────────────────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════════
+  //  LIFECYCLE
+  // ═══════════════════════════════════════════════════════════════════════════
 
   @override
   void initState() {
     super.initState();
-    _tabCtrl = TabController(length: 2, vsync: this);
-    _fadeCtrl = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 500));
-    _fadeAnim = CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOut);
     _companyGuid = AppState.selectedCompany?.guid;
     _loadData();
   }
 
-  @override
-  void dispose() {
-    _tabCtrl.dispose();
-    _fadeCtrl.dispose();
-    super.dispose();
-  }
+  // ═══════════════════════════════════════════════════════════════════════════
+  //  DATA LOADING
+  // ═══════════════════════════════════════════════════════════════════════════
 
-  // ── Data ───────────────────────────────────────────────────────────────────
+  /// Format DateTime to YYYYMMDD string for service calls
+  String _fmtDate(DateTime dt) =>
+      '${dt.year}${dt.month.toString().padLeft(2, '0')}${dt.day.toString().padLeft(2, '0')}';
 
   Future<void> _loadData() async {
     if (_companyGuid == null) {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) setState(() => _isLoading = false);
       return;
     }
-    setState(() => _loading = true);
+
+    // First load shows full-screen loader, subsequent loads only show chart loader
+    final isFirstLoad = _isLoading;
+    if (!isFirstLoad) {
+      if (mounted) setState(() => _isChartLoading = true);
+    }
 
     try {
-      // Load summary values
-      final totalVal = _isReceivable
-          ? await _service.getTotalReceivable(companyGuid: _companyGuid!)
-          : await _service.getTotalPayable(companyGuid: _companyGuid!);
+      final guid = _companyGuid!;
+      final from = _fmtDate(_dateRange.startDate);
+      final to = _fmtDate(_dateRange.endDate);
 
-      // Load chart data
-      final chart = _isReceivable
-          ? await _service.getReceivableChart(
-              companyGuid: _companyGuid!,
-              chartType: _chartTypeEnum)
-          : await _service.getPayableChart(
-              companyGuid: _companyGuid!,
-              chartType: _chartTypeEnum);
+      debugPrint('═══ OutstandingDetail _loadData ═══');
+      debugPrint('  metric: ${widget.metric.displayName}');
+      debugPrint('  dateRange: ${_dateRange.type} | from=$from | to=$to');
+      debugPrint('  chartType: $_chartType');
 
-      // Load party list
-      final parties = _isReceivable
-          ? await _service.getCreditLimitExceeded(companyGuid: _companyGuid!)
-          : await _service.getPaymentDueParties(companyGuid: _companyGuid!);
+      // Fetch real value
+      ReportValue realValue;
+      ReportChartData realChart;
+      if (_isReceivable) {
+        realValue = await _salesAnalyticsService.getTotalReceivable(
+            companyGuid: guid, fromDate: from, toDate: to);
+        realChart = await _salesAnalyticsService.getReceivableChart(
+          companyGuid: guid,
+          chartType: _chartType,
+          fromDate: from,
+          toDate: to,
+        );
+      } else {
+        realValue = await _salesAnalyticsService.getTotalPayable(
+            companyGuid: guid, fromDate: from, toDate: to);
+        realChart = await _salesAnalyticsService.getPayableChart(
+          companyGuid: guid,
+          chartType: _chartType,
+          fromDate: from,
+          toDate: to,
+        );
+      }
+
+      debugPrint(
+          '  totalValue: ${realValue.primaryValue} ${realValue.primaryUnit}');
+      debugPrint('  chartDataPoints: ${realChart.dataPoints.length}');
+      for (final dp in realChart.dataPoints) {
+        debugPrint('    - ${dp.label}: ${dp.value}');
+      }
+
+      // Load party & group data from DB
+      final creditLimit = await _salesAnalyticsService.getCreditLimitExceeded(
+          companyGuid: guid, fromDate: from, toDate: to);
+      final paymentDue = await _salesAnalyticsService.getPaymentDueParties(
+          companyGuid: guid, fromDate: from, toDate: to);
+
+      final topPaying = await _salesAnalyticsService.getTopPayingParties(
+        companyGuid: guid,
+      );
+      final topVend = await _salesAnalyticsService.getTopVendors(
+        companyGuid: guid,
+      );
+
+      final recGroups =
+          await _salesAnalyticsService.getReceivableGroups(companyGuid: guid);
+      final payGroups =
+          await _salesAnalyticsService.getPayableGroups(companyGuid: guid);
+
+      // Compute pending/advance from real DB data
+      final parentGroup = _isReceivable ? 'Sundry Debtors' : 'Sundry Creditors';
+      final breakdown = await _salesAnalyticsService.getOutstandingBreakdown(
+        companyGuid: guid,
+        parentGroup: parentGroup,
+      );
 
       if (!mounted) return;
       setState(() {
-        // Parse the primary value back to double for the summary cards
-        final primary = _parseAmount(
-            totalVal.primaryValue, totalVal.primaryUnit);
-        _totalReceivable = primary;
-        // Pending and advance would come from separate queries in a real app;
-        // here we approximate from chart data for demo purposes
-        _totalPending = chart.dataPoints.isNotEmpty
-            ? chart.dataPoints
-                .take(chart.dataPoints.length ~/ 2)
-                .fold<double>(0, (s, d) => s + d.value)
-            : 0;
-        _totalAdvance = (_totalReceivable - _totalPending).abs();
-
-        _chartData = chart;
-        _parties = _isReceivable
-            ? (parties as List<CreditLimitParty>)
-                .map((p) => _PartyRow(
-                      name: p.name,
-                      amount: p.currentOutstanding,
-                      daysOver: p.daysOverLimit,
-                    ))
-                .toList()
-            : (parties as List<PaymentDueParty>)
-                .map((p) => _PartyRow(
-                      name: p.name,
-                      amount: p.amountDue,
-                      daysOver: p.daysOverdue,
-                    ))
-                .toList();
-
-        _loading = false;
+        _mainValue = realValue.primaryValue;
+        _mainUnit = realValue.primaryUnit;
+        _chartData = realChart;
+        _computeSummaryCards(breakdown);
+        _creditLimitParties = creditLimit;
+        _paymentDueParties = paymentDue;
+        _topPayingParties = topPaying;
+        _topVendors = topVend;
+        _receivableGroups = recGroups;
+        _payableGroups = payGroups;
+        _isLoading = false;
+        _isChartLoading = false;
       });
-      _fadeCtrl.forward(from: 0);
-    } catch (e) {
-      debugPrint('OutstandingDetailScreen error: $e');
-      if (mounted) setState(() => _loading = false);
+    } catch (e, stack) {
+      debugPrint('Error loading ${widget.metric.displayName} data: $e');
+      debugPrint('$stack');
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _isChartLoading = false;
+      });
     }
   }
 
-  ReportChartType get _chartTypeEnum {
-    switch (_selectedChartType) {
-      case 'LINE':    return ReportChartType.line;
-      case 'AREA':    return ReportChartType.area;
-      case 'PIE':     return ReportChartType.pie;
-      case 'HORIBAR': return ReportChartType.horizontalBar;
-      default:        return ReportChartType.bar;
-    }
+  void _computeSummaryCards(Map<String, double> breakdown) {
+    final pending = breakdown['pending'] ?? 0;
+    final advance = breakdown['advance'] ?? 0;
+
+    final pendingFormatted = AmountFormatter.format(pending);
+    final advanceFormatted = AmountFormatter.format(advance);
+
+    _pendingValue = pendingFormatted['value']!;
+    _pendingUnit = pendingFormatted['unit']!;
+    _advanceValue = advanceFormatted['value']!;
+    _advanceUnit = advanceFormatted['unit']!;
   }
 
-  // ── Helpers ────────────────────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════════
+  //  USER ACTIONS
+  // ═══════════════════════════════════════════════════════════════════════════
 
-  /// Re-assemble full double from formatted value + unit suffix.
-  double _parseAmount(String value, String unit) {
-    final clean = value.replaceAll(',', '').replaceAll('₹', '').trim();
-    final base = double.tryParse(clean) ?? 0.0;
-    switch (unit.trim().toUpperCase()) {
-      case 'CR': return base * 1e7;
-      case 'L':  return base * 1e5;
-      case 'K':  return base * 1e3;
-      default:   return base;
-    }
+  void _onDateRangeChanged(DateRangeFilter range) {
+    setState(() => _dateRange = range);
+    _loadData();
   }
 
-  /// Indian number format with ₹ prefix.
-  String _fmt(double amount) {
-    if (amount == 0) return '₹0';
-    final neg = amount < 0;
-    final abs = amount.abs();
-    // Choose compact suffix
-    String value;
-    String unit;
-    if (abs >= 1e7) {
-      value = (abs / 1e7).toStringAsFixed(2);
-      unit  = ' Cr';
-    } else if (abs >= 1e5) {
-      value = (abs / 1e5).toStringAsFixed(2);
-      unit  = ' L';
-    } else if (abs >= 1e3) {
-      value = (abs / 1e3).toStringAsFixed(1);
-      unit  = ' K';
-    } else {
-      value = abs.toStringAsFixed(0);
-      unit  = '';
-    }
-    return '${neg ? '-' : ''}₹$value$unit';
-  }
+  void _showCustomDatePicker() async {
+    final now = DateTime.now();
+    final initialStart =
+        _dateRange.startDate.isAfter(now) ? now : _dateRange.startDate;
+    final initialEnd =
+        _dateRange.endDate.isAfter(now) ? now : _dateRange.endDate;
 
-  /// Full Indian comma-formatted amount for lists.
-  String _fmtFull(double amount) {
-    final neg = amount < 0;
-    final formatted = amount.abs().toStringAsFixed(0).replaceAllMapped(
-        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},');
-    return '${neg ? '-' : ''}₹$formatted';
-  }
-
-  // ── Build ──────────────────────────────────────────────────────────────────
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: _bg,
-      appBar: _buildAppBar(),
-      body: _loading
-          ? const Center(
-              child: CircularProgressIndicator(color: _primary, strokeWidth: 2))
-          : FadeTransition(
-              opacity: _fadeAnim,
-              child: Column(children: [
-                // ── KPI summary cards (FIX 1: FittedBox prevents overflow)
-                _buildSummaryCards(),
-
-                // ── Period selector
-                _buildPeriodSelector(),
-
-                // ── Tab bar: Chart | Ledger
-                _buildTabBar(),
-
-                // ── Content
-                Expanded(
-                  child: TabBarView(
-                    controller: _tabCtrl,
-                    children: [
-                      _buildChartTab(),
-                      _buildLedgerTab(),
-                    ],
-                  ),
-                ),
-              ]),
+    final range = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: now,
+      initialDateRange: DateTimeRange(
+        start: initialStart,
+        end: initialEnd,
+      ),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: AppColors.blue,
+              onPrimary: Colors.white,
+              onSurface: AppColors.textPrimary,
             ),
+          ),
+          child: child!,
+        );
+      },
     );
+    if (range != null) {
+      _onDateRangeChanged(DateRangeFilter.custom(range.start, range.end));
+    }
   }
 
-  // ── AppBar ─────────────────────────────────────────────────────────────────
+  void _onDaysFilterChanged(int? days) {
+    setState(() {
+      _selectedDaysFilter = days;
+      if (days != _customDaysValue) {
+        _customDaysValue = null;
+      }
+    });
+  }
 
-  AppBar _buildAppBar() {
-    return AppBar(
-      backgroundColor: _cardBg,
-      elevation: 0,
-      surfaceTintColor: Colors.transparent,
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios_new_rounded,
-            size: 18, color: _textDark),
-        onPressed: () => Navigator.pop(context),
-      ),
-      title: Text(
-        _isReceivable ? 'Receivables' : 'Payables',
-        style: const TextStyle(
-            fontSize: 18, fontWeight: FontWeight.w800, color: _textDark),
-      ),
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.ios_share_rounded, color: _textMuted, size: 20),
-          onPressed: () {},
+  void _showCustomDaysDialog() async {
+    final controller = TextEditingController(
+      text: _customDaysValue?.toString() ?? '',
+    );
+    final result = await showDialog<int>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Custom Days Filter'),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+            labelText: 'Days overdue (e.g. 45)',
+            border: OutlineInputBorder(),
+          ),
         ),
-      ],
-      bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Container(height: 1, color: Colors.grey.shade100)),
-    );
-  }
-
-  // ── Summary cards (FIX 1) ──────────────────────────────────────────────────
-  // OLD: Row with 3 Expanded cards, each showing a raw unformatted amount
-  //      → caused "OVERFLOWED BY 19 PIXELS" on all 3 cards
-  // FIX: Each card uses FittedBox(fit: BoxFit.scaleDown) on the amount text
-  //      so it shrinks to fit rather than overflowing. Also compact layout.
-
-  Widget _buildSummaryCards() {
-    return Container(
-      color: _cardBg,
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-      child: Row(
-        children: [
-          Expanded(
-            child: _summaryCard(
-              label: _isReceivable ? 'Receivable' : 'Payable',
-              amount: _totalReceivable,
-              color: _isReceivable ? _primary : _negativeC,
-              bg: _isReceivable
-                  ? _primary.withOpacity(0.08)
-                  : _negativeBg,
-            ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
           ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: _summaryCard(
-              label: 'Pending',
-              amount: _totalPending,
-              color: _amberC,
-              bg: _amberBg,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: _summaryCard(
-              label: 'Advance',
-              amount: _totalAdvance,
-              color: _positiveC,
-              bg: _positiveBg,
-            ),
+          FilledButton(
+            onPressed: () {
+              final val = int.tryParse(controller.text);
+              if (val != null && val > 0) {
+                Navigator.pop(ctx, val);
+              }
+            },
+            child: const Text('Apply'),
           ),
         ],
       ),
     );
-  }
-
-  Widget _summaryCard({
-    required String label,
-    required double amount,
-    required Color color,
-    required Color bg,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.2)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                color: color.withOpacity(0.8)),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 4),
-          // FIX: FittedBox shrinks text to fit the card width
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(
-              _fmt(amount),
-              style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: color),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ── Period selector ────────────────────────────────────────────────────────
-
-  Widget _buildPeriodSelector() {
-    return Container(
-      color: _cardBg,
-      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-      child: Row(
-        children: _periods.map((p) {
-          final active = _selectedPeriod == p;
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: GestureDetector(
-              onTap: () {
-                setState(() => _selectedPeriod = p);
-                if (p != 'Custom') _loadData();
-              },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: active ? _primary : Colors.transparent,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                      color: active ? _primary : Colors.grey.shade300),
-                ),
-                child: Text(
-                  p,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: active ? Colors.white : _textMuted,
-                  ),
-                ),
-              ),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-
-  // ── Tab bar ────────────────────────────────────────────────────────────────
-
-  Widget _buildTabBar() {
-    return Container(
-      color: _cardBg,
-      child: TabBar(
-        controller: _tabCtrl,
-        labelColor: _primary,
-        unselectedLabelColor: _textMuted,
-        indicatorColor: _primary,
-        indicatorSize: TabBarIndicatorSize.label,
-        labelStyle: const TextStyle(
-            fontSize: 13, fontWeight: FontWeight.w700),
-        tabs: const [
-          Tab(text: 'Chart'),
-          Tab(text: 'Ledger'),
-        ],
-      ),
-    );
-  }
-
-  // ── Chart tab (FIX 2 + FIX 3) ─────────────────────────────────────────────
-  // FIX 2: Chart type selector was a plain Row → overflow 52px right
-  //         → wrapped in SingleChildScrollView(scrollDirection: Axis.horizontal)
-  // FIX 3: Amount labels on chart bars were raw integers split across lines
-  //         → ReportChart renders amounts with _fmtFull inside bounded SizedBox
-
-  Widget _buildChartTab() {
-    return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(),
-      child: Column(children: [
-        const SizedBox(height: 12),
-
-        // ── Chart type selector (FIX 2) ──────────────────────────────────
-        Container(
-          color: _cardBg,
-          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-          child: Row(children: [
-            // "Receivables" label — flex so it doesn't crowd chips
-            Text(
-              _isReceivable ? 'Receivables' : 'Payables',
-              style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: _textMuted),
-            ),
-            const SizedBox(width: 10),
-            // SCROLLABLE chart type chips — prevents the 52px overflow
-            Expanded(
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                physics: const BouncingScrollPhysics(),
-                child: Row(
-                  children: _chartTypes.map((ct) {
-                    final active = _selectedChartType == ct;
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 6),
-                      child: GestureDetector(
-                        onTap: () {
-                          setState(() => _selectedChartType = ct);
-                          _loadData();
-                        },
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 180),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: active
-                                ? _primary.withOpacity(0.12)
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                                color: active
-                                    ? _primary
-                                    : Colors.grey.shade300,
-                                width: active ? 1.5 : 1),
-                          ),
-                          child: Text(
-                            ct,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: active ? _primary : _textMuted,
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ),
-            ),
-          ]),
-        ),
-
-        const SizedBox(height: 8),
-
-        // ── Chart (FIX 3: bounded SizedBox, chart uses formatted amounts)
-        if (_chartData != null && _chartData!.dataPoints.isNotEmpty)
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 12),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: _cardBg,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 3)),
-              ],
-            ),
-            // Fixed height so chart has bounded constraints
-            child: SizedBox(
-              height: 260,
-              child: ReportChart(data: _chartData!, height: 260),
-            ),
-          )
-        else
-          Container(
-            height: 200,
-            margin: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              color: _cardBg,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.bar_chart_rounded,
-                      size: 44,
-                      color: Colors.grey.shade300),
-                  const SizedBox(height: 10),
-                  const Text('No chart data',
-                      style: TextStyle(
-                          color: _textMuted, fontSize: 13)),
-                ],
-              ),
-            ),
-          ),
-
-        const SizedBox(height: 24),
-      ]),
-    );
-  }
-
-  // ── Ledger tab ─────────────────────────────────────────────────────────────
-
-  Widget _buildLedgerTab() {
-    if (_parties.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.people_outline_rounded,
-                size: 48, color: Colors.grey.shade300),
-            const SizedBox(height: 12),
-            Text(
-              'No ${_isReceivable ? 'receivables' : 'payables'} found',
-              style: const TextStyle(color: _textMuted, fontSize: 14),
-            ),
-          ],
-        ),
-      );
+    if (result != null) {
+      setState(() {
+        _customDaysValue = result;
+        _selectedDaysFilter = result;
+      });
     }
-
-    // Determine max bar width for relative bar chart in list
-    final maxAmt = _parties.fold<double>(
-        0, (m, p) => p.amount > m ? p.amount : m);
-
-    return ListView.builder(
-      physics: const BouncingScrollPhysics(),
-      itemCount: _parties.length,
-      itemBuilder: (ctx, i) => _buildPartyRow(_parties[i], i, maxAmt),
-    );
   }
 
-  Widget _buildPartyRow(_PartyRow party, int index, double maxAmt) {
-    final color = _isReceivable ? _primary : _negativeC;
-    final frac  = maxAmt > 0 ? (party.amount / maxAmt).clamp(0.0, 1.0) : 0.0;
+  // ═══════════════════════════════════════════════════════════════════════════
+  //  SHARE / EXPORT
+  // ═══════════════════════════════════════════════════════════════════════════
 
-    return Container(
-      decoration: BoxDecoration(
-        color: index.isEven ? _cardBg : _bg,
-        border: Border(
-            bottom: BorderSide(color: Colors.grey.shade100, width: 0.8)),
+  void _showShareOptions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-      child: Row(children: [
-        // Party name (left-aligned, flex)
-        Expanded(
-          flex: 2,
-          child: Text(
-            party.name,
-            style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: _textDark),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.right,
-          ),
-        ),
-        const SizedBox(width: 10),
-
-        // Proportional bar + amount (FIX 3: _fmtFull gives proper commas)
-        Expanded(
-          flex: 3,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Bar
-              LayoutBuilder(
-                builder: (ctx, c) => Stack(children: [
-                  Container(
-                    height: 8,
-                    width: c.maxWidth,
-                    decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(4)),
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFD1D5DB),
+                    borderRadius: BorderRadius.circular(2),
                   ),
-                  Container(
-                    height: 8,
-                    width: c.maxWidth * frac,
-                    decoration: BoxDecoration(
-                        color: color,
-                        borderRadius: BorderRadius.circular(4)),
-                  ),
-                ]),
+                ),
               ),
-              const SizedBox(height: 4),
-              // FIX 3: Use _fmtFull for proper comma-separated amount
-              // (old code showed raw double split across lines)
-              Text(
-                _fmtFull(party.amount),
-                style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: color),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+              Padding(
+                padding: const EdgeInsets.only(left: 20, bottom: 12),
+                child: Text('SHARE REPORT', style: AppTypography.cardLabel),
+              ),
+              ListTile(
+                leading:
+                    SvgPicture.string(AppIcons.filePdf, width: 36, height: 36),
+                title: Text('Share as PDF', style: AppTypography.itemTitle),
+                subtitle: Text('Formatted report with charts',
+                    style: AppTypography.itemSubtitle),
+                trailing: Icon(Icons.chevron_right,
+                    color: AppColors.textSecondary, size: 20),
+                onTap: () {
+                  Navigator.pop(ctx);
+                },
+              ),
+              Divider(
+                height: 1,
+                thickness: 0.5,
+                indent: 20,
+                endIndent: 20,
+                color: Colors.grey.shade300,
+              ),
+              ListTile(
+                leading:
+                    SvgPicture.string(AppIcons.fileCsv, width: 36, height: 36),
+                title: Text('Share as Excel', style: AppTypography.itemTitle),
+                subtitle: Text('Raw data for spreadsheets',
+                    style: AppTypography.itemSubtitle),
+                trailing: Icon(Icons.chevron_right,
+                    color: AppColors.textSecondary, size: 20),
+                onTap: () {
+                  Navigator.pop(ctx);
+                },
               ),
             ],
           ),
         ),
-      ]),
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  //  HELPERS
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  String _formatDate(DateTime date) {
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    return '${date.day} ${months[date.month - 1]} ${date.year}';
+  }
+
+  Color _daysColor(int days) {
+    if (days >= 90) return AppColors.red;
+    if (days >= 60) return const Color(0xFFE67E22);
+    if (days >= 30) return AppColors.amber;
+    return AppColors.textSecondary;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  //  BUILD
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  @override
+  Widget build(BuildContext context) {
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.dark.copyWith(
+        statusBarColor: Colors.transparent,
+      ),
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        body: SafeArea(
+          child: Column(
+            children: [
+              _buildHeader(),
+              const SizedBox(height: 14),
+              Expanded(
+                child: _isLoading
+                    ? const Center(
+                        child: CircularProgressIndicator(color: AppColors.blue),
+                      )
+                    : SingleChildScrollView(
+                        physics: const BouncingScrollPhysics(),
+                        padding: const EdgeInsets.only(bottom: 32),
+                        child: Column(
+                          children: [
+                            // Ledger / Group toggle
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: AppSpacing.pagePadding,
+                              ),
+                              child: _buildLedgerGroupToggle(),
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Summary cards row
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: AppSpacing.pagePadding,
+                              ),
+                              child: _buildSummaryCards(),
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Date range selector
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: AppSpacing.pagePadding,
+                              ),
+                              child: DateRangeSelector(
+                                selected: _dateRange,
+                                onChanged: _onDateRangeChanged,
+                                onCustomTap: _showCustomDatePicker,
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+
+                            // Aging Analysis chart
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: AppSpacing.pagePadding,
+                              ),
+                              child: _buildAgingAnalysisCard(),
+                            ),
+                            const SizedBox(height: 20),
+
+                            // Aging Party Wise
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: AppSpacing.pagePadding,
+                              ),
+                              child: _buildAgingPartyWiseCard(),
+                            ),
+                            const SizedBox(height: 20),
+
+                            // Party Wise Aging (Value Wise)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: AppSpacing.pagePadding,
+                              ),
+                              child: _buildPartyWiseValueCard(),
+                            ),
+                            const SizedBox(height: 20),
+
+                            // Top Paying Parties / Top Vendors
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: AppSpacing.pagePadding,
+                              ),
+                              child: _isReceivable
+                                  ? _buildFastestPayingPartiesCard()
+                                  : _buildTopVendorsCard(),
+                            ),
+                            const SizedBox(height: 20),
+
+                            // Ledger Wise / Group Wise Outstanding
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: AppSpacing.pagePadding,
+                              ),
+                              child: _viewMode == 0
+                                  ? _buildLedgerWiseOutstandingCard()
+                                  : _buildGroupWiseOutstandingCard(),
+                            ),
+                          ],
+                        ),
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  //  SUB-WIDGETS
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  Widget _buildHeader() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, AppSpacing.pagePadding, 0),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: () => Navigator.of(context).pop(),
+            child: SizedBox(
+              width: 36,
+              height: 36,
+              child: Center(
+                child: Icon(
+                  Icons.arrow_back_ios_new,
+                  size: 16,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Text(widget.metric.displayName, style: AppTypography.pageTitle),
+          const Spacer(),
+          GestureDetector(
+            onTap: _showShareOptions,
+            child: Container(
+              width: 36,
+              height: 36,
+              margin: const EdgeInsets.only(right: 10),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.divider),
+              ),
+              child: Center(
+                child: SvgPicture.string(
+                  AppIcons.share,
+                  width: 18,
+                  height: 18,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Ledger / Group segmented toggle
+  Widget _buildLedgerGroupToggle() {
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: AppColors.pillBg,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          _buildTogglePill('Ledger', 0),
+          _buildTogglePill('Group', 1),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTogglePill(String label, int index) {
+    final isActive = _viewMode == index;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _viewMode = index),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 9),
+          decoration: BoxDecoration(
+            color: isActive ? AppColors.surface : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: isActive ? AppShadows.pillActive : null,
+          ),
+          child: Center(
+            child: Text(
+              label,
+              style: isActive
+                  ? AppTypography.pillActive
+                      .copyWith(color: AppColors.textPrimary)
+                  : AppTypography.pillInactive,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Three summary cards: Receivable/Payable, Pending, Advance
+  Widget _buildSummaryCards() {
+    final mainLabel = _isReceivable ? 'Receivable' : 'Payable';
+    final mainColor = _isReceivable ? AppColors.purple : AppColors.red;
+
+    return Row(
+      children: [
+        Expanded(
+          child: _buildSummaryCard(
+            label: mainLabel,
+            value: _mainValue,
+            unit: _mainUnit,
+            color: mainColor,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _buildSummaryCard(
+            label: 'Pending',
+            value: _pendingValue,
+            unit: _pendingUnit,
+            color: AppColors.amber,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _buildSummaryCard(
+            label: 'Advance',
+            value: _advanceValue,
+            unit: _advanceUnit,
+            color: AppColors.green,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSummaryCard({
+    required String label,
+    required String value,
+    required String unit,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: AppTypography.cardLabel.copyWith(fontSize: 11),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 6),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Text(
+                  '₹$value',
+                  style: TextStyle(
+                    fontFamily: AppTypography.fontSerif,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: color,
+                    letterSpacing: -0.5,
+                    height: 1.0,
+                  ),
+                ),
+                const SizedBox(width: 3),
+                Text(
+                  unit,
+                  style: TextStyle(
+                    fontFamily: AppTypography.fontBody,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: color,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Aging Analysis card with chart
+  Widget _buildAgingAnalysisCard() {
+    final accentColor = widget.metric.accentColor;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        boxShadow: AppShadows.card,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Title
+          Text('AGING ANALYSIS', style: AppTypography.cardLabel),
+          const SizedBox(height: 12),
+
+          // Chart type selector — scrollable row
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            child: Row(
+              children: ReportChartType.values.map((type) {
+                final isActive = _chartType == type;
+                final label = _chartTypeLabel(type);
+                return Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: GestureDetector(
+                    onTap: () {
+                      setState(() => _chartType = type);
+                      _loadData();
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: isActive
+                            ? AppColors.blue.withValues(alpha: 0.12)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: isActive ? AppColors.blue : AppColors.divider,
+                        ),
+                      ),
+                      child: Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: isActive
+                              ? AppColors.blue
+                              : AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Chart
+          if (_isChartLoading)
+            const SizedBox(
+              height: 220,
+              child: Center(
+                child: CircularProgressIndicator(
+                    color: AppColors.blue, strokeWidth: 2),
+              ),
+            )
+          else if (_chartData.dataPoints.isNotEmpty)
+            SizedBox(
+              height: 220,
+              child: ReportChart(data: _chartData, height: 220),
+            )
+          else
+            SizedBox(
+              height: 160,
+              child: Center(
+                child: Text('No Data', style: AppTypography.itemSubtitle),
+              ),
+            ),
+
+          const SizedBox(height: 16),
+
+          // Legend
+          Row(
+            children: [
+              Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(
+                  color: accentColor,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                'Outstanding Amount',
+                style: AppTypography.itemSubtitle.copyWith(fontSize: 11),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _chartTypeLabel(ReportChartType type) {
+    switch (type) {
+      case ReportChartType.bar:
+        return 'Bar';
+      case ReportChartType.line:
+        return 'Line';
+      case ReportChartType.area:
+        return 'Area';
+      case ReportChartType.pie:
+        return 'Pie';
+      case ReportChartType.horizontalBar:
+        return 'H-Bar';
+    }
+  }
+
+  /// Aging Party Wise card with days filter pills
+  Widget _buildAgingPartyWiseCard() {
+    final accentColor = _isReceivable ? AppColors.purple : AppColors.red;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        boxShadow: AppShadows.card,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'AGING PARTY WISE (DAY-WISE)',
+            style: AppTypography.cardLabel,
+          ),
+          const SizedBox(height: 12),
+
+          // Days filter pills
+          _OutstandingDaysFilterPills(
+            selectedDays: _selectedDaysFilter,
+            customValue: _customDaysValue,
+            onChanged: _onDaysFilterChanged,
+            onCustomTap: _showCustomDaysDialog,
+            accentColor: accentColor,
+          ),
+          const SizedBox(height: 16),
+
+          // Party list
+          if (_isReceivable)
+            ..._buildReceivablePartyList()
+          else
+            ..._buildPayablePartyList(),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildReceivablePartyList() {
+    final parties = _creditLimitParties;
+    final filtered = _selectedDaysFilter == null
+        ? List<CreditLimitParty>.from(parties)
+        : parties
+            .where((p) => p.daysOverLimit >= _selectedDaysFilter!)
+            .toList();
+    filtered.sort((a, b) => b.daysOverLimit.compareTo(a.daysOverLimit));
+
+    if (filtered.isEmpty) {
+      return [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Center(
+            child: Text(
+              _selectedDaysFilter != null
+                  ? 'No parties for ${_selectedDaysFilter}+ days'
+                  : 'No parties found',
+              style: AppTypography.itemSubtitle,
+            ),
+          ),
+        ),
+      ];
+    }
+
+    final displayCount = _agingPartyExpanded
+        ? filtered.length
+        : filtered.length.clamp(0, _initialItemCount);
+
+    final widgets = <Widget>[];
+    for (var i = 0; i < displayCount; i++) {
+      final party = filtered[i];
+      final dc = _daysColor(party.daysOverLimit);
+
+      widgets.add(
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      party.name,
+                      style: AppTypography.itemTitle.copyWith(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      party.creditLimit > 0
+                          ? 'Credit Limit: ₹${AmountFormatter.shortSpaced(party.creditLimit)}'
+                          : 'Sundry Debtors',
+                      style: AppTypography.itemSubtitle.copyWith(fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    '₹${AmountFormatter.shortSpaced(party.currentOutstanding)}',
+                    style: AppTypography.itemTitle.copyWith(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: dc.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.access_time, size: 12, color: dc),
+                        const SizedBox(width: 3),
+                        Text(
+                          '${party.daysOverLimit} days',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: dc,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+
+      if (i < displayCount - 1) {
+        widgets.add(
+          Divider(height: 1, thickness: 0.5, color: Colors.grey.shade200),
+        );
+      }
+    }
+
+    if (filtered.length > _initialItemCount) {
+      widgets.add(_buildSeeMoreButton(
+        expanded: _agingPartyExpanded,
+        totalCount: filtered.length,
+        onTap: () => setState(() => _agingPartyExpanded = !_agingPartyExpanded),
+      ));
+    }
+
+    return widgets;
+  }
+
+  List<Widget> _buildPayablePartyList() {
+    final parties = _paymentDueParties;
+    final filtered = _selectedDaysFilter == null
+        ? List<PaymentDueParty>.from(parties)
+        : parties.where((p) => p.daysOverdue >= _selectedDaysFilter!).toList();
+    filtered.sort((a, b) => b.daysOverdue.compareTo(a.daysOverdue));
+
+    if (filtered.isEmpty) {
+      return [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Center(
+            child: Text(
+              _selectedDaysFilter != null
+                  ? 'No vendors for ${_selectedDaysFilter}+ days'
+                  : 'No vendors found',
+              style: AppTypography.itemSubtitle,
+            ),
+          ),
+        ),
+      ];
+    }
+
+    final displayCount = _agingPartyExpanded
+        ? filtered.length
+        : filtered.length.clamp(0, _initialItemCount);
+
+    final widgets = <Widget>[];
+    for (var i = 0; i < displayCount; i++) {
+      final party = filtered[i];
+      final dc = _daysColor(party.daysOverdue);
+
+      widgets.add(
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      party.name,
+                      style: AppTypography.itemTitle.copyWith(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      party.dueDate != null
+                          ? 'Due: ${_formatDate(party.dueDate!)}'
+                          : 'Sundry Creditors',
+                      style: AppTypography.itemSubtitle.copyWith(fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    '₹${AmountFormatter.shortSpaced(party.amountDue)}',
+                    style: AppTypography.itemTitle.copyWith(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: dc.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.access_time, size: 12, color: dc),
+                        const SizedBox(width: 3),
+                        Text(
+                          '${party.daysOverdue} days',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: dc,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+
+      if (i < displayCount - 1) {
+        widgets.add(
+          Divider(height: 1, thickness: 0.5, color: Colors.grey.shade200),
+        );
+      }
+    }
+
+    if (filtered.length > _initialItemCount) {
+      widgets.add(_buildSeeMoreButton(
+        expanded: _agingPartyExpanded,
+        totalCount: filtered.length,
+        onTap: () => setState(() => _agingPartyExpanded = !_agingPartyExpanded),
+      ));
+    }
+
+    return widgets;
+  }
+
+  /// Party Wise Aging (Value Wise)
+  Widget _buildPartyWiseValueCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        boxShadow: AppShadows.card,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'PARTY WISE AGING (VALUE WISE)',
+            style: AppTypography.cardLabel,
+          ),
+          const SizedBox(height: 16),
+          if (_isReceivable)
+            ..._buildReceivableValueList()
+          else
+            ..._buildPayableValueList(),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildReceivableValueList() {
+    final parties = List<CreditLimitParty>.from(_creditLimitParties)
+      ..sort((a, b) => b.currentOutstanding.compareTo(a.currentOutstanding));
+
+    if (parties.isEmpty) {
+      return [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Center(
+            child: Text(
+              'No party wise value found',
+              style: AppTypography.itemSubtitle,
+            ),
+          ),
+        ),
+      ];
+    }
+
+    final now = DateTime.now();
+    final displayCount = _valueWiseExpanded
+        ? parties.length
+        : parties.length.clamp(0, _initialItemCount);
+    final widgets = <Widget>[];
+
+    for (var i = 0; i < displayCount; i++) {
+      final party = parties[i];
+      final dueDate = now.subtract(Duration(days: party.daysOverLimit));
+      final dc = _daysColor(party.daysOverLimit);
+
+      widgets.add(
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      party.name,
+                      style: AppTypography.itemTitle.copyWith(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Due: ${_formatDate(dueDate)}',
+                      style: AppTypography.itemSubtitle.copyWith(fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    '₹${AmountFormatter.shortSpaced(party.currentOutstanding)}',
+                    style: AppTypography.itemTitle.copyWith(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: dc.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.access_time, size: 12, color: dc),
+                        const SizedBox(width: 3),
+                        Text(
+                          '${party.daysOverLimit} days',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: dc,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+
+      if (i < displayCount - 1) {
+        widgets.add(
+          Divider(height: 1, thickness: 0.5, color: Colors.grey.shade200),
+        );
+      }
+    }
+
+    if (parties.length > _initialItemCount) {
+      widgets.add(_buildSeeMoreButton(
+        expanded: _valueWiseExpanded,
+        totalCount: parties.length,
+        onTap: () => setState(() => _valueWiseExpanded = !_valueWiseExpanded),
+      ));
+    }
+
+    return widgets;
+  }
+
+  List<Widget> _buildPayableValueList() {
+    final parties = List<PaymentDueParty>.from(_paymentDueParties)
+      ..sort((a, b) => b.amountDue.compareTo(a.amountDue));
+
+    if (parties.isEmpty) {
+      return [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Center(
+            child: Text(
+              'No party wise value found',
+              style: AppTypography.itemSubtitle,
+            ),
+          ),
+        ),
+      ];
+    }
+
+    final displayCount = _valueWiseExpanded
+        ? parties.length
+        : parties.length.clamp(0, _initialItemCount);
+    final widgets = <Widget>[];
+
+    for (var i = 0; i < displayCount; i++) {
+      final party = parties[i];
+      final dc = _daysColor(party.daysOverdue);
+
+      widgets.add(
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      party.name,
+                      style: AppTypography.itemTitle.copyWith(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      party.dueDate != null
+                          ? 'Due: ${_formatDate(party.dueDate!)}'
+                          : 'N/A',
+                      style: AppTypography.itemSubtitle.copyWith(fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    '₹${AmountFormatter.shortSpaced(party.amountDue)}',
+                    style: AppTypography.itemTitle.copyWith(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: dc.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.access_time, size: 12, color: dc),
+                        const SizedBox(width: 3),
+                        Text(
+                          '${party.daysOverdue} days',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: dc,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+
+      if (i < displayCount - 1) {
+        widgets.add(
+          Divider(height: 1, thickness: 0.5, color: Colors.grey.shade200),
+        );
+      }
+    }
+
+    if (parties.length > _initialItemCount) {
+      widgets.add(_buildSeeMoreButton(
+        expanded: _valueWiseExpanded,
+        totalCount: parties.length,
+        onTap: () => setState(() => _valueWiseExpanded = !_valueWiseExpanded),
+      ));
+    }
+
+    return widgets;
+  }
+
+  /// Fastest Paying Parties card (Receivable)
+  Widget _buildFastestPayingPartiesCard() {
+    final fy = _selectedFiscalYear;
+    final fyLabel =
+        'FY${fy.startYear.toString().substring(2)}-${fy.endYear.toString().substring(2)}';
+    final months = fy.endDate.difference(fy.startDate).inDays ~/ 30;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        boxShadow: AppShadows.card,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header row
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF7E6),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Center(
+                  child: Icon(Icons.star_rounded,
+                      color: Color(0xFFF59E0B), size: 20),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Fastest Paying Parties',
+                  style: AppTypography.itemTitle.copyWith(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF1B8A5A),
+                  ),
+                ),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8F5EE),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text(
+                  'Early payers',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1B8A5A),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // FY selector
+          GestureDetector(
+            onTap: () {
+              _showFiscalYearPicker();
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0F7FF),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFD0E3FF)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.calendar_today_outlined,
+                      size: 14, color: Color(0xFF1A6FD8)),
+                  const SizedBox(width: 8),
+                  Text(
+                    '$fyLabel ($months months)',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1A6FD8),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.arrow_drop_down,
+                      size: 18, color: Color(0xFF1A6FD8)),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '${_formatMonthYear(fy.startDate)} - ${_formatMonthYear(fy.endDate)}',
+            style: AppTypography.itemSubtitle.copyWith(fontSize: 12),
+          ),
+          const SizedBox(height: 16),
+
+          // Party list
+          if (_topPayingParties.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Center(
+                child: Text(
+                  'No data available',
+                  style: AppTypography.itemSubtitle,
+                ),
+              ),
+            )
+          else
+            ...List.generate(
+              _topPayingParties.length.clamp(0, 4),
+              (i) {
+                final party = _topPayingParties[i];
+                final rank = i + 1;
+                // Derive avg days and early days from percentage
+                final avgDays =
+                    (30 - (party.percentage * 0.18)).round().clamp(5, 30);
+                final earlyDays = (30 - avgDays).clamp(0, 30);
+                final double onTimePercent = party.percentage > 0
+                    ? party.percentage.clamp(0.0, 100.0)
+                    : (100.0 - i * 3).clamp(80.0, 100.0);
+
+                return Column(
+                  children: [
+                    _buildFastestPartyRow(
+                      rank: rank,
+                      name: party.name,
+                      amount: party.amount,
+                      avgDays: avgDays,
+                      earlyDays: earlyDays,
+                      onTimePercent: onTimePercent,
+                    ),
+                    if (i < _topPayingParties.length.clamp(0, 4) - 1)
+                      const SizedBox(height: 4),
+                  ],
+                );
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFastestPartyRow({
+    required int rank,
+    required String name,
+    required double amount,
+    required int avgDays,
+    required int earlyDays,
+    required double onTimePercent,
+  }) {
+    // Medal colors
+    Color rankBg;
+    Color rankFg;
+    if (rank == 1) {
+      rankBg = const Color(0xFFF59E0B); // gold
+      rankFg = Colors.white;
+    } else if (rank == 2) {
+      rankBg = const Color(0xFF9CA3AF); // silver
+      rankFg = Colors.white;
+    } else if (rank == 3) {
+      rankBg = const Color(0xFFCD7F32); // bronze
+      rankFg = Colors.white;
+    } else {
+      rankBg = Colors.grey.shade200;
+      rankFg = AppColors.textSecondary;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFAFBFC),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          // Rank circle
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: rankBg,
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: Text(
+                '$rank',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: rankFg,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+
+          // Name + avg days + early badge
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  style: AppTypography.itemTitle.copyWith(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Text(
+                      'Avg $avgDays days',
+                      style: AppTypography.itemSubtitle.copyWith(fontSize: 12),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8F5EE),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '${earlyDays}d early',
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF1B8A5A),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+
+          // Amount + on-time %
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '₹${AmountFormatter.shortSpaced(amount)}',
+                style: AppTypography.itemTitle.copyWith(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${onTimePercent.toStringAsFixed(0)}% on-time',
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF1B8A5A),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Top Vendors card (Payable)
+  Widget _buildTopVendorsCard() {
+    final fy = _selectedFiscalYear;
+    final fyLabel =
+        'FY${fy.startYear.toString().substring(2)}-${fy.endYear.toString().substring(2)}';
+    final months = fy.endDate.difference(fy.startDate).inDays ~/ 30;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        boxShadow: AppShadows.card,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF7E6),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Center(
+                  child: Icon(Icons.store_rounded,
+                      color: Color(0xFFF59E0B), size: 20),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Top Vendors',
+                  style: AppTypography.itemTitle.copyWith(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.red,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // FY selector
+          GestureDetector(
+            onTap: _showFiscalYearPicker,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0F7FF),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFD0E3FF)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.calendar_today_outlined,
+                      size: 14, color: Color(0xFF1A6FD8)),
+                  const SizedBox(width: 8),
+                  Text(
+                    '$fyLabel ($months months)',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1A6FD8),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.arrow_drop_down,
+                      size: 18, color: Color(0xFF1A6FD8)),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          if (_topVendors.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Center(
+                child: Text('No data available',
+                    style: AppTypography.itemSubtitle),
+              ),
+            )
+          else
+            ...List.generate(
+              _topVendors.length.clamp(0, 4),
+              (i) {
+                final vendor = _topVendors[i];
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 24,
+                        child: Text(
+                          '${i + 1}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          vendor.name,
+                          style: AppTypography.itemTitle,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Text(
+                        '₹${AmountFormatter.shortSpaced(vendor.amount)}',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
+  void _showFiscalYearPicker() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 36,
+              height: 4,
+              margin: const EdgeInsets.only(top: 12, bottom: 16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFD1D5DB),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(left: 20, bottom: 12),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child:
+                    Text('SELECT FISCAL YEAR', style: AppTypography.cardLabel),
+              ),
+            ),
+            ..._fiscalYearOptions.map((fy) {
+              final isSelected = fy.startYear == _selectedFiscalYear.startYear;
+              return ListTile(
+                leading: Icon(
+                  isSelected
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_off,
+                  color: isSelected ? AppColors.blue : AppColors.textSecondary,
+                  size: 20,
+                ),
+                title: Text(
+                  'FY${fy.startYear.toString().substring(2)}-${fy.endYear.toString().substring(2)}',
+                  style: TextStyle(
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                    color: isSelected ? AppColors.blue : AppColors.textPrimary,
+                  ),
+                ),
+                subtitle: Text(
+                  '${_formatMonthYear(fy.startDate)} - ${_formatMonthYear(fy.endDate)}',
+                  style: AppTypography.itemSubtitle.copyWith(fontSize: 12),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  setState(() => _selectedFiscalYear = fy);
+                  _loadData();
+                },
+              );
+            }),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatMonthYear(DateTime date) {
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    return '${months[date.month - 1]} ${date.year}';
+  }
+
+  /// Ledger Wise Outstanding card
+  Widget _buildLedgerWiseOutstandingCard() {
+    // Use creditLimitParties/paymentDueParties if available,
+    // otherwise fall back to chart data points
+    final hasPartyData = _isReceivable
+        ? _creditLimitParties.isNotEmpty
+        : _paymentDueParties.isNotEmpty;
+
+    final chartFallback =
+        _chartData.dataPoints.where((dp) => dp.value > 0).toList();
+
+    final avatarColors = [
+      const Color(0xFF6366F1),
+      const Color(0xFFF59E0B),
+      const Color(0xFF10B981),
+      const Color(0xFFEF4444),
+      const Color(0xFF8B5CF6),
+      const Color(0xFF06B6D4),
+      const Color(0xFFF97316),
+      const Color(0xFFEC4899),
+    ];
+
+    final int totalCount;
+    if (hasPartyData) {
+      totalCount = _isReceivable
+          ? _creditLimitParties.length
+          : _paymentDueParties.length;
+    } else {
+      totalCount = chartFallback.length;
+    }
+    final displayCount = _ledgerWiseExpanded
+        ? totalCount
+        : totalCount.clamp(0, _initialItemCount);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        boxShadow: AppShadows.card,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'LEDGER WISE OUTSTANDING',
+            style: AppTypography.cardLabel,
+          ),
+          const SizedBox(height: 16),
+          if (totalCount == 0)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Center(
+                child: Text('No ledger data found',
+                    style: AppTypography.itemSubtitle),
+              ),
+            )
+          else
+            for (var i = 0; i < displayCount; i++) ...[
+              _buildLedgerRow(
+                name: hasPartyData
+                    ? (_isReceivable
+                        ? _creditLimitParties[i].name
+                        : _paymentDueParties[i].name)
+                    : chartFallback[i].label,
+                group: _isReceivable ? 'Sundry Debtors' : 'Sundry Creditors',
+                amount: hasPartyData
+                    ? (_isReceivable
+                        ? _creditLimitParties[i].currentOutstanding
+                        : _paymentDueParties[i].amountDue)
+                    : chartFallback[i].value,
+                days: hasPartyData
+                    ? (_isReceivable
+                        ? _creditLimitParties[i].daysOverLimit
+                        : _paymentDueParties[i].daysOverdue)
+                    : 0,
+                avatarColor: avatarColors[i % avatarColors.length],
+              ),
+              if (i < displayCount - 1)
+                Divider(height: 1, thickness: 0.5, color: Colors.grey.shade200),
+            ],
+          if (totalCount > _initialItemCount)
+            _buildSeeMoreButton(
+              expanded: _ledgerWiseExpanded,
+              totalCount: totalCount,
+              onTap: () =>
+                  setState(() => _ledgerWiseExpanded = !_ledgerWiseExpanded),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLedgerRow({
+    required String name,
+    required String group,
+    required double amount,
+    required int days,
+    required Color avatarColor,
+  }) {
+    final dc = _daysColor(days);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: avatarColor.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Center(
+              child: Text(
+                name.isNotEmpty ? name[0].toUpperCase() : '?',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: avatarColor,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  style: AppTypography.itemTitle.copyWith(fontSize: 13),
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  group,
+                  style: AppTypography.itemSubtitle.copyWith(fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '₹${AmountFormatter.shortSpaced(amount)}',
+                style: AppTypography.itemTitle.copyWith(fontSize: 13),
+              ),
+              const SizedBox(height: 4),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: dc.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  '${days}d',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: dc,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Group Wise Outstanding card
+  Widget _buildGroupWiseOutstandingCard() {
+    final groups = _isReceivable ? _receivableGroups : _payableGroups;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        boxShadow: AppShadows.card,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'GROUP WISE OUTSTANDING',
+            style: AppTypography.cardLabel,
+          ),
+          const SizedBox(height: 16),
+          for (var i = 0; i < groups.length; i++) ...[
+            _buildGroupRow(groups[i]),
+            if (i < groups.length - 1)
+              Divider(height: 1, thickness: 0.5, color: Colors.grey.shade200),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGroupRow(GroupOutstanding group) {
+    final groupColor = _isReceivable ? AppColors.purple : AppColors.red;
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => GroupOutstandingDetailScreen(
+              group: group,
+              isReceivable: _isReceivable,
+            ),
+          ),
+        );
+      },
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Dot
+            Padding(
+              padding: const EdgeInsets.only(top: 5),
+              child: Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: groupColor,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            // Content
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Group name + Amount & chevron
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          group.groupName,
+                          style: AppTypography.itemTitle.copyWith(
+                              fontSize: 14, fontWeight: FontWeight.w600),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '₹${AmountFormatter.shortSpaced(group.amount)}',
+                        style: AppTypography.itemTitle.copyWith(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(
+                        Icons.chevron_right,
+                        size: 18,
+                        color: AppColors.textSecondary,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  // Party count + percentage
+                  Row(
+                    children: [
+                      Text(
+                        '${group.partyCount} parties',
+                        style:
+                            AppTypography.itemSubtitle.copyWith(fontSize: 12),
+                      ),
+                      const Spacer(),
+                      Text(
+                        '${group.percentage.toStringAsFixed(1)}%',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: groupColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  // Progress bar
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(2),
+                    child: SizedBox(
+                      height: 4,
+                      child: LinearProgressIndicator(
+                        value: group.percentage / 100,
+                        backgroundColor: Colors.grey.shade100,
+                        valueColor: AlwaysStoppedAnimation<Color>(groupColor),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSeeMoreButton({
+    required bool expanded,
+    required int totalCount,
+    required VoidCallback onTap,
+  }) {
+    final remaining = totalCount - _initialItemCount;
+    return GestureDetector(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.only(top: 12),
+        child: Center(
+          child: Text(
+            expanded ? 'See Less' : 'See More ($remaining more)',
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppColors.blue,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
 
-// ── Data model ─────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+//  Days filter pills
+// ─────────────────────────────────────────────────────────────────────────────
 
-class _PartyRow {
-  final String name;
-  final double amount;
-  final int daysOver;
-  const _PartyRow({
-    required this.name,
-    required this.amount,
-    required this.daysOver,
+class _OutstandingDaysFilterPills extends StatelessWidget {
+  final int? selectedDays;
+  final ValueChanged<int?> onChanged;
+  final VoidCallback onCustomTap;
+  final int? customValue;
+  final Color accentColor;
+
+  const _OutstandingDaysFilterPills({
+    required this.selectedDays,
+    required this.onChanged,
+    required this.onCustomTap,
+    required this.accentColor,
+    this.customValue,
   });
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      children: [
+        _buildPill('All', null),
+        _buildPill('30+', 30),
+        _buildPill('60+', 60),
+        _buildPill('90+', 90),
+        _buildCustomPill(),
+      ],
+    );
+  }
+
+  Widget _buildPill(String label, int? days) {
+    final isActive =
+        (days == null && selectedDays == null && customValue == null) ||
+            (days != null && selectedDays == days && customValue == null);
+    return GestureDetector(
+      onTap: () => onChanged(days),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isActive ? accentColor : accentColor.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(20),
+          border: isActive
+              ? null
+              : Border.all(color: accentColor.withValues(alpha: 0.25)),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: isActive ? Colors.white : accentColor,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCustomPill() {
+    final isActive = customValue != null && selectedDays == customValue;
+    return GestureDetector(
+      onTap: onCustomTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isActive ? accentColor : accentColor.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(20),
+          border: isActive
+              ? null
+              : Border.all(color: accentColor.withValues(alpha: 0.25)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              isActive ? '${customValue}+' : 'Custom',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: isActive ? Colors.white : accentColor,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(
+              Icons.arrow_drop_down,
+              size: 16,
+              color: isActive ? Colors.white : accentColor,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

@@ -141,10 +141,140 @@ import 'screens/Analysis/analysis_home_screen.dart';
 import 'screens/mobile/reports_overview_screen.dart';
 import 'screens/mobile/mobile_profile_tab.dart';
 import 'screens/theme/app_theme.dart';
+import 'ai/di/ai_dependencies.dart';
+import 'config/api_config.dart';
+import './ai/config/ai_endpoints.dart';
+import 'utils/date_utils.dart' as app_date;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await AuthService.init();
+  AiDependencies.apiBaseUrl = ApiConfig.baseUrl;
+  AiDependencies.databaseProvider = () => DatabaseHelper.instance.database;
+  AiDependencies.claudeApiKey = AiConfig.claudeApiKey;
+  AiDependencies.huggingFaceApiKey = AiConfig.huggingFaceApiKey;
+  AiDependencies.openRouterApiKey = AiConfig.openRouterApiKey;
+  AiDependencies.glm5ApiKey = AiConfig.glm5ApiKey;
+
+  // FY start date getter: converts a YYYYMMDD date to its FY start date
+  AiDependencies.fyStartDateGetter = (String dateStr) {
+    final date = app_date.stringToDate(dateStr);
+    return app_date.getFyStartDateString(date);
+  };
+
+  // Stock valuation calculator: reads pre-calculated closing stock from DB
+  // Uses latest available closing_date <= target date (stock_item_closing_balance
+  // stores month-end snapshots, not every day)
+  AiDependencies.stockValuationCalculator = ({
+    required String companyGuid,
+    required String fromDate,
+    required String toDate,
+  }) async {
+    final db = await DatabaseHelper.instance.database;
+
+    // Find the latest available closing date <= toDate
+    final closingDateRow = await db.rawQuery('''
+      SELECT MAX(closing_date) as best_date
+      FROM stock_item_closing_balance
+      WHERE company_guid = ? AND closing_date <= ?
+    ''', [companyGuid, toDate]);
+    final closingDate = closingDateRow.first['best_date'] as String?;
+
+    // Debug: check available dates
+    final availableDates = await db.rawQuery('''
+      SELECT DISTINCT closing_date, COUNT(*) as cnt
+      FROM stock_item_closing_balance
+      WHERE company_guid = ?
+      GROUP BY closing_date ORDER BY closing_date DESC LIMIT 5
+    ''', [companyGuid]);
+    debugPrint('[STOCK CALC] Available dates: $availableDates');
+    debugPrint('[STOCK CALC] Target: $toDate, Best match: $closingDate');
+
+    // Find the latest available closing date <= fromDate (for opening stock)
+    final openingDateRow = await db.rawQuery('''
+      SELECT MAX(closing_date) as best_date
+      FROM stock_item_closing_balance
+      WHERE company_guid = ? AND closing_date <= ?
+    ''', [companyGuid, fromDate]);
+    final openingDate = openingDateRow.first['best_date'] as String?;
+
+    // Fetch closing stock items
+    final rows = await db.rawQuery('''
+      SELECT
+        si.name as item_name,
+        si.stock_item_guid,
+        COALESCE(si.costing_method, 'Avg. Cost') as costing_method,
+        COALESCE(si.base_units, '') as unit,
+        COALESCE(si.parent, '') as parent_name,
+        COALESCE(cb.closing_balance, 0.0) as closing_qty,
+        COALESCE(cb.closing_value, 0.0) as closing_value,
+        COALESCE(cb.closing_rate, 0.0) as closing_rate
+      FROM stock_items si
+      INNER JOIN (
+        SELECT DISTINCT stock_item_guid FROM stock_item_batch_allocation
+        UNION
+        SELECT DISTINCT stock_item_guid FROM voucher_inventory_entries WHERE company_guid = ?
+      ) active ON active.stock_item_guid = si.stock_item_guid
+      LEFT JOIN stock_item_closing_balance cb
+        ON cb.stock_item_guid = si.stock_item_guid
+        AND cb.company_guid = ?
+        AND cb.closing_date = ?
+      WHERE si.company_guid = ?
+        AND si.is_deleted = 0
+      ORDER BY si.name ASC
+    ''', [companyGuid, companyGuid, closingDate ?? '', companyGuid]);
+
+    double totalClosing = 0.0;
+    final detailed = <AiStockItemResult>[];
+
+    for (final row in rows) {
+      final closingQty = (row['closing_qty'] as num?)?.toDouble() ?? 0.0;
+      final closingValue = (row['closing_value'] as num?)?.toDouble() ?? 0.0;
+      final closingRate = (row['closing_rate'] as num?)?.toDouble() ?? 0.0;
+      totalClosing += closingValue;
+
+      detailed.add(AiStockItemResult(
+        itemName: row['item_name'] as String,
+        stockGroup: row['parent_name'] as String? ?? '',
+        unit: row['unit'] as String? ?? '',
+        godowns: {
+          'Main Location': AiGodownCost(
+            godownName: 'Main Location',
+            currentStockQty: closingQty,
+            closingValue: closingValue,
+            averageRate: closingRate,
+          ),
+        },
+      ));
+    }
+
+    // Opening stock
+    final openingRows = await db.rawQuery('''
+      SELECT COALESCE(SUM(cb.closing_value), 0.0) as total_opening
+      FROM stock_items si
+      INNER JOIN (
+        SELECT DISTINCT stock_item_guid FROM stock_item_batch_allocation
+        UNION
+        SELECT DISTINCT stock_item_guid FROM voucher_inventory_entries WHERE company_guid = ?
+      ) active ON active.stock_item_guid = si.stock_item_guid
+      LEFT JOIN stock_item_closing_balance cb
+        ON cb.stock_item_guid = si.stock_item_guid
+        AND cb.company_guid = ?
+        AND cb.closing_date = ?
+      WHERE si.company_guid = ?
+        AND si.is_deleted = 0
+    ''', [companyGuid, companyGuid, openingDate ?? '', companyGuid]);
+
+    final totalOpening = (openingRows.first['total_opening'] as num?)?.toDouble() ?? 0.0;
+
+    return AiStockValuationResult(
+      openingStockValue: totalOpening,
+      closingStockValue: totalClosing,
+      itemCount: detailed.length,
+      detailedResults: detailed,
+    );
+  };
+
   runApp(const MyApp());
 }
 

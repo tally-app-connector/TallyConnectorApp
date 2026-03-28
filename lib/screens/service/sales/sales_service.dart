@@ -15,14 +15,9 @@ class SalesAnalyticsService {
   Future<Map<String, String>> _getCompanyDates() async {
     final company = await _db.getSelectedCompanyByGuid();
     return {
-          'from': '20250401',
-          'to': '20260331',
-        };
-    
-    // return {
-    //   'from': (company?['starting_from'] as String? ?? '20250401').replaceAll('-', ''),
-    //   'to': (company?['ending_at'] as String? ?? '20260331').replaceAll('-', ''),
-    // };
+      'from': (company?['starting_from'] as String? ?? '20250401').replaceAll('-', ''),
+      'to': (company?['ending_at'] as String? ?? '20260331').replaceAll('-', ''),
+    };
   }
 
   // ── Helper: wrap a double into a ReportValue ─────────────────
@@ -44,73 +39,79 @@ class SalesAnalyticsService {
   // ══════════════════════════════════════════════════════════════════
 
   Future<ReportValue> getTotalSales({
-    required String companyGuid,    
+    required String companyGuid,
+    String? fromDate,
+    String? toDate,
   }) async {
     final dates = await _getCompanyDates();
-    final from = dates['from']!;
-    final to = dates['to']!;
+    final from = fromDate ?? dates['from']!;
+    final to = toDate ?? dates['to']!;
     final v = await _getNetSales(companyGuid, from, to);
     return _toReportValue(v, 'Net Sales');
   }
 
   Future<ReportValue> getTotalPurchase({
     required String companyGuid,
-    
-    
+    String? fromDate,
+    String? toDate,
   }) async {
     final dates = await _getCompanyDates();
-    final from = dates['from']!;
-    final to = dates['to']!;
+    final from = fromDate ?? dates['from']!;
+    final to = toDate ?? dates['to']!;
     final v = await _getNetPurchase(companyGuid, from, to);
     return _toReportValue(v, 'Net Purchase');
   }
 
   Future<ReportValue> getTotalProfit({
     required String companyGuid,
-    
-    
+    String? fromDate,
+    String? toDate,
   }) async {
     final dates = await _getCompanyDates();
-    final from = dates['from']!;
-    final to = dates['to']!;
-    final sales = await _getNetSales(companyGuid, from, to);
-    final purchase = await _getNetPurchase(companyGuid, from, to);
-    return _toReportValue(sales - purchase, 'Gross Profit');
+    final from = fromDate ?? dates['from']!;
+    final to = toDate ?? dates['to']!;
+    final results = await Future.wait([
+      _getNetSales(companyGuid, from, to),
+      _getNetPurchase(companyGuid, from, to),
+    ]);
+    // OLD: return _toReportValue(results[0] - results[1], 'Gross Profit');
+    // FIX: use .abs() consistently (matches getRevenueExpenseProfit)
+    return _toReportValue(results[0].abs() - results[1].abs(), 'Gross Profit');
   }
 
   Future<ReportValue> getTotalReceivable({
     required String companyGuid,
-    
-    
+    String? fromDate,
+    String? toDate,
   }) async {
     final dates = await _getCompanyDates();
-    final from = dates['from']!;
-    final to = dates['to']!;
+    final from = fromDate ?? dates['from']!;
+    final to = toDate ?? dates['to']!;
     final v = await _getReceivables(companyGuid, from, to);
     return _toReportValue(v, 'Receivables');
   }
 
   Future<ReportValue> getTotalPayable({
     required String companyGuid,
-    
-    
+    String? fromDate,
+    String? toDate,
   }) async {
     final dates = await _getCompanyDates();
-    final from = dates['from']!;
-    final to = dates['to']!;
+    final from = fromDate ?? dates['from']!;
+    final to = toDate ?? dates['to']!;
     final v = await _getPayables(companyGuid, from, to);
     return _toReportValue(v, 'Payables');
   }
 
   Future<ReportValue> getTotalGST({
     required String companyGuid,
-    
-    
+    String? fromDate,
+    String? toDate,
   }) async {
     // GST = sum of gst_amount from voucher_inventory_entries for sales vouchers
     final dates = await _getCompanyDates();
-    final from = dates['from']!;
-    final to = dates['to']!;
+    final from = fromDate ?? dates['from']!;
+    final to = toDate ?? dates['to']!;
     try {
       final db = await _db.database;
 
@@ -141,24 +142,24 @@ class SalesAnalyticsService {
 
   Future<ReportValue> getTotalReceipts({
     required String companyGuid,
-    
-    
+    String? fromDate,
+    String? toDate,
   }) async {
     final dates = await _getCompanyDates();
-    final from = dates['from']!;
-    final to = dates['to']!;
+    final from = fromDate ?? dates['from']!;
+    final to = toDate ?? dates['to']!;
     final v = await _getReceipts(companyGuid, from, to);
     return _toReportValue(v, 'Receipts');
   }
 
   Future<ReportValue> getTotalPayments({
     required String companyGuid,
-    
-    
+    String? fromDate,
+    String? toDate,
   }) async {
     final dates = await _getCompanyDates();
-    final from = dates['from']!;
-    final to = dates['to']!;
+    final from = fromDate ?? dates['from']!;
+    final to = toDate ?? dates['to']!;
     final v = await _getPayments(companyGuid, from, to);
     return _toReportValue(v, 'Payments');
   }
@@ -299,29 +300,42 @@ class SalesAnalyticsService {
         WHERE g.company_guid = ?
           AND g.is_deleted = 0
       )
-      SELECT 
-        COUNT(*) as vouchers,
-        SUM(debit_amount) as debit_total,
-        SUM(credit_amount) as credit_total,
-        SUM(net_amount) as net_purchase
-      FROM (
-        SELECT
-          SUM(CASE WHEN vle.amount < 0 THEN ABS(vle.amount) ELSE 0 END) as debit_amount,
-          SUM(CASE WHEN vle.amount > 0 THEN vle.amount ELSE 0 END) as credit_amount,
-          (SUM(CASE WHEN vle.amount < 0 THEN ABS(vle.amount) ELSE 0 END) - 
-           SUM(CASE WHEN vle.amount > 0 THEN vle.amount ELSE 0 END)) as net_amount
-        FROM vouchers v
-        INNER JOIN voucher_ledger_entries vle ON vle.voucher_guid = v.voucher_guid
-        INNER JOIN ledgers l ON l.name = vle.ledger_name AND l.company_guid = v.company_guid
-        INNER JOIN group_tree gt ON l.parent = gt.name
-        WHERE v.company_guid = ?
-          AND v.is_deleted = 0
-          AND v.is_cancelled = 0
-          AND v.is_optional = 0
-          AND v.date >= ?
-          AND v.date <= ?
-        GROUP BY v.voucher_guid
-      ) voucher_totals
+      -- OLD: used raw amount sign (ignores is_deemed_positive for debit notes/purchase returns)
+      -- SELECT COUNT(*) as vouchers,
+      --   SUM(debit_amount) as debit_total, SUM(credit_amount) as credit_total, SUM(net_amount) as net_purchase
+      -- FROM (
+      --   SELECT
+      --     SUM(CASE WHEN vle.amount < 0 THEN ABS(vle.amount) ELSE 0 END) as debit_amount,
+      --     SUM(CASE WHEN vle.amount > 0 THEN vle.amount ELSE 0 END) as credit_amount,
+      --     (SUM(CASE WHEN vle.amount < 0 THEN ABS(vle.amount) ELSE 0 END) -
+      --      SUM(CASE WHEN vle.amount > 0 THEN vle.amount ELSE 0 END)) as net_amount
+      --   FROM vouchers v
+      --   INNER JOIN voucher_ledger_entries vle ON vle.voucher_guid = v.voucher_guid
+      --   INNER JOIN ledgers l ON l.name = vle.ledger_name AND l.company_guid = v.company_guid
+      --   INNER JOIN group_tree gt ON l.parent = gt.name
+      --   WHERE v.company_guid = ? AND v.is_deleted = 0 AND v.is_cancelled = 0
+      --     AND v.is_optional = 0 AND v.date >= ? AND v.date <= ?
+      --   GROUP BY v.voucher_guid
+      -- ) voucher_totals
+      -- FIX: use is_deemed_positive to match sales query pattern
+      SELECT
+        SUM(CASE WHEN vle.is_deemed_positive = 1 THEN ABS(vle.amount) ELSE 0 END) as debit_total,
+        SUM(CASE WHEN vle.is_deemed_positive = 0 THEN ABS(vle.amount) ELSE 0 END) as credit_total,
+        SUM(CASE
+          WHEN vle.is_deemed_positive = 1 THEN ABS(vle.amount)
+          ELSE -ABS(vle.amount)
+        END) as net_purchase,
+        COUNT(DISTINCT v.voucher_guid) as vouchers
+      FROM voucher_ledger_entries vle
+      INNER JOIN vouchers v ON v.voucher_guid = vle.voucher_guid
+      INNER JOIN ledgers l ON l.name = vle.ledger_name AND l.company_guid = v.company_guid
+      INNER JOIN group_tree gt ON l.parent_guid = gt.group_guid
+      WHERE v.company_guid = ?
+        AND v.is_deleted = 0
+        AND v.is_cancelled = 0
+        AND v.is_optional = 0
+        AND v.date >= ?
+        AND v.date <= ?
     ''', [companyGuid, companyGuid, companyGuid, fromDate, toDate]);
 
     final debitTotal =
@@ -335,6 +349,60 @@ class SalesAnalyticsService {
       return netPurchase;
     } catch (_) {
       return 0.0;
+    }
+  }
+
+  /// Returns purchase amounts grouped by ledger name (category).
+  /// Each entry: { 'ledger_name': String, 'net_amount': double }
+  Future<List<Map<String, dynamic>>> getPurchaseByCategory({
+    required String companyGuid,
+    required String fromDate,
+    required String toDate,
+  }) async {
+    try {
+      final db = await _db.database;
+      final result = await db.rawQuery('''
+        WITH RECURSIVE group_tree AS (
+          SELECT group_guid, name
+          FROM groups
+          WHERE company_guid = ?
+            AND reserved_name = 'Purchase Accounts'
+            AND is_deleted = 0
+
+          UNION ALL
+
+          SELECT g.group_guid, g.name
+          FROM groups g
+          INNER JOIN group_tree gt ON g.parent_guid = gt.group_guid
+          WHERE g.company_guid = ?
+            AND g.is_deleted = 0
+        )
+        SELECT
+          vle.ledger_name,
+          SUM(CASE WHEN vle.amount < 0 THEN ABS(vle.amount) ELSE 0 END) -
+          SUM(CASE WHEN vle.amount > 0 THEN vle.amount ELSE 0 END) as net_amount
+        FROM vouchers v
+        INNER JOIN voucher_ledger_entries vle ON vle.voucher_guid = v.voucher_guid
+        INNER JOIN ledgers l ON l.name = vle.ledger_name AND l.company_guid = v.company_guid
+        INNER JOIN group_tree gt ON l.parent = gt.name
+        WHERE v.company_guid = ?
+          AND v.is_deleted = 0
+          AND v.is_cancelled = 0
+          AND v.is_optional = 0
+          AND v.date >= ?
+          AND v.date <= ?
+        GROUP BY vle.ledger_name
+        HAVING net_amount > 0
+        ORDER BY net_amount DESC
+      ''', [companyGuid, companyGuid, companyGuid, fromDate, toDate]);
+
+      return result.map((row) => {
+        'ledger_name': row['ledger_name'] as String,
+        'net_amount': (row['net_amount'] as num?)?.toDouble() ?? 0.0,
+      }).toList();
+    } catch (e) {
+      debugPrint('Error fetching purchase categories: $e');
+      return [];
     }
   }
 
@@ -618,10 +686,12 @@ Future<ReportChartData> getSalesTrend({
   required String companyGuid,
   ReportChartType? chartType,
   ChartPeriod? period,
+  String? fromDate,
+  String? toDate,
 }) async {
   final dates = await _getCompanyDates();
-  final from = dates['from']!;
-  final to = dates['to']!;
+  final from = fromDate ?? dates['from']!;
+  final to = toDate ?? dates['to']!;
   try {
     final db = await _db.database;
     final rows = await db.rawQuery('''
@@ -673,10 +743,12 @@ Future<ReportChartData> getPurchaseTrend({
   required String companyGuid,
   ReportChartType? chartType,
   ChartPeriod? period,
+  String? fromDate,
+  String? toDate,
 }) async {
   final dates = await _getCompanyDates();
-  final from = dates['from']!;
-  final to = dates['to']!;
+  final from = fromDate ?? dates['from']!;
+  final to = toDate ?? dates['to']!;
   try {
     final db = await _db.database;
     final rows = await db.rawQuery('''
@@ -728,9 +800,15 @@ Future<ReportChartData> getProfitTrend({
   required String companyGuid,
   ReportChartType? chartType,
   ChartPeriod? period,
+  String? fromDate,
+  String? toDate,
 }) async {
-  final sales = await getSalesTrend(companyGuid: companyGuid, chartType: chartType);
-  final purchase = await getPurchaseTrend(companyGuid: companyGuid, chartType: chartType);
+  final results = await Future.wait([
+    getSalesTrend(companyGuid: companyGuid, chartType: chartType, fromDate: fromDate, toDate: toDate),
+    getPurchaseTrend(companyGuid: companyGuid, chartType: chartType, fromDate: fromDate, toDate: toDate),
+  ]);
+  final sales = results[0];
+  final purchase = results[1];
   final points = <ChartDataPoint>[];
   for (var i = 0; i < sales.dataPoints.length; i++) {
     final pVal = i < purchase.dataPoints.length
@@ -753,10 +831,12 @@ Future<ReportChartData> getGSTTrend({
   required String companyGuid,
   ReportChartType? chartType,
   ChartPeriod? period,
+  String? fromDate,
+  String? toDate,
 }) async {
   final dates = await _getCompanyDates();
-  final from = dates['from']!;
-  final to = dates['to']!;
+  final from = fromDate ?? dates['from']!;
+  final to = toDate ?? dates['to']!;
   try {
     final db = await _db.database;
 
@@ -806,10 +886,12 @@ Future<ReportChartData> getReceiptsTrend({
   required String companyGuid,
   ReportChartType? chartType,
   ChartPeriod? period,
+  String? fromDate,
+  String? toDate,
 }) async {
   final dates = await _getCompanyDates();
-  final from = dates['from']!;
-  final to = dates['to']!;
+  final from = fromDate ?? dates['from']!;
+  final to = toDate ?? dates['to']!;
   try {
     final db = await _db.database;
     final rows = await db.rawQuery('''
@@ -847,10 +929,12 @@ Future<ReportChartData> getPaymentsTrend({
   required String companyGuid,
   ReportChartType? chartType,
   ChartPeriod? period,
+  String? fromDate,
+  String? toDate,
 }) async {
   final dates = await _getCompanyDates();
-  final from = dates['from']!;
-  final to = dates['to']!;
+  final from = fromDate ?? dates['from']!;
+  final to = toDate ?? dates['to']!;
   try {
     final db = await _db.database;
     final rows = await db.rawQuery('''
@@ -888,10 +972,12 @@ Future<ReportChartData> getReceivableChart({
   required String companyGuid,
   ReportChartType? chartType,
   ChartPeriod? period,
+  String? fromDate,
+  String? toDate,
 }) async {
   final dates = await _getCompanyDates();
-  final from = dates['from']!;
-  final to = dates['to']!;
+  final from = fromDate ?? dates['from']!;
+  final to = toDate ?? dates['to']!;
   try {
     final db = await _db.database;
     final rows = await db.rawQuery('''
@@ -944,10 +1030,12 @@ Future<ReportChartData> getPayableChart({
   required String companyGuid,
   ReportChartType? chartType,
   ChartPeriod? period,
+  String? fromDate,
+  String? toDate,
 }) async {
   final dates = await _getCompanyDates();
-  final from = dates['from']!;
-  final to = dates['to']!;
+  final from = fromDate ?? dates['from']!;
+  final to = toDate ?? dates['to']!;
   try {
     final db = await _db.database;
     final rows = await db.rawQuery('''
@@ -1047,12 +1135,16 @@ Future<ReportChartData> getStockChart({
 
   Future<SalesPurchaseChartData> getSalesPurchaseTrend({
     required String companyGuid,
-    
-    
     ChartPeriod? period,
+    String? fromDate,
+    String? toDate,
   }) async {
-    final sales = await getSalesTrend(companyGuid: companyGuid,  );
-    final purchase = await getPurchaseTrend(companyGuid: companyGuid,  );
+    final results = await Future.wait([
+      getSalesTrend(companyGuid: companyGuid, fromDate: fromDate, toDate: toDate),
+      getPurchaseTrend(companyGuid: companyGuid, fromDate: fromDate, toDate: toDate),
+    ]);
+    final sales = results[0];
+    final purchase = results[1];
     final points = <SalesPurchaseDataPoint>[];
     for (var i = 0; i < sales.dataPoints.length; i++) {
       final pVal = i < purchase.dataPoints.length ? purchase.dataPoints[i].value : 0.0;
@@ -1067,18 +1159,24 @@ Future<ReportChartData> getStockChart({
 
   Future<RevenueExpenseProfitData> getRevenueExpenseProfit({
     required String companyGuid,
-    
-    
+    String? fromDate,
+    String? toDate,
   }) async {
     final dates = await _getCompanyDates();
-    final from = dates['from']!;
-    final to = dates['to']!;
-    final sales = await _getNetSales(companyGuid, from, to);
-    final purchase = await _getNetPurchase(companyGuid, from, to);
+    final from = fromDate ?? dates['from']!;
+    final to = toDate ?? dates['to']!;
+    final results = await Future.wait([
+      _getNetSales(companyGuid, from, to),
+      _getNetPurchase(companyGuid, from, to),
+    ]);
+    final sales = results[0].abs();
+    final purchase = results[1].abs();
+    final profit = sales - purchase;
+    debugPrint('[RevExpProfit] sales=$sales purchase=$purchase profit=$profit');
     return RevenueExpenseProfitData(
       revenue: sales,
       expense: purchase,
-      profit: sales - purchase,
+      profit: profit,
     );
   }
 
@@ -1089,24 +1187,26 @@ Future<ReportChartData> getStockChart({
   Future<ReportValue> getReportValueForMetric(
     ReportMetric metric, {
     required String companyGuid,
+    String? fromDate,
+    String? toDate,
   }) async {
     switch (metric) {
       case ReportMetric.sales:
-        return getTotalSales(companyGuid: companyGuid);
+        return getTotalSales(companyGuid: companyGuid, fromDate: fromDate, toDate: toDate);
       case ReportMetric.purchase:
-        return getTotalPurchase(companyGuid: companyGuid);
+        return getTotalPurchase(companyGuid: companyGuid, fromDate: fromDate, toDate: toDate);
       case ReportMetric.profit:
-        return getTotalProfit(companyGuid: companyGuid);
+        return getTotalProfit(companyGuid: companyGuid, fromDate: fromDate, toDate: toDate);
       case ReportMetric.receivable:
-        return getTotalReceivable(companyGuid: companyGuid);
+        return getTotalReceivable(companyGuid: companyGuid, fromDate: fromDate, toDate: toDate);
       case ReportMetric.payable:
-        return getTotalPayable(companyGuid: companyGuid);
+        return getTotalPayable(companyGuid: companyGuid, fromDate: fromDate, toDate: toDate);
       case ReportMetric.receipts:
-        return getTotalReceipts(companyGuid: companyGuid);
+        return getTotalReceipts(companyGuid: companyGuid, fromDate: fromDate, toDate: toDate);
       case ReportMetric.payments:
-        return getTotalPayments(companyGuid: companyGuid);
+        return getTotalPayments(companyGuid: companyGuid, fromDate: fromDate, toDate: toDate);
       case ReportMetric.gst:
-        return getTotalGST(companyGuid: companyGuid);
+        return getTotalGST(companyGuid: companyGuid, fromDate: fromDate, toDate: toDate);
       case ReportMetric.stock:
         return getTotalStock(companyGuid: companyGuid);
     }
@@ -1120,10 +1220,12 @@ Future<List<TopSellingItem>> getTopItems(
   ReportMetric metric, {
   required String companyGuid,
   int limit = 10,
+  String? fromDate,
+  String? toDate,
 }) async {
   final dates = await _getCompanyDates();
-  final from = dates['from']!;
-  final to = dates['to']!;
+  final from = fromDate ?? dates['from']!;
+  final to = toDate ?? dates['to']!;
   try {
     final db = await _db.database;
     List<Map<String, Object?>> rows;
@@ -1356,7 +1458,11 @@ Future<List<TopSellingItem>> getTopItems(
   //  OUTSTANDING HELPERS
   // ══════════════════════════════════════════════════════════════════
 
-  Future<List<CreditLimitParty>> getCreditLimitExceeded({required String companyGuid}) async {
+  Future<List<CreditLimitParty>> getCreditLimitExceeded({
+    required String companyGuid,
+    String? fromDate,
+    String? toDate,
+  }) async {
     try {
       final db = await _db.database;
       final dates = await _getCompanyDates();
@@ -1386,7 +1492,7 @@ Future<List<TopSellingItem>> getTopItems(
         GROUP BY l.name, l.opening_balance, l.credit_limit
         HAVING outstanding > l.credit_limit
         ORDER BY outstanding DESC
-      ''', [companyGuid, companyGuid, dates['from'], dates['to'], companyGuid]);
+      ''', [companyGuid, companyGuid, fromDate ?? dates['from'], toDate ?? dates['to'], companyGuid]);
       return rows.map((r) {
         final balance = (r['outstanding'] as num?)?.toDouble() ?? 0;
         final limit = (r['credit_limit'] as num?)?.toDouble() ?? 0;
@@ -1402,7 +1508,11 @@ Future<List<TopSellingItem>> getTopItems(
     }
   }
 
-  Future<List<PaymentDueParty>> getPaymentDueParties({required String companyGuid}) async {
+  Future<List<PaymentDueParty>> getPaymentDueParties({
+    required String companyGuid,
+    String? fromDate,
+    String? toDate,
+  }) async {
     try {
       final db = await _db.database;
       final dates = await _getCompanyDates();
@@ -1432,7 +1542,7 @@ Future<List<TopSellingItem>> getTopItems(
         GROUP BY l.name, l.opening_balance
         HAVING outstanding > 0
         ORDER BY outstanding DESC LIMIT 20
-      ''', [companyGuid, companyGuid, dates['from'], dates['to'], companyGuid]);
+      ''', [companyGuid, companyGuid, fromDate ?? dates['from'], toDate ?? dates['to'], companyGuid]);
       final now = DateTime.now();
       return rows.map((r) {
         final balance = (r['outstanding'] as num?)?.toDouble() ?? 0;
@@ -1949,11 +2059,23 @@ Future<List<TopSellingItem>> getTopItems(
       ''', [companyGuid, parentGroupName, parentGroupName, companyGuid,
             fromDate, toDate, companyGuid, companyGuid]);
 
-      return rows.map((r) => GroupOutstanding(
+      final groups = rows.map((r) => GroupOutstanding(
         groupName: r['group_name']?.toString() ?? parentGroupName,
         amount: (r['total_amount'] as num?)?.toDouble() ?? 0,
         partyCount: (r['party_count'] as int?) ?? 0,
       )).toList();
+
+      // Calculate percentage as each group's share of total
+      final totalAmount = groups.fold<double>(0, (sum, g) => sum + g.amount);
+      if (totalAmount > 0) {
+        return groups.map((g) => GroupOutstanding(
+          groupName: g.groupName,
+          amount: g.amount,
+          partyCount: g.partyCount,
+          percentage: (g.amount / totalAmount) * 100,
+        )).toList();
+      }
+      return groups;
     } catch (_) {
       return [];
     }

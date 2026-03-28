@@ -1,13 +1,13 @@
 class AmountFormatter {
   static Map<String, String> format(double amount) {
     final abs = amount.abs();
-    // if (abs >= 10000000) {
-    //   return {'value': (abs / 10000000).toStringAsFixed(2), 'unit': 'Cr'};
-    // } else if (abs >= 100000) {
-    //   return {'value': (abs / 100000).toStringAsFixed(2), 'unit': 'L'};
-    // } else if (abs >= 1000) {
-    //   return {'value': (abs / 1000).toStringAsFixed(1), 'unit': 'K'};
-    // }
+    if (abs >= 10000000) {
+      return {'value': (abs / 10000000).toStringAsFixed(2), 'unit': 'Cr'};
+    } else if (abs >= 100000) {
+      return {'value': (abs / 100000).toStringAsFixed(2), 'unit': 'L'};
+    } else if (abs >= 1000) {
+      return {'value': (abs / 1000).toStringAsFixed(1), 'unit': 'K'};
+    }
     return {'value': abs.toStringAsFixed(0), 'unit': ''};
   }
 
@@ -21,6 +21,29 @@ class AmountFormatter {
     final f = format(amount);
     final unit = f['unit']!;
     return unit.isEmpty ? f['value']! : '${f['value']} $unit';
+  }
+
+  /// "₹12.45 Cr" — with rupee sign, handles negative
+  static String currencyShort(double amount) {
+    final neg = amount < 0;
+    final f = format(amount);
+    final unit = f['unit']!;
+    final prefix = neg ? '-₹' : '₹';
+    return unit.isEmpty ? '$prefix${f['value']}' : '$prefix${f['value']} $unit';
+  }
+
+  /// "12.45 Cr" or "-12.45 Cr" — no rupee sign, handles negative
+  static String shortSigned(double amount) {
+    final neg = amount < 0;
+    final f = format(amount);
+    final unit = f['unit']!;
+    final prefix = neg ? '-' : '';
+    return unit.isEmpty ? '$prefix${f['value']}' : '$prefix${f['value']} $unit';
+  }
+
+  /// "₹1,23,456.78" — full Indian format with rupee sign
+  static String currencyIndian(double amount) {
+    return '₹${formatIndian(amount)}';
   }
 
   static double unitMultiplier(String unit) {

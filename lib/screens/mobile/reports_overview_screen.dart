@@ -207,6 +207,7 @@ import '../service/sales/sales_service.dart';
 import '../main.dart';
 import 'metric_detail_screen.dart';
 import 'outstanding_detail_screen.dart';
+import 'Recevaible_screen.dart';
 
 class ReportsOverviewScreen extends StatefulWidget {
   const ReportsOverviewScreen({super.key});
@@ -224,6 +225,8 @@ class _ReportsOverviewScreenState extends State<ReportsOverviewScreen>
   String? _companyGuid;
   final Map<ReportMetric, ReportValue> _metricValues = {};
   bool _isLoading = true;
+  String? _errorMessage;
+  int _loadGeneration = 0; // cancellation token for in-flight loads
 
   // Which metrics have finished loading individually
   final Set<ReportMetric> _loadedMetrics = {};
@@ -242,6 +245,7 @@ class _ReportsOverviewScreenState extends State<ReportsOverviewScreen>
 
   @override
   void dispose() {
+    _loadGeneration++; // cancel any in-flight loads
     _searchController.dispose();
     _fadeCtrl.dispose();
     super.dispose();
@@ -250,37 +254,63 @@ class _ReportsOverviewScreenState extends State<ReportsOverviewScreen>
   // ── Data ───────────────────────────────────────────────────────────────────
 
   Future<void> _loadCompanyAndData() async {
-    if (mounted) setState(() { _isLoading = true; _loadedMetrics.clear(); });
+    final gen = ++_loadGeneration; // cancel any previous in-flight load
+
+    if (mounted) setState(() { _isLoading = true; _loadedMetrics.clear(); _errorMessage = null; });
 
     _companyGuid = AppState.selectedCompany?.guid;
 
     if (_companyGuid == null) {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) setState(() { _isLoading = false; _errorMessage = 'No company selected. Please sync your data first.'; });
       return;
     }
 
     try {
-      // Load each metric individually so cards appear progressively
-      for (final metric in ReportMetric.values) {
-        final value = await _salesService.getReportValueForMetric(
-          metric,
-          companyGuid: _companyGuid!,
-        );
-        if (!mounted) return;
+      // Load metrics in small batches (3 at a time) to avoid SQLite lock contention
+      final metrics = ReportMetric.values.toList();
+      const batchSize = 3;
+
+      for (var i = 0; i < metrics.length; i += batchSize) {
+        if (!mounted || gen != _loadGeneration) return;
+
+        final batch = metrics.skip(i).take(batchSize);
+        final results = <ReportMetric, ReportValue>{};
+
+        await Future.wait(batch.map((metric) async {
+          try {
+            final value = await _salesService.getReportValueForMetric(
+              metric,
+              companyGuid: _companyGuid!,
+            );
+            if (gen == _loadGeneration) results[metric] = value;
+          } catch (e) {
+            debugPrint('Error loading metric ${metric.name}: $e');
+          }
+        }));
+
+        if (!mounted || gen != _loadGeneration) return;
+        final isFirstBatch = _isLoading;
         setState(() {
-          _metricValues[metric] = value;
-          _loadedMetrics.add(metric);
-          // Clear the full-screen loader once first card is ready
+          _metricValues.addAll(results);
+          _loadedMetrics.addAll(results.keys);
           if (_isLoading) _isLoading = false;
         });
+        // Start fade animation as soon as first batch is ready
+        if (isFirstBatch && _loadedMetrics.isNotEmpty) {
+          _fadeCtrl.forward(from: 0);
+        }
       }
     } catch (e) {
       debugPrint('Error loading report overview data: $e');
     }
 
-    if (mounted) {
-      setState(() => _isLoading = false);
-      _fadeCtrl.forward(from: 0);
+    if (mounted && gen == _loadGeneration) {
+      setState(() {
+        _isLoading = false;
+        if (_loadedMetrics.isEmpty) {
+          _errorMessage = 'Failed to load reports. Tap to retry.';
+        }
+      });
     }
   }
 
@@ -297,13 +327,30 @@ class _ReportsOverviewScreenState extends State<ReportsOverviewScreen>
   }
 
   void _navigateToMetric(ReportMetric metric) {
-    final isOutstanding = metric == ReportMetric.receivable ||
-        metric == ReportMetric.payable;
+    // Cancel any in-flight metric loading to free the database for the detail screen
+    _loadGeneration++;
+
+    if (metric == ReportMetric.receivable) {
+      Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => const ReceivableScreen(),
+      )).then((_) {
+        if (mounted && _loadedMetrics.length < ReportMetric.values.length) {
+          _loadCompanyAndData();
+        }
+      });
+      return;
+    }
+    final isOutstanding = metric == ReportMetric.payable;
     Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => isOutstanding
           ? OutstandingDetailScreen(metric: metric)
           : MetricDetailScreen(metric: metric),
-    ));
+    )).then((_) {
+      // Resume loading remaining metrics when returning from detail screen
+      if (mounted && _loadedMetrics.length < ReportMetric.values.length) {
+        _loadCompanyAndData();
+      }
+    });
   }
 
   // ── Build ──────────────────────────────────────────────────────────────────
@@ -334,7 +381,7 @@ class _ReportsOverviewScreenState extends State<ReportsOverviewScreen>
                         border: Border.all(
                             color: AppColors.divider),
                       ),
-                      child: const Icon(Icons.refresh_rounded,
+                      child: Icon(Icons.refresh_rounded,
                           size: 16, color: AppColors.textSecondary),
                     ),
                   ),
@@ -359,7 +406,9 @@ class _ReportsOverviewScreenState extends State<ReportsOverviewScreen>
           Expanded(
             child: _isLoading && _loadedMetrics.isEmpty
                 ? _buildFullLoader()
-                : FadeTransition(
+                : (!_isLoading && _loadedMetrics.isEmpty && _errorMessage != null)
+                    ? _buildErrorState()
+                    : FadeTransition(
                     opacity: _isLoading
                         ? const AlwaysStoppedAnimation(1.0)
                         : _fadeAnim,
@@ -387,18 +436,53 @@ class _ReportsOverviewScreenState extends State<ReportsOverviewScreen>
   // ── Full-screen loader ─────────────────────────────────────────────────────
 
   Widget _buildFullLoader() {
-    return const Center(
+    return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          CircularProgressIndicator(
+          const CircularProgressIndicator(
               color: AppColors.blue, strokeWidth: 2),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           Text('Loading reports…',
               style: TextStyle(
                   fontSize: 13,
                   color: AppColors.textSecondary)),
         ],
+      ),
+    );
+  }
+
+  // ── Error / no-company state ──────────────────────────────────────────────
+
+  Widget _buildErrorState() {
+    return Center(
+      child: GestureDetector(
+        onTap: _loadCompanyAndData,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.error_outline_rounded,
+                size: 48, color: AppColors.textSecondary),
+            const SizedBox(height: 16),
+            Text(_errorMessage ?? 'Something went wrong.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    fontSize: 14, color: AppColors.textSecondary)),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppColors.blue.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Text('Tap to retry',
+                  style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.blue,
+                      fontWeight: FontWeight.w600)),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -417,7 +501,7 @@ class _ReportsOverviewScreenState extends State<ReportsOverviewScreen>
                   size: 44,
                   color: AppColors.textSecondary.withOpacity(0.4)),
               const SizedBox(height: 12),
-              const Text('No reports found',
+              Text('No reports found',
                   style: TextStyle(
                       fontSize: 14,
                       color: AppColors.textSecondary)),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 import 'mobile_dashboard_tab.dart';
 import 'mobile_reports_tab.dart';
 import 'mobile_profile_tab.dart';
@@ -24,6 +25,8 @@ class _MobileHomeScreenState extends State<MobileHomeScreen> {
     return Scaffold(
       body: _tabs[_currentIndex],
       bottomNavigationBar: NavigationBar(
+        backgroundColor: AppColors.surface,
+        indicatorColor: AppColors.blue.withValues(alpha: 0.12),
         selectedIndex: _currentIndex,
         onDestinationSelected: (index) {
           setState(() => _currentIndex = index);

@@ -17,6 +17,7 @@ import '../main.dart';
 import '../models/sales_data.dart' hide ChartPeriod;
 import '../widgets/detail_widgets.dart';
 import '../utils/chart_period_helper.dart';
+import '../utils/amount_formatter.dart';
 import 'pdf_export_screen.dart';
 import 'excel_export_screen.dart';
 
@@ -46,10 +47,11 @@ class _MetricDetailScreenState extends State<MetricDetailScreen> {
 
   // Chart display settings — default comes from the metric
   late ReportChartType _chartType = widget.metric.defaultChartType;
-  int _chartPeriodIndex = 0; // 0 = Monthly, 1 = Quarterly, 2 = YoY
+  final int _chartPeriodIndex = 0; // 0 = Monthly, 1 = Quarterly, 2 = YoY
 
-  // Loading flag
+  // Loading flags
   bool _isLoading = true;
+  bool _isChartLoading = false;
 
   // Report data objects
   ReportValue _reportValue = ReportValue(
@@ -138,6 +140,9 @@ class _MetricDetailScreenState extends State<MetricDetailScreen> {
   /// service for the current [widget.metric]. Falls back to mock data when no
   /// company is available or on error.
   Future<void> _loadData() async {
+    if (!_isLoading) {
+      setState(() => _isChartLoading = true);
+    }
     final metric = widget.metric;
     final period = ChartPeriodExtension.fromIndex(_chartPeriodIndex);
 
@@ -157,7 +162,9 @@ class _MetricDetailScreenState extends State<MetricDetailScreen> {
 
       // Get company's actual FY start from DB
       final fyStart = _parseFYDate(_company?.startingFrom) ??
-          (today.month >= 4 ? DateTime(today.year, 4, 1) : DateTime(today.year - 1, 4, 1));
+          (today.month >= 4
+              ? DateTime(today.year, 4, 1)
+              : DateTime(today.year - 1, 4, 1));
       final fyMonth = fyStart.month;
 
       switch (_dateRange.type) {
@@ -172,9 +179,11 @@ class _MetricDetailScreenState extends State<MetricDetailScreen> {
           break;
         case DateRangeType.quarter:
           // Fiscal quarter based on company's FY start month
-          final fiscalMonth = today.month >= fyMonth ? today.month : today.month + 12;
+          final fiscalMonth =
+              today.month >= fyMonth ? today.month : today.month + 12;
           final qStartOffset = ((fiscalMonth - fyMonth) ~/ 3) * 3 + fyMonth;
-          final qStartMonth = qStartOffset > 12 ? qStartOffset - 12 : qStartOffset;
+          final qStartMonth =
+              qStartOffset > 12 ? qStartOffset - 12 : qStartOffset;
           final qStartYear = qStartOffset > 12
               ? today.year
               : (today.month >= fyMonth ? today.year : today.year - 1);
@@ -204,74 +213,130 @@ class _MetricDetailScreenState extends State<MetricDetailScreen> {
           break;
       }
 
+      // Convert date range to Tally YYYYMMDD format
+      String fmtDate(DateTime dt) =>
+          '${dt.year}${dt.month.toString().padLeft(2, '0')}${dt.day.toString().padLeft(2, '0')}';
+      final fromDate = fmtDate(start);
+      final toDate = fmtDate(end);
+
+      debugPrint('[MetricDetail] === LOAD === metric=${metric.displayName} '
+          'period=${_dateRange.type} from=$fromDate to=$toDate');
+
       // Fetch trend chart data based on the actual metric
-      final ReportChartData realChart;
-      switch (metric) {
-        case ReportMetric.sales:
-          realChart = await _salesAnalyticsService.getSalesTrend(
-            companyGuid: guid,
-            chartType: _chartType, period: period,
-          );
-        case ReportMetric.purchase:
-          realChart = await _salesAnalyticsService.getPurchaseTrend(
-            companyGuid: guid,
-            chartType: _chartType, period: period,
-          );
-        case ReportMetric.profit:
-          realChart = await _salesAnalyticsService.getProfitTrend(
-            companyGuid: guid,
-            chartType: _chartType, period: period,
-          );
-        case ReportMetric.gst:
-          realChart = await _salesAnalyticsService.getGSTTrend(
-            companyGuid: guid,
-            chartType: _chartType, period: period,
-          );
-        case ReportMetric.receipts:
-          realChart = await _salesAnalyticsService.getReceiptsTrend(
-            companyGuid: guid,
-            chartType: _chartType, period: period,
-          );
-        case ReportMetric.payments:
-          realChart = await _salesAnalyticsService.getPaymentsTrend(
-            companyGuid: guid,
-            chartType: _chartType, period: period,
-          );
-        case ReportMetric.receivable:
-          realChart = await _salesAnalyticsService.getReceivableChart(
-            companyGuid: guid, chartType: _chartType,
-          );
-        case ReportMetric.payable:
-          realChart = await _salesAnalyticsService.getPayableChart(
-            companyGuid: guid, chartType: _chartType,
-          );
-        case ReportMetric.stock:
-          realChart = await _salesAnalyticsService.getStockChart(
-            companyGuid: guid, chartType: _chartType,
-          );
+      Future<ReportChartData> fetchChart() {
+        switch (metric) {
+          case ReportMetric.sales:
+            return _salesAnalyticsService.getSalesTrend(
+              companyGuid: guid,
+              chartType: _chartType,
+              period: period,
+              fromDate: fromDate,
+              toDate: toDate,
+            );
+          case ReportMetric.purchase:
+            return _salesAnalyticsService.getPurchaseTrend(
+              companyGuid: guid,
+              chartType: _chartType,
+              period: period,
+              fromDate: fromDate,
+              toDate: toDate,
+            );
+          case ReportMetric.profit:
+            return _salesAnalyticsService.getProfitTrend(
+              companyGuid: guid,
+              chartType: _chartType,
+              period: period,
+              fromDate: fromDate,
+              toDate: toDate,
+            );
+          case ReportMetric.gst:
+            return _salesAnalyticsService.getGSTTrend(
+              companyGuid: guid,
+              chartType: _chartType,
+              period: period,
+              fromDate: fromDate,
+              toDate: toDate,
+            );
+          case ReportMetric.receipts:
+            return _salesAnalyticsService.getReceiptsTrend(
+              companyGuid: guid,
+              chartType: _chartType,
+              period: period,
+              fromDate: fromDate,
+              toDate: toDate,
+            );
+          case ReportMetric.payments:
+            return _salesAnalyticsService.getPaymentsTrend(
+              companyGuid: guid,
+              chartType: _chartType,
+              period: period,
+              fromDate: fromDate,
+              toDate: toDate,
+            );
+          case ReportMetric.receivable:
+            return _salesAnalyticsService.getReceivableChart(
+              companyGuid: guid,
+              chartType: _chartType,
+              fromDate: fromDate,
+              toDate: toDate,
+            );
+          case ReportMetric.payable:
+            return _salesAnalyticsService.getPayableChart(
+              companyGuid: guid,
+              chartType: _chartType,
+              fromDate: fromDate,
+              toDate: toDate,
+            );
+          case ReportMetric.stock:
+            return _salesAnalyticsService.getStockChart(
+              companyGuid: guid,
+              chartType: _chartType,
+            );
+        }
       }
 
-      // Fetch sales vs purchase combo data
-      final realCombo = await _salesAnalyticsService.getSalesPurchaseTrend(
-        companyGuid: guid,
-        period: period,
-      );
+      // Run ALL queries in parallel instead of sequentially
+      final results = await Future.wait([
+        fetchChart(), // [0]
+        _salesAnalyticsService.getSalesPurchaseTrend(
+          // [1]
+          companyGuid: guid, period: period,
+          fromDate: fromDate, toDate: toDate,
+        ),
+        _salesAnalyticsService.getRevenueExpenseProfit(
+          // [2]
+          companyGuid: guid, fromDate: fromDate, toDate: toDate,
+        ),
+        _salesAnalyticsService.getReportValueForMetric(
+          metric, // [3]
+          companyGuid: guid, fromDate: fromDate, toDate: toDate,
+        ),
+        _salesAnalyticsService.getTopItems(
+          metric, // [4]
+          companyGuid: guid, fromDate: fromDate, toDate: toDate,
+        ),
+      ]);
 
-      // Fetch revenue / expense / profit breakdown
-      final revExpProfit = await _salesAnalyticsService.getRevenueExpenseProfit(
-        companyGuid: guid
-      );
+      final realChart = results[0] as ReportChartData;
+      final realCombo = results[1] as SalesPurchaseChartData;
+      final revExpProfit = results[2] as RevenueExpenseProfitData;
+      final derivedValue = results[3] as ReportValue;
+      final topItems = results[4] as List<TopSellingItem>;
 
-      // Fetch the actual total value for this metric from the service
-      final derivedValue = await _salesAnalyticsService.getReportValueForMetric(
-        metric,
-        companyGuid: guid
-      );
+      debugPrint('[MetricDetail] === RESULTS === '
+          'value=${derivedValue.primaryValue} ${derivedValue.primaryUnit} | '
+          'chartPoints=${realChart.dataPoints.length} | '
+          'comboPoints=${realCombo.dataPoints.length} | '
+          'topItems=${topItems.length}');
+      for (final dp in realChart.dataPoints) {
+        debugPrint('[MetricDetail]   chart: ${dp.label} = ${dp.value}');
+      }
 
       // Auto-aggregate monthly data into quarters/years based on data count
-      final autoPeriod = autoSelectPeriod(realChart.dataPoints.length);
-      final aggChart = aggregateChartData(realChart, autoPeriod);
-      final aggCombo = aggregateSalesPurchaseData(realCombo, autoPeriod);
+      final chartPeriod = autoSelectPeriod(realChart.dataPoints.length);
+      final comboPeriod = autoSelectPeriod(realCombo.dataPoints.length);
+      final aggChart = aggregateChartData(realChart, chartPeriod);
+      final aggCombo = aggregateSalesPurchaseData(realCombo, comboPeriod);
 
       final useRevExpProfit =
           revExpProfit.revenue != 0 || revExpProfit.expense != 0;
@@ -279,12 +344,7 @@ class _MetricDetailScreenState extends State<MetricDetailScreen> {
           ? revExpProfit
           : _deriveRevExpProfitFromCombo(aggCombo);
 
-      // Fetch top items from DB
-      final topItems = await _salesAnalyticsService.getTopItems(
-        metric,
-        companyGuid: guid
-      );
-
+      if (!mounted) return;
       setState(() {
         _reportValue = derivedValue;
         _chartData = aggChart;
@@ -292,11 +352,16 @@ class _MetricDetailScreenState extends State<MetricDetailScreen> {
         _revExpProfitData = finalRevExpProfit;
         _topItems = topItems;
         _isLoading = false;
+        _isChartLoading = false;
       });
     } catch (e, stack) {
       debugPrint('Error loading ${metric.displayName} data: $e');
       debugPrint('$stack');
-      setState(() => _isLoading = false);
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _isChartLoading = false;
+      });
     }
   }
 
@@ -304,16 +369,16 @@ class _MetricDetailScreenState extends State<MetricDetailScreen> {
   RevenueExpenseProfitData _deriveRevExpProfitFromCombo(
       SalesPurchaseChartData combo) {
     final totalRevenue =
-        combo.dataPoints.fold<double>(0.0, (sum, dp) => sum + dp.salesValue);
+        combo.dataPoints.fold<double>(0.0, (sum, dp) => sum + dp.salesValue.abs());
     final totalExpense =
-        combo.dataPoints.fold<double>(0.0, (sum, dp) => sum + dp.purchaseValue);
+        combo.dataPoints.fold<double>(0.0, (sum, dp) => sum + dp.purchaseValue.abs());
+    final profit = totalRevenue - totalExpense;
     return RevenueExpenseProfitData(
       revenue: totalRevenue,
       expense: totalExpense,
-      profit: totalRevenue - totalExpense,
+      profit: profit,
     );
   }
-
 
   // ═══════════════════════════════════════════════════════════════════════════
   //  USER ACTIONS
@@ -342,7 +407,7 @@ class _MetricDetailScreenState extends State<MetricDetailScreen> {
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(
+            colorScheme: ColorScheme.light(
               primary: AppColors.blue,
               onPrimary: Colors.white,
               onSurface: AppColors.textPrimary,
@@ -380,7 +445,7 @@ class _MetricDetailScreenState extends State<MetricDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(_chartData.title, style: AppTypography.cardLabel),
+            Text(_chartData.title, style: AppTypography.chartSectionTitle),
             const SizedBox(height: 16),
             ReportChart(data: _chartData, height: 200),
             if (_chartData.legends.isNotEmpty) ...[
@@ -396,24 +461,26 @@ class _MetricDetailScreenState extends State<MetricDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(_salesPurchaseData.title, style: AppTypography.cardLabel),
+            Text(_salesPurchaseData.title, style: AppTypography.chartSectionTitle),
             const SizedBox(height: 16),
             (_salesPurchaseData.dataPoints.isEmpty)
                 ? SizedBox(
                     height: 220,
                     child: Center(
                       child: Text(
-                        'No Data',
+                        'No data for selected period',
                         style: Theme.of(context)
                                 .textTheme
                                 .bodyMedium
                                 ?.copyWith(color: AppColors.textSecondary) ??
-                            const TextStyle(color: AppColors.textSecondary),
+                            TextStyle(color: AppColors.textSecondary),
                       ),
                     ),
                   )
                 : SalesPurchaseComboChart(
-                    data: _salesPurchaseData, height: 220),
+                    data: _salesPurchaseData,
+                    height: 220,
+                    chartType: _chartType),
           ],
         ),
       ),
@@ -421,16 +488,6 @@ class _MetricDetailScreenState extends State<MetricDetailScreen> {
       // Sales / Purchase / Profit bar chart
       _buildChartCard(
         child: SalesPurchaseProfitBarChart(data: _revExpProfitData),
-      ),
-
-      // Stacked bar chart
-      _buildChartCard(
-        child: SalesPurchaseStackedBarChart(data: _salesPurchaseData),
-      ),
-
-      // Revenue / Expense / Profit grid chart
-      _buildChartCard(
-        child: RevenueExpenseProfitGridChart(data: _revExpProfitData),
       ),
 
       // Gauges
@@ -558,8 +615,7 @@ class _MetricDetailScreenState extends State<MetricDetailScreen> {
         companyLogoBytes: _companyLogoBytes,
       );
 
-      final fileName =
-          '${companyName.replaceAll(' ', '_')}_stock_items.xlsx';
+      final fileName = '${companyName.replaceAll(' ', '_')}_stock_items.xlsx';
 
       if (!mounted) return;
       Navigator.pop(context); // dismiss loading
@@ -638,7 +694,7 @@ class _MetricDetailScreenState extends State<MetricDetailScreen> {
               // Section title
               Padding(
                 padding: const EdgeInsets.only(left: 20, bottom: 12),
-                child: Text('SHARE REPORT', style: AppTypography.cardLabel),
+                child: Text('SHARE REPORT', style: AppTypography.chartSectionTitle),
               ),
 
               // Option 1 — PDF export
@@ -648,11 +704,10 @@ class _MetricDetailScreenState extends State<MetricDetailScreen> {
                   width: 36,
                   height: 36,
                 ),
-                title: Text('Share as PDF',
-                    style: AppTypography.itemTitle),
+                title: Text('Share as PDF', style: AppTypography.itemTitle),
                 subtitle: Text('Formatted report with charts',
                     style: AppTypography.itemSubtitle),
-                trailing: const Icon(Icons.chevron_right,
+                trailing: Icon(Icons.chevron_right,
                     color: AppColors.textSecondary, size: 20),
                 onTap: () {
                   Navigator.pop(ctx);
@@ -676,11 +731,10 @@ class _MetricDetailScreenState extends State<MetricDetailScreen> {
                   width: 36,
                   height: 36,
                 ),
-                title: Text('Share as Excel',
-                    style: AppTypography.itemTitle),
+                title: Text('Share as Excel', style: AppTypography.itemTitle),
                 subtitle: Text('Raw data for spreadsheets',
                     style: AppTypography.itemSubtitle),
-                trailing: const Icon(Icons.chevron_right,
+                trailing: Icon(Icons.chevron_right,
                     color: AppColors.textSecondary, size: 20),
                 onTap: () {
                   Navigator.pop(ctx);
@@ -757,34 +811,33 @@ class _MetricDetailScreenState extends State<MetricDetailScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Row(
-                                    children: [
-                                      Text(_chartData.title,
-                                          style: AppTypography.cardLabel),
-                                      const Spacer(),
-                                      ReportChartPeriodSelector(
-                                        selectedIndex: _chartPeriodIndex,
-                                        onChanged: (index) {
-                                          setState(() =>
-                                              _chartPeriodIndex = index);
-                                          _loadData();
-                                        },
-                                      ),
-                                    ],
-                                  ),
+                                  Text(_chartData.title,
+                                      style: AppTypography.chartSectionTitle),
                                   const SizedBox(height: 10),
                                   ChartTypeSelector(
                                     selected: _chartType,
-                                    availableTypes:
-                                        metric.applicableChartTypes,
+                                    availableTypes: metric.applicableChartTypes,
                                     onChanged: (type) {
                                       setState(() => _chartType = type);
                                       _loadData();
                                     },
                                   ),
-                                  const SizedBox(height: 16),
-                                  ReportChart(data: _chartData, height: 200),
-                                  if (_chartData.legends.isNotEmpty) ...[
+                                  const SizedBox(height: 24),
+                                  AnimatedSwitcher(
+                                    duration: const Duration(milliseconds: 300),
+                                    child: _isChartLoading
+                                        ? const ChartShimmerPlaceholder(
+                                            key: ValueKey('shimmer-trend'),
+                                            height: 200,
+                                          )
+                                        : ReportChart(
+                                            key: ValueKey(_chartType),
+                                            data: _chartData,
+                                            height: 200,
+                                          ),
+                                  ),
+                                  if (!_isChartLoading &&
+                                      _chartData.legends.isNotEmpty) ...[
                                     const SizedBox(height: 16),
                                     Center(
                                       child: ChartLegend(
@@ -794,7 +847,7 @@ class _MetricDetailScreenState extends State<MetricDetailScreen> {
                                 ],
                               ),
                             ),
-                            const SizedBox(height: 20),
+                            const SizedBox(height: 32),
 
                             // Sales vs Purchase combo chart
                             _buildChartCard(
@@ -802,14 +855,14 @@ class _MetricDetailScreenState extends State<MetricDetailScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(_salesPurchaseData.title,
-                                      style: AppTypography.cardLabel),
+                                      style: AppTypography.chartSectionTitle),
                                   const SizedBox(height: 16),
                                   (_salesPurchaseData.dataPoints.isEmpty)
                                       ? SizedBox(
                                           height: 220,
                                           child: Center(
                                             child: Text(
-                                              'No Data',
+                                              'No data for selected period',
                                               style: Theme.of(context)
                                                       .textTheme
                                                       .bodyMedium
@@ -817,7 +870,7 @@ class _MetricDetailScreenState extends State<MetricDetailScreen> {
                                                         color: AppColors
                                                             .textSecondary,
                                                       ) ??
-                                                  const TextStyle(
+                                                  TextStyle(
                                                       color: AppColors
                                                           .textSecondary),
                                             ),
@@ -826,6 +879,7 @@ class _MetricDetailScreenState extends State<MetricDetailScreen> {
                                       : SalesPurchaseComboChart(
                                           data: _salesPurchaseData,
                                           height: 220,
+                                          chartType: ReportChartType.bar,
                                         ),
                                 ],
                               ),
@@ -835,22 +889,6 @@ class _MetricDetailScreenState extends State<MetricDetailScreen> {
                             // Sales / Purchase / Profit bar chart
                             _buildChartCard(
                               child: SalesPurchaseProfitBarChart(
-                                data: _revExpProfitData,
-                              ),
-                            ),
-                            const SizedBox(height: 20),
-
-                            // Stacked bar chart
-                            _buildChartCard(
-                              child: SalesPurchaseStackedBarChart(
-                                data: _salesPurchaseData,
-                              ),
-                            ),
-                            const SizedBox(height: 20),
-
-                            // Revenue / Expense / Profit grid chart
-                            _buildChartCard(
-                              child: RevenueExpenseProfitGridChart(
                                 data: _revExpProfitData,
                               ),
                             ),
@@ -923,23 +961,11 @@ class _MetricDetailScreenState extends State<MetricDetailScreen> {
     );
   }
 
-  String _formatItemNumber(int number) {
-    if (number >= 100000) {
-      return '${(number / 100000).toStringAsFixed(1)}L';
-    } else if (number >= 1000) {
-      return '${(number / 1000).toStringAsFixed(0)}K';
-    }
-    return number.toString();
-  }
+  String _formatItemNumber(int number) =>
+      AmountFormatter.short(number.toDouble());
 
-  String _formatItemCurrency(double amount) {
-    if (amount >= 10000000) {
-      return '₹${(amount / 10000000).toStringAsFixed(2)} Cr';
-    } else if (amount >= 100000) {
-      return '₹${(amount / 100000).toStringAsFixed(1)} L';
-    }
-    return '₹${amount.toStringAsFixed(0)}';
-  }
+  String _formatItemCurrency(double amount) =>
+      AmountFormatter.currencyShort(amount);
 
   /// Header row: back arrow, page title, and share button.
   Widget _buildHeader() {
@@ -950,7 +976,7 @@ class _MetricDetailScreenState extends State<MetricDetailScreen> {
           // Back button
           GestureDetector(
             onTap: () => Navigator.of(context).pop(),
-            child: const SizedBox(
+            child: SizedBox(
               width: 36,
               height: 36,
               child: Center(
@@ -965,7 +991,7 @@ class _MetricDetailScreenState extends State<MetricDetailScreen> {
           const SizedBox(width: 12),
 
           // Title — dynamic from metric
-          Text(widget.metric.displayName, style: AppTypography.pageTitle),
+          Text(widget.metric.displayName, style: AppTypography.pageTitle.copyWith(fontSize: 20)),
           const Spacer(),
 
           // Share button — opens the share-report bottom sheet

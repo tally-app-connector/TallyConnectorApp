@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 import '../Analysis/analysis_home_screen.dart';
 import '../Analysis/balance_sheet_screen.dart';
 import '../Analysis/profit_loss_screen2.dart';
@@ -11,7 +12,7 @@ class MobileReportsTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Reports', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
       ),
@@ -34,9 +35,9 @@ class MobileReportsTab extends StatelessWidget {
             ),
             const SizedBox(height: 12),
 
-            const Text(
+            Text(
               'Financial Reports',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
             ),
             const SizedBox(height: 12),
 
@@ -130,11 +131,11 @@ class MobileReportsTab extends StatelessWidget {
                   children: [
                     Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 4),
-                    Text(subtitle, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                    Text(subtitle, style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                   ],
                 ),
               ),
-              Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey[400]),
+              Icon(Icons.arrow_forward_ios, size: 16, color: AppColors.textSecondary),
             ],
           ),
         ),

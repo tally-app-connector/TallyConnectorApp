@@ -341,16 +341,16 @@ class AuthService {
         );
       } on CognitoClientException catch (e) {
         debugPrint('=== Cognito Login Error ===');
-        debugPrint('Code: \${e.code}');
-        debugPrint('Name: \${e.name}');
-        debugPrint('Message: \${e.message}');
-        debugPrint('StatusCode: \${e.statusCode}');
+        debugPrint('Code: ${e.code}');
+        debugPrint('Name: ${e.name}');
+        debugPrint('Message: ${e.message}');
+        debugPrint('StatusCode: ${e.statusCode}');
         rethrow;
       } catch (e, stack) {
         debugPrint('=== Unknown Login Error ===');
-        debugPrint('Type: \${e.runtimeType}');
-        debugPrint('Error: \$e');
-        debugPrint('Stack: \$stack');
+        debugPrint('Type: ${e.runtimeType}');
+        debugPrint('Error: $e');
+        debugPrint('Stack: $stack');
         rethrow;
       }
 

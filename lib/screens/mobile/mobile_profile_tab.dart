@@ -530,6 +530,7 @@ import '../auth/email_verification_screen.dart';
 import '../sync_screen.dart';
 import 'dart:convert';
 import 'database_overview_screen.dart';
+import '../theme/app_theme.dart';
 
 class MobileProfileTab extends StatefulWidget {
   const MobileProfileTab({Key? key}) : super(key: key);
@@ -555,10 +556,10 @@ class _MobileProfileTabState extends State<MobileProfileTab>
   // ── Theme tokens (matches app) ─────────────────────────────────────────────
   static const Color _primary    = Color(0xFF1A6FD8);
   static const Color _accent     = Color(0xFF00C9A7);
-  static const Color _bg         = Color(0xFFF4F6FB);
-  static const Color _cardBg     = Colors.white;
-  static const Color _textDark   = Color(0xFF1A2340);
-  static const Color _textMuted  = Color(0xFF8A94A6);
+  static Color get _bg           => AppColors.background;
+  static Color get _cardBg       => AppColors.surface;
+  static Color get _textDark     => AppColors.textPrimary;
+  static Color get _textMuted    => AppColors.textSecondary;
   static const Color _danger     = Color(0xFFE53935);
   static const Color _warning    = Color(0xFFFFA000);
   static const Color _positive   = Color(0xFF1B8A5A);
@@ -709,14 +710,14 @@ class _MobileProfileTabState extends State<MobileProfileTab>
           const SizedBox(width: 12),
           Expanded(
             child: Text(title,
-                style: const TextStyle(
+                style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
                     color: _textDark)),
           ),
         ]),
         content: Text(body,
-            style: const TextStyle(
+            style: TextStyle(
                 fontSize: 14, color: _textMuted, height: 1.5)),
         actions: [
           OutlinedButton(
@@ -755,7 +756,7 @@ class _MobileProfileTabState extends State<MobileProfileTab>
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
+      return Scaffold(
         backgroundColor: _bg,
         body: Center(child: CircularProgressIndicator(color: _primary)),
       );
@@ -794,7 +795,7 @@ class _MobileProfileTabState extends State<MobileProfileTab>
 
                     // App version
                     Text('Tally Connector  ·  v1.0.0',
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontSize: 11, color: _textMuted)),
                     const SizedBox(height: 8),
                   ],
@@ -821,8 +822,11 @@ class _MobileProfileTabState extends State<MobileProfileTab>
         : 'U';
     final verified = _currentUser?.isVerified == true;
 
+    final textScale = MediaQuery.of(context).textScaler.scale(1.0);
+    final headerHeight = (240 * textScale).clamp(240.0, 340.0);
+
     return SliverAppBar(
-      expandedHeight: 220,
+      expandedHeight: headerHeight,
       pinned: false,
       floating: false,
       elevation: 0,
@@ -1006,7 +1010,7 @@ class _MobileProfileTabState extends State<MobileProfileTab>
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: Colors.grey.shade200),
             ),
-            child: const Row(children: [
+            child: Row(children: [
               Icon(Icons.info_outline_rounded,
                   size: 16, color: _textMuted),
               SizedBox(width: 8),
@@ -1020,7 +1024,7 @@ class _MobileProfileTabState extends State<MobileProfileTab>
           )
         else
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
               color: _bg,
               borderRadius: BorderRadius.circular(10),
@@ -1029,13 +1033,33 @@ class _MobileProfileTabState extends State<MobileProfileTab>
             child: DropdownButtonHideUnderline(
               child: DropdownButton<String>(
                 isExpanded: true,
-                icon: const Icon(Icons.unfold_more_rounded,
+                isDense: false,
+                icon: Icon(Icons.unfold_more_rounded,
                     size: 18, color: _textMuted),
                 value: _selectedCompany?['company_guid'],
-                style: const TextStyle(
+                style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                     color: _textDark),
+                selectedItemBuilder: (context) {
+                  return _companies.map((company) {
+                    final name = company['company_name'] ?? '';
+                    final addr = (company['company_address'] ?? '').toString();
+                    final display = addr.isNotEmpty ? '$name - ($addr)' : name;
+                    return Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        display,
+                        style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                            color: _textDark),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    );
+                  }).toList();
+                },
                 items: _companies.map((company) {
                   return DropdownMenuItem<String>(
                     value: company['company_guid'],
@@ -1044,7 +1068,7 @@ class _MobileProfileTabState extends State<MobileProfileTab>
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(company['company_name'] ?? '',
-                            style: const TextStyle(
+                            style: TextStyle(
                                 fontWeight: FontWeight.w700,
                                 fontSize: 13,
                                 color: _textDark)),
@@ -1053,7 +1077,7 @@ class _MobileProfileTabState extends State<MobileProfileTab>
                             .isNotEmpty)
                           Text(
                             company['company_address'],
-                            style: const TextStyle(
+                            style: TextStyle(
                                 fontSize: 11, color: _textMuted),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -1096,6 +1120,22 @@ class _MobileProfileTabState extends State<MobileProfileTab>
           ),
           _divider(),
         ],
+
+        _actionRow(
+          icon: Icons.text_fields_rounded,
+          label: 'Font Size  ·  ${FontScaleNotifier.options.entries.firstWhere((e) => (e.value - fontScaleNotifier.value).abs() < 0.01, orElse: () => const MapEntry('Default', 1.0)).key}',
+          color: const Color(0xFF7C3AED),
+          onTap: _showFontSizePicker,
+        ),
+        _divider(),
+
+        _actionRow(
+          icon: Icons.dark_mode_rounded,
+          label: 'Theme  ·  ${_themeLabel()}',
+          color: const Color(0xFF6366F1),
+          onTap: _showThemePicker,
+        ),
+        _divider(),
 
         _actionRow(
           icon: Icons.sync_alt_rounded,
@@ -1142,6 +1182,210 @@ class _MobileProfileTabState extends State<MobileProfileTab>
     );
   }
 
+  // ── Font size picker ───────────────────────────────────────────────────────
+
+  void _showFontSizePicker() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Font Size',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: _textDark,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ...FontScaleNotifier.options.entries.map((entry) {
+                  final isSelected =
+                      (entry.value - fontScaleNotifier.value).abs() < 0.01;
+                  return InkWell(
+                    onTap: () {
+                      fontScaleNotifier.setScale(entry.value);
+                      Navigator.pop(context);
+                      setState(() {});
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 14),
+                      margin: const EdgeInsets.only(bottom: 8),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? const Color(0xFF7C3AED).withValues(alpha: 0.08)
+                            : AppColors.pillBg,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isSelected
+                              ? const Color(0xFF7C3AED)
+                              : AppColors.divider,
+                          width: isSelected ? 1.5 : 1,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Text(
+                            'Aa',
+                            style: TextStyle(
+                              fontSize: 14 * entry.value,
+                              fontWeight: FontWeight.w600,
+                              color: isSelected
+                                  ? const Color(0xFF7C3AED)
+                                  : _textDark,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              entry.key,
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight:
+                                    isSelected ? FontWeight.w700 : FontWeight.w500,
+                                color: isSelected
+                                    ? const Color(0xFF7C3AED)
+                                    : _textDark,
+                              ),
+                            ),
+                          ),
+                          if (isSelected)
+                            const Icon(Icons.check_circle,
+                                size: 20, color: Color(0xFF7C3AED)),
+                        ],
+                      ),
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // ── Theme picker ─────────────────────────────────────────────────────────
+
+  String _themeLabel() {
+    switch (themeModeNotifier.value) {
+      case ThemeMode.light: return 'Light';
+      case ThemeMode.dark: return 'Dark';
+      case ThemeMode.system: return 'System';
+    }
+  }
+
+  void _showThemePicker() {
+    final options = {
+      'Light': ThemeMode.light,
+      'Dark': ThemeMode.dark,
+      'System': ThemeMode.system,
+    };
+    final icons = {
+      'Light': Icons.light_mode_rounded,
+      'Dark': Icons.dark_mode_rounded,
+      'System': Icons.settings_suggest_rounded,
+    };
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Theme',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ...options.entries.map((entry) {
+                  final isSelected = themeModeNotifier.value == entry.value;
+                  return InkWell(
+                    onTap: () {
+                      themeModeNotifier.setMode(entry.value);
+                      Navigator.pop(context);
+                      setState(() {});
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 14),
+                      margin: const EdgeInsets.only(bottom: 8),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? const Color(0xFF6366F1).withValues(alpha: 0.08)
+                            : AppColors.pillBg,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isSelected
+                              ? const Color(0xFF6366F1)
+                              : AppColors.divider,
+                          width: isSelected ? 1.5 : 1,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            icons[entry.key],
+                            size: 22,
+                            color: isSelected
+                                ? const Color(0xFF6366F1)
+                                : AppColors.textSecondary,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              entry.key,
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight:
+                                    isSelected ? FontWeight.w700 : FontWeight.w500,
+                                color: isSelected
+                                    ? const Color(0xFF6366F1)
+                                    : AppColors.textPrimary,
+                              ),
+                            ),
+                          ),
+                          if (isSelected)
+                            const Icon(Icons.check_circle,
+                                color: Color(0xFF6366F1), size: 22),
+                        ],
+                      ),
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   // ── Reusable sub-widgets ───────────────────────────────────────────────────
 
   Widget _card({required Widget child}) {
@@ -1174,7 +1418,7 @@ class _MobileProfileTabState extends State<MobileProfileTab>
       ),
       const SizedBox(width: 8),
       Text(title,
-          style: const TextStyle(
+          style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w800,
               color: _textDark,
@@ -1196,11 +1440,11 @@ class _MobileProfileTabState extends State<MobileProfileTab>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
             Text(label,
-                style: const TextStyle(
+                style: TextStyle(
                     fontSize: 11, color: _textMuted)),
             const SizedBox(height: 2),
             Text(value,
-                style: const TextStyle(
+                style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                     color: _textDark)),

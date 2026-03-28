@@ -818,6 +818,61 @@ class DatabaseHelper {
         'CREATE INDEX idx_companies_selected ON companies(is_selected)');
     await db
         .execute('CREATE INDEX idx_companies_deleted ON companies(is_deleted)');
+
+// ============================================
+// AI QUERIES TABLES
+// ============================================
+    await db.execute('''
+      CREATE TABLE chat_messages (
+        message_id TEXT PRIMARY KEY,
+        company_guid TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        message_type TEXT NOT NULL,
+        content TEXT NOT NULL,
+        generated_sql TEXT,
+        result_count INTEGER,
+        timestamp TEXT NOT NULL,
+        session_id TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE query_logs (
+        log_id TEXT PRIMARY KEY,
+        company_guid TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        user_question TEXT NOT NULL,
+        detected_intent TEXT,
+        extracted_entities TEXT,
+        template_id TEXT,
+        generated_sql TEXT,
+        execution_time_ms INTEGER,
+        result_count INTEGER,
+        error_message TEXT,
+        feedback_score INTEGER,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE user_preferences (
+        user_id TEXT PRIMARY KEY,
+        preferred_date_format TEXT DEFAULT 'DD-MM-YYYY',
+        chat_history_retention_days INTEGER DEFAULT 30,
+        enable_suggestions INTEGER DEFAULT 1
+      )
+    ''');
+
+    await db.execute('''
+      CREATE INDEX idx_chat_messages_company
+      ON chat_messages(company_guid, session_id)
+    ''');
+
+    await db.execute('''
+      CREATE INDEX idx_query_logs_company
+      ON query_logs(company_guid, created_at)
+    ''');
   }
 
   Future<List<Map<String, dynamic>>> query({
@@ -3089,5 +3144,108 @@ Future<int> getLastAlterId(
     } catch (e) {
       return null;
     }
+  }
+
+  // ============================================
+  // AI QUERIES METHODS
+  // ============================================
+
+  /// Insert chat message
+  Future<int> insertChatMessage(Map<String, dynamic> message) async {
+    final db = await database;
+    return await db.insert('chat_messages', message);
+  }
+
+  /// Get chat history for a company/session
+  Future<List<Map<String, dynamic>>> getChatHistory({
+    required String companyGuid,
+    String? sessionId,
+    int limit = 50,
+  }) async {
+    final db = await database;
+
+    if (sessionId != null) {
+      return await db.query(
+        'chat_messages',
+        where: 'company_guid = ? AND session_id = ?',
+        whereArgs: [companyGuid, sessionId],
+        orderBy: 'timestamp DESC',
+        limit: limit,
+      );
+    } else {
+      return await db.query(
+        'chat_messages',
+        where: 'company_guid = ?',
+        whereArgs: [companyGuid],
+        orderBy: 'timestamp DESC',
+        limit: limit,
+      );
+    }
+  }
+
+  /// Insert query log
+  Future<int> insertQueryLog(Map<String, dynamic> log) async {
+    final db = await database;
+    return await db.insert('query_logs', log);
+  }
+
+  /// Update feedback score for a query log
+  Future<int> updateFeedbackScore(String logId, int score) async {
+    final db = await database;
+    return await db.update(
+      'query_logs',
+      {'feedback_score': score},
+      where: 'log_id = ?',
+      whereArgs: [logId],
+    );
+  }
+
+  /// Get user preferences
+  Future<Map<String, dynamic>?> getUserPreferences(String userId) async {
+    final db = await database;
+    final results = await db.query(
+      'user_preferences',
+      where: 'user_id = ?',
+      whereArgs: [userId],
+    );
+
+    if (results.isNotEmpty) {
+      return results.first;
+    }
+    return null;
+  }
+
+  /// Save user preferences
+  Future<int> saveUserPreferences(Map<String, dynamic> preferences) async {
+    final db = await database;
+    return await db.insert(
+      'user_preferences',
+      preferences,
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  /// Delete old chat messages (privacy/retention)
+  Future<int> deleteOldChatMessages(int retentionDays) async {
+    final db = await database;
+    final cutoffDate = DateTime.now()
+        .subtract(Duration(days: retentionDays))
+        .toIso8601String();
+
+    return await db.delete(
+      'chat_messages',
+      where: 'created_at < ?',
+      whereArgs: [cutoffDate],
+    );
+  }
+
+  /// Clear all chat history for a company
+  Future<int> clearChatHistory(String companyGuid) async {
+    final db = await database;
+    return await db.delete(
+      'chat_messages',
+      where: 'company_guid = ?',
+      whereArgs: [companyGuid],
+    );
   }
 }
