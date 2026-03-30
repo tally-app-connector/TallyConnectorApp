@@ -1,7 +1,7 @@
 // screens/voucher_detail_screen.dart
 
 import 'package:flutter/material.dart';
-import '../../database/database_helper.dart';
+import '../../services/queries/query_service.dart';
 
 class VoucherDetailScreen extends StatefulWidget {
   final String companyGuid;
@@ -20,7 +20,6 @@ class VoucherDetailScreen extends StatefulWidget {
 }
 
 class _VoucherDetailScreenState extends State<VoucherDetailScreen> {
-  final _db = DatabaseHelper.instance;
   bool _loading = true;
   Map<String, dynamic>? _voucherHeader;
   List<Map<String, dynamic>> _voucherEntries = [];
@@ -34,58 +33,23 @@ class _VoucherDetailScreenState extends State<VoucherDetailScreen> {
   Future<void> _loadVoucherDetails() async {
     setState(() => _loading = true);
 
-    final db = await _db.database;
+    final header = await QueryService.getVoucherHeader(
+      widget.companyGuid, widget.voucherGuid,
+    );
 
-    // Get voucher header
-    final headerResult = await db.rawQuery('''
-      SELECT 
-        voucher_guid,
-        date,
-        voucher_type,
-        voucher_number,
-        reference_number,
-        reference_date,
-        narration,
-        party_name,
-        is_invoice,
-        is_accounting_voucher,
-        is_inventory_voucher
-      FROM vouchers
-      WHERE company_guid = ?
-        AND voucher_guid = ?
-        AND is_deleted = 0
-      LIMIT 1
-    ''', [widget.companyGuid, widget.voucherGuid]);
-
-    if (headerResult.isEmpty) {
+    if (header == null) {
       setState(() => _loading = false);
       return;
     }
 
-    _voucherHeader = headerResult.first;
+    _voucherHeader = header;
 
-    // Get all ledger entries for this voucher
-    final entriesResult = await db.rawQuery('''
-      SELECT 
-        ledger_name,
-        amount,
-        CASE 
-          WHEN amount < 0 THEN ABS(amount)
-          ELSE 0 
-        END as debit,
-        CASE 
-          WHEN amount > 0 THEN amount
-          ELSE 0 
-        END as credit
-      FROM voucher_ledger_entries
-      WHERE voucher_guid = ?
-      ORDER BY 
-        CASE WHEN amount < 0 THEN 0 ELSE 1 END,
-        ABS(amount) DESC
-    ''', [widget.voucherGuid]);
+    final entries = await QueryService.getVoucherLedgerEntries(
+      widget.voucherGuid,
+    );
 
     setState(() {
-      _voucherEntries = entriesResult;
+      _voucherEntries = entries;
       _loading = false;
     });
   }

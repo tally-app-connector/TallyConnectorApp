@@ -1,7 +1,7 @@
 /// Query Builder Service
 /// Injects parameters into SQL templates and validates security.
 
-import '../models/query_template.dart';
+import '../../models/ai/query_template.dart';
 
 class QuerySecurityError implements Exception {
   final String message;

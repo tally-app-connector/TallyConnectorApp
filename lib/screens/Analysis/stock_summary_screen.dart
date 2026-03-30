@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/data_model.dart';
 import '../../database/database_helper.dart';
+import '../../services/queries/query_service.dart';
 import '../../utils/date_utils.dart';
 
 class StockSummaryScreen extends StatefulWidget {
@@ -53,15 +54,7 @@ class _StockSummaryScreenState extends State<StockSummaryScreen> {
 
   // ── Load distinct months from DB ─────────────────────────────
   Future<void> _loadAvailableMonths() async {
-    final db = await _db.database;
-    final rows = await db.rawQuery('''
-      SELECT DISTINCT closing_date
-      FROM stock_item_closing_balance
-      WHERE company_guid = ?
-      ORDER BY closing_date DESC
-    ''', [_companyGuid]);
-
-    _availableMonths = rows.map((r) => r['closing_date'] as String).toList();
+    _availableMonths = await QueryService.getAvailableStockMonths(_companyGuid!);
 
     // Default to latest month
     if (_selectedMonth == null && _availableMonths.isNotEmpty) {
@@ -116,45 +109,8 @@ class _StockSummaryScreenState extends State<StockSummaryScreen> {
 
   Future<List<StockItemInfo>> fetchAllStockItems(
     String companyGuid, String? closingDate) async {
-  final db = await _db.database;
-
-  final stockItemResults = await db.rawQuery('''
-    SELECT 
-      si.name as item_name,
-      si.stock_item_guid,
-      COALESCE(si.costing_method, 'Avg. Cost') as costing_method,
-      COALESCE(si.base_units, '') as unit,
-      COALESCE(cb.closing_balance, 0.0) as closing_balance,
-      COALESCE(cb.closing_value, 0.0) as closing_value,
-      COALESCE(cb.closing_rate, 0.0) as closing_rate,
-      COALESCE(si.parent, '') as parent_name
-    FROM stock_items si
-    INNER JOIN (
-      SELECT DISTINCT stock_item_guid FROM stock_item_batch_allocation
-      UNION
-      SELECT DISTINCT stock_item_guid FROM voucher_inventory_entries WHERE company_guid = ?
-    ) active ON active.stock_item_guid = si.stock_item_guid
-    LEFT JOIN stock_item_closing_balance cb
-      ON cb.stock_item_guid = si.stock_item_guid
-      AND cb.company_guid = ?
-      AND cb.closing_date = ?
-    WHERE si.company_guid = ?
-      AND si.is_deleted = 0
-    ORDER BY si.name ASC
-  ''', [companyGuid, companyGuid, closingDate ?? '', companyGuid]);
-
-  return stockItemResults.map((row) => StockItemInfo(
-    itemName: row['item_name'] as String,
-    stockItemGuid: row['stock_item_guid'] as String,
-    costingMethod: row['costing_method'] as String,
-    unit: row['unit'] as String,
-    parentName: row['parent_name'] as String,
-    closingRate: (row['closing_rate'] as num?)?.toDouble() ?? 0.0,
-    closingQty: (row['closing_balance'] as num?)?.toDouble() ?? 0.0,
-    closingValue: (row['closing_value'] as num?)?.toDouble() ?? 0.0,
-    openingData: [],
-  )).toList();
-}
+    return QueryService.fetchAllClosingStock(companyGuid, closingDate);
+  }
 
   // ── On month chip tap ────────────────────────────────────────
   Future<void> _onMonthSelected(String closingDate) async {

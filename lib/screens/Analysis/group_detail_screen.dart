@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import '../../database/database_helper.dart';
+import '../../services/queries/query_service.dart';
 import 'ledger_detail_screen.dart';
 
 class GroupDetailScreen extends StatefulWidget {
@@ -38,161 +39,9 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
   Future<void> _loadLedgers() async {
     setState(() => _loading = true);
 
-    final db = await _db.database;
-
-    // Determine the query based on group type
-    String query;
-    List<dynamic> params;
-
-    if (widget.groupName == 'Purchase Accounts') {
-      query = '''
-        WITH RECURSIVE group_tree AS (
-          SELECT group_guid, name
-          FROM groups
-          WHERE company_guid = ?
-            AND reserved_name = 'Purchase Accounts'
-            AND is_deleted = 0
-          
-          UNION ALL
-          
-          SELECT g.group_guid, g.name
-          FROM groups g
-          INNER JOIN group_tree gt ON g.parent_guid = gt.group_guid
-          WHERE g.company_guid = ?
-            AND g.is_deleted = 0
-        )
-        SELECT 
-          l.name as ledger_name,
-          l.opening_balance,
-          COALESCE(SUM(CASE WHEN vle.amount < 0 THEN ABS(vle.amount) ELSE 0 END), 0) as debit_total,
-          COALESCE(SUM(CASE WHEN vle.amount > 0 THEN vle.amount ELSE 0 END), 0) as credit_total,
-          (l.opening_balance + 
-           COALESCE(SUM(CASE WHEN vle.amount < 0 THEN ABS(vle.amount) ELSE 0 END), 0) - 
-           COALESCE(SUM(CASE WHEN vle.amount > 0 THEN vle.amount ELSE 0 END), 0)) as closing_balance,
-          COUNT(DISTINCT v.voucher_guid) as voucher_count
-        FROM ledgers l
-        INNER JOIN group_tree gt ON l.parent = gt.name
-        INNER JOIN voucher_ledger_entries vle ON vle.ledger_name = l.name
-        INNER JOIN vouchers v ON v.voucher_guid = vle.voucher_guid 
-          AND v.company_guid = l.company_guid
-          AND v.is_deleted = 0
-          AND v.is_cancelled = 0
-          AND v.is_optional = 0
-          AND v.date >= ?
-          AND v.date <= ?
-        WHERE l.company_guid = ?
-          AND l.is_deleted = 0
-        GROUP BY l.name, l.opening_balance
-        ORDER BY closing_balance DESC
-      ''';
-      params = [
-        widget.companyGuid,
-        widget.companyGuid,
-        widget.fromDate,
-        widget.toDate,
-        widget.companyGuid,
-      ];
-    } else if (widget.groupName == 'Sales Accounts') {
-      query = '''
-        WITH RECURSIVE group_tree AS (
-          SELECT group_guid, name
-          FROM groups
-          WHERE company_guid = ?
-            AND reserved_name = 'Sales Accounts'
-            AND is_deleted = 0
-          
-          UNION ALL
-          
-          SELECT g.group_guid, g.name
-          FROM groups g
-          INNER JOIN group_tree gt ON g.parent_guid = gt.group_guid
-          WHERE g.company_guid = ?
-            AND g.is_deleted = 0
-        )
-        SELECT 
-          l.name as ledger_name,
-          l.opening_balance,
-          COALESCE(SUM(CASE WHEN vle.amount > 0 THEN vle.amount ELSE 0 END), 0) as credit_total,
-          COALESCE(SUM(CASE WHEN vle.amount < 0 THEN ABS(vle.amount) ELSE 0 END), 0) as debit_total,
-          (l.opening_balance + 
-           COALESCE(SUM(CASE WHEN vle.amount > 0 THEN vle.amount ELSE 0 END), 0) - 
-           COALESCE(SUM(CASE WHEN vle.amount < 0 THEN ABS(vle.amount) ELSE 0 END), 0)) as closing_balance,
-          COUNT(DISTINCT v.voucher_guid) as voucher_count
-        FROM ledgers l
-        INNER JOIN group_tree gt ON l.parent = gt.name
-        INNER JOIN voucher_ledger_entries vle ON vle.ledger_name = l.name
-        INNER JOIN vouchers v ON v.voucher_guid = vle.voucher_guid 
-          AND v.company_guid = l.company_guid
-          AND v.is_deleted = 0
-          AND v.is_cancelled = 0
-          AND v.is_optional = 0
-          AND v.date >= ?
-          AND v.date <= ?
-        WHERE l.company_guid = ?
-          AND l.is_deleted = 0
-        GROUP BY l.name, l.opening_balance
-        ORDER BY closing_balance DESC
-      ''';
-      params = [
-        widget.companyGuid,
-        widget.companyGuid,
-        widget.fromDate,
-        widget.toDate,
-        widget.companyGuid,
-      ];
-    } else {
-      // For Direct/Indirect Expenses and Incomes
-      query = '''
-        WITH RECURSIVE group_tree AS (
-          SELECT group_guid, name
-          FROM groups
-          WHERE company_guid = ?
-            AND name = ?
-            AND is_deleted = 0
-          
-          UNION ALL
-          
-          SELECT g.group_guid, g.name
-          FROM groups g
-          INNER JOIN group_tree gt ON g.parent_guid = gt.group_guid
-          WHERE g.company_guid = ?
-            AND g.is_deleted = 0
-        )
-        SELECT 
-          l.name as ledger_name,
-          l.opening_balance,
-          COALESCE(SUM(CASE WHEN vle.amount < 0 THEN ABS(vle.amount) ELSE 0 END), 0) as debit_total,
-          COALESCE(SUM(CASE WHEN vle.amount > 0 THEN vle.amount ELSE 0 END), 0) as credit_total,
-          (l.opening_balance + 
-           COALESCE(SUM(CASE WHEN vle.amount > 0 THEN vle.amount ELSE 0 END), 0) - 
-           COALESCE(SUM(CASE WHEN vle.amount < 0 THEN ABS(vle.amount) ELSE 0 END), 0)) as closing_balance,
-          COUNT(DISTINCT v.voucher_guid) as voucher_count
-        FROM ledgers l
-        INNER JOIN group_tree gt ON l.parent = gt.name
-        INNER JOIN voucher_ledger_entries vle ON vle.ledger_name = l.name
-        INNER JOIN vouchers v ON v.voucher_guid = vle.voucher_guid 
-          AND v.company_guid = l.company_guid
-          AND v.is_deleted = 0
-          AND v.is_cancelled = 0
-          AND v.is_optional = 0
-          AND v.date >= ?
-          AND v.date <= ?
-        WHERE l.company_guid = ?
-          AND l.is_deleted = 0
-        GROUP BY l.name, l.opening_balance
-        ORDER BY closing_balance DESC
-      ''';
-      params = [
-        widget.companyGuid,
-        widget.groupName,
-        widget.companyGuid,
-        widget.fromDate,
-        widget.toDate,
-        widget.companyGuid,
-      ];
-    }
-
-    final result = await db.rawQuery(query, params);
+    final result = await QueryService.getLedgersForGroup(
+      widget.companyGuid, widget.groupName, widget.fromDate, widget.toDate,
+    );
 
     setState(() {
       _ledgers = result;

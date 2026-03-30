@@ -1,5 +1,5 @@
-import '../../services/cloud_to_local_sync_service.dart';
-import '../../database/database_helper.dart';
+import 'cloud_to_local_sync_service.dart';
+import '../database/database_helper.dart';
 
 class DataSyncService {
   static final DataSyncService instance = DataSyncService._init();

@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../database/database_helper.dart';
-import '../utils/amount_formatter.dart';
+import '../../utils/amount_formatter.dart';
 import '../theme/app_theme.dart';
 import '../Analysis/bill_wise_detail_screen.dart';
-import '../models/report_data.dart';
-import '../service/sales/sales_service.dart';
+import '../../models/report_data.dart';
+import '../../services/sales_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ReceivableScreen — main overview (shows top 4 parties + View More)

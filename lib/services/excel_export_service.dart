@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 import '../models/report_data.dart';
-import '../../database/database_helper.dart';
+import '../database/database_helper.dart';
 
 class ExcelExportResult {
   final Uint8List bytes;

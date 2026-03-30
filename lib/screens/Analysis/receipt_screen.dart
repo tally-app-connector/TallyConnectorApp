@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import '../../database/database_helper.dart';
+import '../../services/queries/query_service.dart';
 
 class ReceiptScreen extends StatefulWidget {
   @override
@@ -46,32 +47,10 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
   }
   
   Future<void> _fetchReceipts() async {
-    final db = await _db.database;
-    
-    final result = await db.rawQuery('''
-      SELECT 
-        v.voucher_guid,
-        v.date,
-        v.voucher_number,
-        v.narration,
-        SUM(CASE WHEN vle.amount > 0 THEN vle.amount ELSE 0 END) as amount,
-        GROUP_CONCAT(DISTINCT CASE 
-          WHEN vle.amount < 0 THEN vle.ledger_name 
-          ELSE NULL 
-        END) as party_names
-      FROM vouchers v
-      INNER JOIN voucher_ledger_entries vle ON v.voucher_guid = vle.voucher_guid
-      WHERE v.company_guid = ?
-        AND v.voucher_type = 'Receipt'
-        AND v.is_deleted = 0
-        AND v.is_cancelled = 0
-        AND v.is_optional = 0
-        AND v.date >= ?
-        AND v.date <= ?
-      GROUP BY v.voucher_guid, v.date, v.voucher_number, v.narration
-      ORDER BY v.date DESC, v.voucher_number DESC
-    ''', [_companyGuid, _fromDate, _toDate]);
-    
+    final result = await QueryService.fetchVouchersByType(
+      _companyGuid!, 'Receipt', _fromDate!, _toDate!,
+    );
+
     _receipts = result;
     _totalReceipts = _receipts.fold(0.0, (sum, item) => sum + ((item['amount'] as num?)?.toDouble() ?? 0.0));
   }
@@ -311,19 +290,10 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
   
   Future<void> _showReceiptDetails(Map<String, dynamic> receipt) async {
     final voucherGuid = receipt['voucher_guid'] as String;
-    
-    // Fetch detailed entries
-    final db = await _db.database;
-    final entries = await db.rawQuery('''
-      SELECT 
-        vle.ledger_name,
-        vle.amount,
-        l.parent as group_name
-      FROM voucher_ledger_entries vle
-      LEFT JOIN ledgers l ON l.name = vle.ledger_name AND l.company_guid = ?
-      WHERE vle.voucher_guid = ?
-      ORDER BY vle.amount DESC
-    ''', [_companyGuid, voucherGuid]);
+
+    final entries = await QueryService.fetchVoucherEntries(
+      _companyGuid!, voucherGuid,
+    );
     
     showModalBottomSheet(
       context: context,

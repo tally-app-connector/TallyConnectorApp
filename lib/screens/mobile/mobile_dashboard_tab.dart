@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../database/database_helper.dart';
-import '../utils/amount_formatter.dart';
+import '../../services/queries/query_service.dart';
+import '../../utils/amount_formatter.dart';
 import '../../utils/secure_storage.dart';
 import '../../models/user_model.dart';
 import '../theme/app_theme.dart';
@@ -61,160 +62,18 @@ class _MobileDashboardTabState extends State<MobileDashboardTab> {
     String fromDate,
     String toDate,
   ) async {
-    final db = await _db.database;
-
-    // Sales
-    final salesResult = await db.rawQuery('''
-      WITH RECURSIVE group_tree AS (
-        SELECT group_guid, name FROM groups
-        WHERE company_guid = ? AND reserved_name = 'Sales Accounts' AND is_deleted = 0
-        UNION ALL
-        SELECT g.group_guid, g.name FROM groups g
-        INNER JOIN group_tree gt ON g.parent_guid = gt.group_guid
-        WHERE g.company_guid = ? AND g.is_deleted = 0
-      )
-      -- OLD: used raw amount sign (ignores is_deemed_positive for credit notes/debit notes)
-      -- COALESCE(SUM(CASE WHEN vle.amount > 0 THEN vle.amount ELSE 0 END) -
-      -- SUM(CASE WHEN vle.amount < 0 THEN ABS(vle.amount) ELSE 0 END), 0) as net_sales
-      -- FIX: use is_deemed_positive to match sales_service.dart canonical formula
-      SELECT
-        COALESCE(SUM(CASE
-          WHEN vle.is_deemed_positive = 1 THEN ABS(vle.amount)
-          ELSE -ABS(vle.amount)
-        END), 0) as net_sales
-      FROM voucher_ledger_entries vle
-      INNER JOIN vouchers v ON v.voucher_guid = vle.voucher_guid
-      INNER JOIN ledgers l ON l.name = vle.ledger_name AND l.company_guid = v.company_guid
-      INNER JOIN group_tree gt ON l.parent = gt.name
-      WHERE v.company_guid = ? AND v.is_deleted = 0 AND v.is_cancelled = 0
-        AND v.is_optional = 0 AND v.date >= ? AND v.date <= ?
-    ''', [companyGuid, companyGuid, companyGuid, fromDate, toDate]);
-
-    final netSales = (salesResult.first['net_sales'] as num?)?.toDouble() ?? 0.0;
-
-    // Purchase
-    final purchaseResult = await db.rawQuery('''
-      WITH RECURSIVE group_tree AS (
-        SELECT group_guid, name FROM groups
-        WHERE company_guid = ? AND reserved_name = 'Purchase Accounts' AND is_deleted = 0
-        UNION ALL
-        SELECT g.group_guid, g.name FROM groups g
-        INNER JOIN group_tree gt ON g.parent_guid = gt.group_guid
-        WHERE g.company_guid = ? AND g.is_deleted = 0
-      )
-      -- OLD: used raw amount sign (ignores is_deemed_positive for debit notes/purchase returns)
-      -- COALESCE(SUM(CASE WHEN vle.amount < 0 THEN ABS(vle.amount) ELSE 0 END) -
-      -- SUM(CASE WHEN vle.amount > 0 THEN vle.amount ELSE 0 END), 0) as net_purchase
-      -- FIX: use is_deemed_positive to match sales_service.dart canonical formula
-      SELECT
-        COUNT(DISTINCT v.voucher_guid) as vouchers,
-        COALESCE(SUM(CASE
-          WHEN vle.is_deemed_positive = 1 THEN ABS(vle.amount)
-          ELSE -ABS(vle.amount)
-        END), 0) as net_purchase
-      FROM voucher_ledger_entries vle
-      INNER JOIN vouchers v ON v.voucher_guid = vle.voucher_guid
-      INNER JOIN ledgers l ON l.name = vle.ledger_name AND l.company_guid = v.company_guid
-      INNER JOIN group_tree gt ON l.parent = gt.name
-      WHERE v.company_guid = ? AND v.is_deleted = 0 AND v.is_cancelled = 0
-        AND v.is_optional = 0 AND v.date >= ? AND v.date <= ?
-    ''', [companyGuid, companyGuid, companyGuid, fromDate, toDate]);
-
-    final netPurchase = (purchaseResult.first['net_purchase'] as num?)?.toDouble() ?? 0.0;
-
-    // Receivables
-    final receivablesResult = await db.rawQuery('''
-      WITH RECURSIVE group_tree AS (
-        SELECT group_guid, name FROM groups
-        WHERE company_guid = ? AND (name = 'Sundry Debtors' OR reserved_name = 'Sundry Debtors') AND is_deleted = 0
-        UNION ALL
-        SELECT g.group_guid, g.name FROM groups g
-        INNER JOIN group_tree gt ON g.parent_guid = gt.group_guid
-        WHERE g.company_guid = ? AND g.is_deleted = 0
-      )
-      SELECT COALESCE(SUM(outstanding), 0) as total_receivables FROM (
-        SELECT
-          (l.opening_balance * -1) +
-          COALESCE(SUM(CASE WHEN vle.amount < 0 THEN ABS(vle.amount) ELSE 0 END), 0) -
-          COALESCE(SUM(CASE WHEN vle.amount > 0 THEN vle.amount ELSE 0 END), 0)
-          as outstanding
-        FROM ledgers l
-        INNER JOIN group_tree gt ON l.parent = gt.name
-        LEFT JOIN voucher_ledger_entries vle ON vle.ledger_name = l.name
-        LEFT JOIN vouchers v ON v.voucher_guid = vle.voucher_guid
-          AND v.company_guid = l.company_guid AND v.is_deleted = 0
-          AND v.is_cancelled = 0 AND v.is_optional = 0
-          AND v.date >= ? AND v.date <= ?
-        WHERE l.company_guid = ? AND l.is_deleted = 0
-        GROUP BY l.name, l.opening_balance
-        HAVING outstanding > 0
-      )
-    ''', [companyGuid, companyGuid, fromDate, toDate, companyGuid]);
-
-    final totalReceivables = (receivablesResult.first['total_receivables'] as num?)?.toDouble() ?? 0.0;
-
-    // Payables
-    final payablesResult = await db.rawQuery('''
-      WITH RECURSIVE group_tree AS (
-        SELECT group_guid, name FROM groups
-        WHERE company_guid = ? AND (name = 'Sundry Creditors' OR reserved_name = 'Sundry Creditors') AND is_deleted = 0
-        UNION ALL
-        SELECT g.group_guid, g.name FROM groups g
-        INNER JOIN group_tree gt ON g.parent_guid = gt.group_guid
-        WHERE g.company_guid = ? AND g.is_deleted = 0
-      )
-      SELECT COALESCE(SUM(outstanding), 0) as total_payables FROM (
-        SELECT
-          l.opening_balance +
-          COALESCE(SUM(CASE WHEN vle.amount > 0 THEN vle.amount ELSE 0 END), 0) -
-          COALESCE(SUM(CASE WHEN vle.amount < 0 THEN ABS(vle.amount) ELSE 0 END), 0)
-          as outstanding
-        FROM ledgers l
-        INNER JOIN group_tree gt ON l.parent = gt.name
-        LEFT JOIN voucher_ledger_entries vle ON vle.ledger_name = l.name
-        LEFT JOIN vouchers v ON v.voucher_guid = vle.voucher_guid
-          AND v.company_guid = l.company_guid AND v.is_deleted = 0
-          AND v.is_cancelled = 0 AND v.is_optional = 0
-          AND v.date >= ? AND v.date <= ?
-        WHERE l.company_guid = ? AND l.is_deleted = 0
-        GROUP BY l.name, l.opening_balance
-        HAVING outstanding > 0
-      )
-    ''', [companyGuid, companyGuid, fromDate, toDate, companyGuid]);
-
-    final totalPayables = (payablesResult.first['total_payables'] as num?)?.toDouble() ?? 0.0;
-
-    // Receipts & Payments totals
-    final receiptsResult = await db.rawQuery('''
-      SELECT COALESCE(SUM(CASE WHEN vle.amount > 0 THEN vle.amount ELSE 0 END), 0) as total_receipts
-      FROM vouchers v
-      INNER JOIN voucher_ledger_entries vle ON v.voucher_guid = vle.voucher_guid
-      WHERE v.company_guid = ? AND v.voucher_type = 'Receipt'
-        AND v.is_deleted = 0 AND v.is_cancelled = 0 AND v.is_optional = 0
-        AND v.date >= ? AND v.date <= ?
-    ''', [companyGuid, fromDate, toDate]);
-
-    final totalReceipts = (receiptsResult.first['total_receipts'] as num?)?.toDouble() ?? 0.0;
-
-    final paymentsResult = await db.rawQuery('''
-      SELECT COALESCE(SUM(CASE WHEN vle.amount < 0 THEN ABS(vle.amount) ELSE 0 END), 0) as total_payments
-      FROM vouchers v
-      INNER JOIN voucher_ledger_entries vle ON v.voucher_guid = vle.voucher_guid
-      WHERE v.company_guid = ? AND v.voucher_type = 'Payment'
-        AND v.is_deleted = 0 AND v.is_cancelled = 0 AND v.is_optional = 0
-        AND v.date >= ? AND v.date <= ?
-    ''', [companyGuid, fromDate, toDate]);
-
-    final totalPayments = (paymentsResult.first['total_payments'] as num?)?.toDouble() ?? 0.0;
+    final data = await QueryService.getAnalysisDetailed(
+      companyGuid, fromDate, toDate,
+    );
 
     return {
-      'sales': netSales,
-      'purchase': netPurchase,
-      'gross_profit': netSales - netPurchase,
-      'receivables': totalReceivables,
-      'payables': totalPayables,
-      'receipts': totalReceipts,
-      'payments': totalPayments,
+      'sales': data['sales'],
+      'purchase': data['purchase'],
+      'gross_profit': data['gross_profit'],
+      'receivables': data['total_receivables'],
+      'payables': data['total_payables'],
+      'receipts': data['total_receipts'],
+      'payments': data['total_payments'],
     };
   }
 

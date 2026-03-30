@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import '../../database/database_helper.dart';
+import '../../services/queries/query_service.dart';
 import 'ledger_detail_screen.dart';
 
 // ── Mode enum ──────────────────────────────────────────────────────────────────
@@ -127,119 +128,26 @@ class _LedgerListScreenState extends State<LedgerListScreen>
   // ── All-ledgers query (was LedgerReportsScreen) ───────────────────────────
 
   Future<void> _fetchLedgers() async {
-    final db = await _db.database;
-
-    String where = 'l.company_guid = ? AND l.is_deleted = 0';
-    final params = <dynamic>[_companyGuid];
-
-    if (_selectedGroup != null) {
-      where += ' AND l.parent = ?';
-      params.add(_selectedGroup);
-    }
-    if (_searchQuery.isNotEmpty) {
-      where += ' AND l.name LIKE ?';
-      params.add('%$_searchQuery%');
-    }
-
-    final result = await db.rawQuery('''
-      SELECT 
-        l.name          AS ledger_name,
-        l.parent        AS group_name,
-        l.opening_balance,
-        COALESCE(SUM(CASE WHEN vle.amount < 0 THEN ABS(vle.amount) ELSE 0 END), 0) AS debit_total,
-        COALESCE(SUM(CASE WHEN vle.amount > 0 THEN vle.amount           ELSE 0 END), 0) AS credit_total,
-        (l.opening_balance +
-         COALESCE(SUM(CASE WHEN vle.amount > 0 THEN vle.amount           ELSE 0 END), 0) -
-         COALESCE(SUM(CASE WHEN vle.amount < 0 THEN ABS(vle.amount) ELSE 0 END), 0)
-        ) AS closing_balance,
-        COUNT(DISTINCT v.voucher_guid) AS voucher_count
-      FROM ledgers l
-      LEFT JOIN voucher_ledger_entries vle ON vle.ledger_name = l.name
-      LEFT JOIN vouchers v
-        ON  v.voucher_guid   = vle.voucher_guid
-        AND v.company_guid   = l.company_guid
-        AND v.is_deleted     = 0
-        AND v.is_cancelled   = 0
-        AND v.is_optional    = 0
-        AND v.date >= ?
-        AND v.date <= ?
-      WHERE $where
-      GROUP BY l.name, l.parent, l.opening_balance
-      ORDER BY l.name
-    ''', [_fromDate, _toDate, ...params]);
-
+    final result = await QueryService.fetchLedgersWithBalances(
+      _companyGuid!, _fromDate!, _toDate!,
+      selectedGroup: _selectedGroup,
+      searchQuery: _searchQuery.isNotEmpty ? _searchQuery : null,
+    );
     setState(() => _rows = result);
   }
 
   Future<void> _fetchGroups() async {
-    final db = await _db.database;
-    final result = await db.rawQuery('''
-      SELECT DISTINCT parent AS group_name
-      FROM ledgers
-      WHERE company_guid = ? AND is_deleted = 0 AND parent IS NOT NULL
-      ORDER BY parent
-    ''', [_companyGuid]);
-    setState(() {
-      _groups = result.map((r) => r['group_name'] as String).toList();
-    });
+    final groups = await QueryService.fetchDistinctGroups(_companyGuid!);
+    setState(() => _groups = groups);
   }
 
   // ── Party-ledger query (was PartyLedgerDetailScreen) ─────────────────────
 
   Future<void> _fetchParties() async {
-    final db = await _db.database;
-    final isDebtors = widget.groupName == 'Sundry Debtors';
-    final treeName  = isDebtors ? 'debtor_tree' : 'creditor_tree';
-    final seedName  = isDebtors ? 'Sundry Debtors' : 'Sundry Creditors';
-    final reservedN = isDebtors ? 'Sundry Debtors' : 'Sundry Creditors';
-
-    final query = '''
-      WITH RECURSIVE $treeName AS (
-        SELECT group_guid, name
-        FROM groups
-        WHERE company_guid = ?
-          AND (name = '$seedName' OR reserved_name = '$reservedN')
-          AND is_deleted = 0
-        UNION ALL
-        SELECT g.group_guid, g.name
-        FROM groups g
-        INNER JOIN $treeName t ON g.parent_guid = t.group_guid
-        WHERE g.company_guid = ? AND g.is_deleted = 0
-      )
-      SELECT
-        l.name          AS ledger_name,
-        l.parent        AS group_name,
-        l.opening_balance,
-        COALESCE(SUM(CASE WHEN vle.amount < 0 THEN ABS(vle.amount) ELSE 0 END), 0) AS debit_total,
-        COALESCE(SUM(CASE WHEN vle.amount > 0 THEN vle.amount           ELSE 0 END), 0) AS credit_total,
-        (l.opening_balance +
-         COALESCE(SUM(CASE WHEN vle.amount < 0 THEN ABS(vle.amount) ELSE 0 END), 0) -
-         COALESCE(SUM(CASE WHEN vle.amount > 0 THEN vle.amount           ELSE 0 END), 0)
-        ) AS closing_balance,
-        COUNT(DISTINCT v.voucher_guid) AS voucher_count
-      FROM ledgers l
-      INNER JOIN $treeName t ON l.parent = t.name
-      LEFT JOIN voucher_ledger_entries vle ON vle.ledger_name = l.name
-      LEFT JOIN vouchers v
-        ON  v.voucher_guid   = vle.voucher_guid
-        AND v.company_guid   = l.company_guid
-        AND v.is_deleted     = 0
-        AND v.is_cancelled   = 0
-        AND v.is_optional    = 0
-      WHERE l.company_guid = ? AND l.is_deleted = 0
-      GROUP BY l.name, l.parent, l.opening_balance
-      ORDER BY ABS(closing_balance) DESC
-    ''';
-
-    final result = await db.rawQuery(
-        query, [_companyGuid, _companyGuid, _companyGuid]);
-
-    setState(() {
-      _rows = result.where((row) {
-        final bal = (row['closing_balance'] as num?)?.toDouble() ?? 0.0;
-        return widget.isReceivable ? bal > 0.01 : bal < -0.01;
-      }).toList();
-    });
+    final result = await QueryService.fetchPartyLedgers(
+      _companyGuid!, widget.groupName!, widget.isReceivable,
+    );
+    setState(() => _rows = result);
   }
 
   // ── Computed values ───────────────────────────────────────────────────────

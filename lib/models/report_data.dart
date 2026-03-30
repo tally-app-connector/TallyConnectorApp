@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../theme/app_theme.dart';
-import '../icons/app_icons.dart';
+import '../screens/theme/app_theme.dart';
+import '../screens/icons/app_icons.dart';
 
 // ─────────────────────────────────────────────
 //  REPORT METRIC ENUM

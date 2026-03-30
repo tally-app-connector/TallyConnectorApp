@@ -453,6 +453,7 @@
 
 import 'package:flutter/material.dart';
 import '../../database/database_helper.dart';
+import '../../services/queries/query_service.dart';
 import 'voucher_detail_screen.dart';
 
 class LedgerDetailScreen extends StatefulWidget {
@@ -518,40 +519,13 @@ class _LedgerDetailScreenState extends State<LedgerDetailScreen>
   Future<void> _loadVouchers() async {
     setState(() => _loading = true);
 
-    final db = await _db.database;
+    _openingBalance = await QueryService.getOpeningBalance(
+      widget.companyGuid, widget.ledgerName,
+    );
 
-    final ledgerResult = await db.rawQuery('''
-      SELECT opening_balance FROM ledgers
-      WHERE company_guid = ? AND name = ? AND is_deleted = 0
-      LIMIT 1
-    ''', [widget.companyGuid, widget.ledgerName]);
-
-    if (ledgerResult.isNotEmpty) {
-      _openingBalance =
-          (ledgerResult.first['opening_balance'] as num?)?.toDouble() ?? 0.0;
-    }
-
-    final voucherResult = await db.rawQuery('''
-      SELECT
-        v.voucher_guid,
-        v.date,
-        v.voucher_type,
-        v.voucher_number,
-        v.narration,
-        vle.amount,
-        CASE WHEN vle.amount < 0 THEN ABS(vle.amount) ELSE 0 END AS debit,
-        CASE WHEN vle.amount > 0 THEN vle.amount           ELSE 0 END AS credit
-      FROM vouchers v
-      INNER JOIN voucher_ledger_entries vle ON vle.voucher_guid = v.voucher_guid
-      WHERE v.company_guid   = ?
-        AND vle.ledger_name  = ?
-        AND v.is_deleted     = 0
-        AND v.is_cancelled   = 0
-        AND v.is_optional    = 0
-        AND v.date >= ?
-        AND v.date <= ?
-      ORDER BY v.date ASC, v.voucher_number ASC
-    ''', [widget.companyGuid, widget.ledgerName, widget.fromDate, widget.toDate]);
+    final voucherResult = await QueryService.getLedgerVouchers(
+      widget.companyGuid, widget.ledgerName, widget.fromDate, widget.toDate,
+    );
 
     double balance = _openingBalance;
     final withBalance = <Map<String, dynamic>>[];

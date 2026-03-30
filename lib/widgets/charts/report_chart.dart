@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
-import '../../theme/app_theme.dart';
+import '../../screens/theme/app_theme.dart';
 import '../../models/report_data.dart';
 import '../../utils/amount_formatter.dart';
 import '../../utils/chart_period_helper.dart';

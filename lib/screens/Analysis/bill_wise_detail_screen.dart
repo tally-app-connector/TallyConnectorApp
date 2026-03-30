@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../database/database_helper.dart';
+import '../../services/queries/query_service.dart';
 
 class BillWiseDetailScreen extends StatefulWidget {
   final String companyGuid;
@@ -44,66 +45,10 @@ class _BillWiseDetailScreenState extends State<BillWiseDetailScreen> {
 
   Future<void> _loadBills() async {
   setState(() => _loading = true);
-  
-  final db = await _db.database;
-  
-  final result = await db.rawQuery('''
-    WITH bill_entries AS (
-      SELECT 
-        vle.ledger_name,
-        vle.bill_name as reference_name,
-        vle.bill_type,
-        v.date as transaction_date,
-        v.voucher_number,
-        v.voucher_type,
-        vle.bill_date,
-        CASE 
-          WHEN vle.bill_type = 'New Ref' THEN vle.amount
-          ELSE 0
-        END as bill_amount,
-        CASE 
-          WHEN vle.bill_type = 'Agst Ref' THEN vle.amount
-          ELSE 0
-        END as payment_amount,
-        v.voucher_guid
-      FROM voucher_ledger_entries vle
-      INNER JOIN vouchers v ON v.voucher_guid = vle.voucher_guid
-      WHERE v.company_guid = ?
-        AND vle.ledger_name = ?
-        AND vle.bill_name IS NOT NULL
-        AND vle.bill_name != ''
-        AND v.is_deleted = 0
-        AND v.is_cancelled = 0
-        AND v.is_optional = 0
-        AND v.date >= ?
-        AND v.date <= ?
-    ),
-    bill_summary AS (
-      SELECT 
-        reference_name,
-        MIN(bill_date) as bill_date,
-        MIN(transaction_date) as first_transaction_date,
-        SUM(bill_amount) as total_bill_amount,
-        SUM(payment_amount) as total_payment_amount,
-        (SUM(bill_amount) + SUM(payment_amount)) as outstanding,
-        COUNT(DISTINCT CASE WHEN bill_type = 'New Ref' THEN voucher_guid END) as bill_count,
-        COUNT(DISTINCT CASE WHEN bill_type = 'Agst Ref' THEN voucher_guid END) as payment_count
-      FROM bill_entries
-      GROUP BY reference_name
-      HAVING ABS(outstanding) > 0.01
-    )
-    SELECT 
-      reference_name,
-      COALESCE(bill_date, first_transaction_date) as bill_date,
-      total_bill_amount,
-      ABS(total_payment_amount) as total_payment_amount,
-      outstanding,
-      bill_count,
-      payment_count,
-      SUM(outstanding) OVER () as total_outstanding
-    FROM bill_summary
-    ORDER BY COALESCE(bill_date, first_transaction_date) DESC, reference_name
-  ''', [widget.companyGuid, widget.ledgerName, widget.fromDate, widget.toDate]);
+
+  final result = await QueryService.getBillWiseDetail(
+    widget.companyGuid, widget.ledgerName, widget.fromDate, widget.toDate,
+  );
   // prettyPrint(result);
       print('reference_name, bill_date, total_bill_amount, total_payment_amount, outstanding, bill_count, payment_count');
 

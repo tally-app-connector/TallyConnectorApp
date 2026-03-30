@@ -1,12 +1,14 @@
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import '../../ai/services/ai_provider_service.dart';
-import '../../ai/models/metric_config.dart';
-import '../../ai/di/ai_dependencies.dart';
-import '../../ai/services/ai_qa_service.dart';
-import '../../ai/models/query_result.dart';
-import '../../ai/services/query_templates.dart';
-import '../../ai/services/query_builder.dart';
+import 'package:fl_chart/fl_chart.dart';
+import '../../services/ai/ai_provider_service.dart';
+import '../../models/ai/metric_config.dart';
+import '../../config/ai_dependencies.dart';
+import '../../services/ai/ai_qa_service.dart';
+import '../../models/ai/query_result.dart';
+import '../../services/ai/query_templates.dart';
+import '../../services/ai/query_builder.dart';
 
 /// Result type categories for universal summary card
 enum _ResultType {
@@ -705,6 +707,15 @@ class _AIQueriesScreenState extends State<AIQueriesScreen> {
               if (message['generated_sql'] != null)
                 _buildDateRangeFilter(message),
               _buildQueryResultTable(message['query_result']),
+              // Chart visualization (below table)
+              _buildQueryChart(
+                message['query_result'],
+                message['original_question']?.toString() ?? message['content']?.toString() ?? '',
+              ),
+              // Related questions
+              _buildRelatedQuestions(
+                message['original_question']?.toString() ?? message['content']?.toString() ?? '',
+              ),
               // Calculation methodology note for salary/TDS queries
               if (_isSalaryQuery(message['original_question']?.toString() ?? message['content']?.toString() ?? ''))
                 _buildCalcNote(
@@ -1648,85 +1659,785 @@ class _AIQueriesScreenState extends State<AIQueriesScreen> {
     if (queryResult.hasError) {
       return Container(
         padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: Colors.red[50],
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Text(
-          'Error: ${queryResult.error}',
-          style: TextStyle(fontSize: 12, color: Colors.red[700]),
-        ),
+        decoration: BoxDecoration(color: Colors.red[50], borderRadius: BorderRadius.circular(8)),
+        child: Text('Error: ${queryResult.error}', style: TextStyle(fontSize: 12, color: Colors.red[700])),
       );
     }
-
     if (queryResult.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Text(
-          'No results found (${queryResult.formattedExecutionTime})',
-          style: const TextStyle(fontSize: 12, color: Colors.black54),
-        ),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)),
+        child: Text('No results found (${queryResult.formattedExecutionTime})',
+            style: const TextStyle(fontSize: 12, color: Colors.black54)),
       );
+    }
+    return _SortableTable(
+      columns: List<String>.from(queryResult.columnNames),
+      rows: List<Map<String, dynamic>>.from(queryResult.data),
+      executionTime: queryResult.formattedExecutionTime,
+    );
+  }
+
+  // ─── Chart constants (matches mobile app_theme) ───
+  static const _cBlue = Color(0xFF2D8BE0);
+  static const _cGreen = Color(0xFF16A34A);
+  static const _cRed = Color(0xFFEF4444);
+  static const _cAmber = Color(0xFFF59E0B);
+  static const _cTextSec = Color(0xFF9CA3AF);
+  static const int _ckNone = 0, _ckHBar = 1, _ckVBar = 2, _ckPie = 3, _ckLine = 4;
+
+  /// Determine what chart to show based on columns and question
+  Widget _buildQueryChart(dynamic queryResult, String question) {
+    if (queryResult == null || queryResult.hasError || queryResult.isEmpty) {
+      return const SizedBox.shrink();
     }
 
     final List<String> columns = List<String>.from(queryResult.columnNames);
     final List<Map<String, dynamic>> rows =
         List<Map<String, dynamic>>.from(queryResult.data);
-    final displayRows = rows; // Show all results, no pagination limit
+    final q = question.toLowerCase();
+    final colLower = columns.map((c) => c.toLowerCase()).toList();
+
+    // Skip charts for transaction lists (day book, voucher lists)
+    if (colLower.contains('voucher_number') || colLower.contains('narration')) {
+      return const SizedBox.shrink();
+    }
+
+    // ── Special single-row charts (must check BEFORE rows.length filter) ──
+    if (rows.length == 1) {
+      // P&L summary
+      if (colLower.contains('net_sales') && colLower.contains('net_purchase') && colLower.contains('gross_profit')) {
+        return _buildPLChart(rows.first);
+      }
+      // Cash flow (receipts vs payments)
+      if (colLower.contains('total_receipts') && colLower.contains('total_payments')) {
+        return _buildReceiptsPaymentsChart(rows.first);
+      }
+      // Total sales (single aggregate)
+      if (colLower.contains('net_sales') && colLower.contains('vouchers') && rows.first['net_sales'] is num) {
+        return _buildSingleMetricCard('Net Sales', (rows.first['net_sales'] as num).toDouble(), _cGreen, Icons.trending_up,
+            extras: {'Vouchers': rows.first['vouchers']?.toString() ?? '0'});
+      }
+      // Total purchase
+      if (colLower.contains('net_purchase') && colLower.contains('vouchers') && rows.first['net_purchase'] is num) {
+        return _buildSingleMetricCard('Net Purchase', (rows.first['net_purchase'] as num).toDouble(), _cAmber, Icons.shopping_cart,
+            extras: {'Vouchers': rows.first['vouchers']?.toString() ?? '0'});
+      }
+      return const SizedBox.shrink();
+    }
+
+    // Detect chart kind, label column, and value column(s)
+    String? labelCol;
+    String? valueCol;
+    String? valueCol2;
+    String? valueLabel1, valueLabel2;
+    int kind = _ckNone;
+    String chartTitle = '';
+
+    // ── Month wise → Line chart (detect combo: sales+expense or sales+purchase) ──
+    if (colLower.contains('month_name')) {
+      labelCol = columns[colLower.indexOf('month_name')];
+      // Check for dual-series combo
+      final hasSales = colLower.contains('net_sales');
+      final hasExpense = colLower.contains('net_expense');
+      final hasPurchase = colLower.contains('net_purchase');
+      if (hasSales && hasExpense) {
+        valueCol = columns[colLower.indexOf('net_sales')];
+        valueCol2 = columns[colLower.indexOf('net_expense')];
+        valueLabel1 = 'Sales';
+        valueLabel2 = 'Expenses';
+        chartTitle = 'Sales vs Expenses';
+      } else if (hasSales && hasPurchase) {
+        valueCol = columns[colLower.indexOf('net_sales')];
+        valueCol2 = columns[colLower.indexOf('net_purchase')];
+        valueLabel1 = 'Sales';
+        valueLabel2 = 'Purchase';
+        chartTitle = 'Sales vs Purchase';
+      } else {
+        valueCol = _pickValueCol(columns, colLower, ['net_sales', 'net_purchase', 'net_expense', 'net_cash_flow']);
+        chartTitle = 'Monthly Trend';
+      }
+      kind = _ckLine;
+    }
+    // ── Top N / party / item → Horizontal bar ──
+    else if (q.contains('top') || q.contains('by amount') || q.contains('by value') || q.contains('by sales') || q.contains('by purchase')) {
+      labelCol = _pickLabelCol(columns, colLower);
+      valueCol = _pickValueCol(columns, colLower, ['total_sales', 'total_purchase', 'outstanding', 'total_amount', 'closing_value', 'net_amount']);
+      kind = _ckHBar;
+      chartTitle = 'Top Items';
+    }
+    // ── Aging → Vertical bar by aging bucket ──
+    else if (colLower.contains('aging_bucket') || q.contains('aging')) {
+      // Aggregate by aging bucket
+      return _buildAgingChart(rows, colLower, columns);
+    }
+    // ── Stock group wise → Pie chart ──
+    else if (colLower.contains('stock_group') && colLower.contains('total_value') && !colLower.contains('item_name')) {
+      labelCol = columns[colLower.indexOf('stock_group')];
+      valueCol = columns[colLower.indexOf('total_value')];
+      kind = _ckPie;
+      chartTitle = 'Stock by Group';
+    }
+    // ── Expense breakdown / P&L → Pie chart ──
+    else if ((q.contains('breakdown') || q.contains('direct') || q.contains('indirect'))
+        && colLower.contains('ledger_name') && rows.length >= 2 && rows.length <= 20) {
+      labelCol = columns[colLower.indexOf('ledger_name')];
+      valueCol = _pickValueCol(columns, colLower, ['net_amount', 'debit_total', 'closing_balance']);
+      kind = _ckPie;
+      chartTitle = 'Breakdown';
+    }
+    // ── Balance sheet → Horizontal bar ──
+    else if (colLower.contains('group_name') && colLower.contains('total_balance')) {
+      labelCol = columns[colLower.indexOf('group_name')];
+      valueCol = columns[colLower.indexOf('total_balance')];
+      kind = _ckHBar;
+      chartTitle = 'Balance Sheet';
+    }
+    // ── Cash flow (receipts vs payments) → Vertical bar ──
+    else if (colLower.contains('total_receipts') && colLower.contains('total_payments')) {
+      return _buildReceiptsPaymentsChart(rows.first);
+    }
+    // ── P&L summary → Horizontal bar ──
+    else if (colLower.contains('net_sales') && colLower.contains('net_purchase') && colLower.contains('gross_profit')) {
+      return _buildPLChart(rows.first);
+    }
+    // ── Voucher type summary → Pie chart ──
+    else if (colLower.contains('voucher_type') && colLower.contains('voucher_count')) {
+      labelCol = columns[colLower.indexOf('voucher_type')];
+      valueCol = columns[colLower.indexOf('voucher_count')];
+      kind = _ckPie;
+      chartTitle = 'Voucher Distribution';
+    }
+    // ── GST HSN → Horizontal bar ──
+    else if (colLower.contains('taxable_value') && (colLower.contains('hsn_code') || colLower.contains('stock_item_name'))) {
+      labelCol = colLower.contains('stock_item_name')
+          ? columns[colLower.indexOf('stock_item_name')]
+          : columns[colLower.indexOf('hsn_code')];
+      valueCol = columns[colLower.indexOf('taxable_value')];
+      kind = _ckHBar;
+      chartTitle = 'GST Summary';
+    }
+    // ── Tax ledgers → Horizontal bar ──
+    else if (colLower.contains('ledger_name') && colLower.contains('txn_count') && rows.length >= 2 && rows.length <= 25) {
+      labelCol = columns[colLower.indexOf('ledger_name')];
+      valueCol = _pickValueCol(columns, colLower, ['debit_total', 'credit_total']);
+      kind = _ckHBar;
+      chartTitle = 'Tax Ledgers';
+    }
+    // ── Receivables / Payables list with outstanding → Horizontal bar (limit 10) ──
+    else if (colLower.contains('outstanding') && colLower.contains('party_name') && rows.length >= 3) {
+      labelCol = columns[colLower.indexOf('party_name')];
+      valueCol = columns[colLower.indexOf('outstanding')];
+      kind = _ckHBar;
+      chartTitle = 'Outstanding';
+    }
+
+    if (kind == _ckNone || labelCol == null || valueCol == null) {
+      return const SizedBox.shrink();
+    }
+
+    // Prepare data (limit to 10-15 items for readability)
+    final maxItems = kind == _ckPie ? 8 : (kind == _ckLine ? rows.length : 10);
+    final displayRows = rows.length > maxItems ? rows.sublist(0, maxItems) : rows;
+
+    final labels = displayRows.map((r) => _truncLabel(r[labelCol]?.toString() ?? '', 14)).toList();
+    final values = displayRows.map((r) {
+      final v = r[valueCol];
+      return (v is num) ? v.toDouble().abs() : 0.0;
+    }).toList();
+
+    switch (kind) {
+      case _ckHBar:
+        return _buildHBarChart(labels, values, chartTitle);
+      case _ckVBar:
+        return _buildVBarChart(labels, values, chartTitle);
+      case _ckPie:
+        return _buildPieChart(labels, values, chartTitle);
+      case _ckLine:
+        // Build second series if combo
+        List<double>? values2;
+        if (valueCol2 != null) {
+          values2 = displayRows.map((r) {
+            final v = r[valueCol2];
+            return (v is num) ? v.toDouble().abs() : 0.0;
+          }).toList();
+        }
+        return _buildLineChart(labels, values, chartTitle,
+            values2: values2, label1: valueLabel1, label2: valueLabel2);
+      default:
+        return const SizedBox.shrink();
+    }
+  }
+
+  String? _pickValueCol(List<String> cols, List<String> colLower, List<String> preferred) {
+    for (final p in preferred) {
+      final idx = colLower.indexOf(p);
+      if (idx >= 0) return cols[idx];
+    }
+    // Fallback: first numeric-looking column
+    for (int i = 0; i < cols.length; i++) {
+      if (colLower[i].contains('total') || colLower[i].contains('amount') ||
+          colLower[i].contains('value') || colLower[i].contains('balance')) {
+        return cols[i];
+      }
+    }
+    return null;
+  }
+
+  String? _pickLabelCol(List<String> cols, List<String> colLower) {
+    for (final n in ['party_name', 'item_name', 'ledger_name', 'stock_item_name', 'stock_group', 'hsn_code']) {
+      final idx = colLower.indexOf(n);
+      if (idx >= 0) return cols[idx];
+    }
+    return cols.isNotEmpty ? cols.first : null;
+  }
+
+  String _truncLabel(String s, int max) {
+    if (s.length <= max) return s;
+    return '${s.substring(0, max - 2)}..';
+  }
+
+  String _chartFormatNum(double value) {
+    final abs = value.abs();
+    if (abs >= 10000000) return '${(abs / 10000000).toStringAsFixed(2)} Cr';
+    if (abs >= 100000) return '${(abs / 100000).toStringAsFixed(2)} L';
+    if (abs >= 1000) return '${(abs / 1000).toStringAsFixed(1)}K';
+    return abs.toStringAsFixed(0);
+  }
+
+  // Pie chart needs multiple colors; everything else uses _cBlue
+  static const _pieColors = [
+    Color(0xFF2D8BE0), Color(0xFF16A34A), Color(0xFFF59E0B), Color(0xFFEF4444),
+    Color(0xFF8B5CF6), Color(0xFF06B6D4), Color(0xFFEC4899), Color(0xFFD97706),
+  ];
+
+  // ── Horizontal Bar Chart ──
+  Widget _buildHBarChart(List<String> labels, List<double> values, String title) {
+    if (values.isEmpty || values.reduce(math.max) == 0) return const SizedBox.shrink();
+    return _SortableBarChart(labels: labels, values: values, title: title);
+  }
+
+  // ── Vertical Bar Chart (currently unused, kept for future) ──
+  Widget _buildVBarChart(List<String> labels, List<double> values, String title) {
+    // Redirect to horizontal bar for consistent overflow-safe rendering
+    return _buildHBarChart(labels, values, title);
+  }
+
+  // ── Pie Chart ──
+  Widget _buildPieChart(List<String> labels, List<double> values, String title) {
+    final total = values.fold(0.0, (a, b) => a + b);
+    if (total == 0) return const SizedBox.shrink();
 
     return Container(
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.shade200),
       ),
-      clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: DataTable(
-              columnSpacing: 16,
-              horizontalMargin: 8,
-              headingRowHeight: 36,
-              dataRowMinHeight: 32,
-              dataRowMaxHeight: 48,
-              headingTextStyle: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
-              ),
-              dataTextStyle: const TextStyle(
-                fontSize: 12,
-                color: Colors.black87,
-              ),
-              columns: columns
-                  .map<DataColumn>((col) => DataColumn(label: Text(col)))
-                  .toList(),
-              rows: displayRows
-                  .map<DataRow>((row) => DataRow(
-                        cells: columns
-                            .map<DataCell>((col) => DataCell(
-                                  Text(
-                                    _formatCellValue(row[col]),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ))
-                            .toList(),
-                      ))
-                  .toList(),
+          Text(title, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.black54)),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 200,
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: PieChart(
+                    PieChartData(
+                      sectionsSpace: 2,
+                      centerSpaceRadius: 28,
+                      sections: List.generate(labels.length, (i) {
+                        final pct = (values[i] / total * 100);
+                        return PieChartSectionData(
+                          value: values[i],
+                          color: _pieColors[i % _pieColors.length],
+                          radius: 55,
+                          title: pct >= 9 ? '${pct.toStringAsFixed(0)}%' : '',
+                          titleStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
+                          titlePositionPercentageOffset: 0.55,
+                        );
+                      }),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 2,
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(labels.length, (i) {
+                        final pct = (values[i] / total * 100).toStringAsFixed(0);
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 2),
+                          child: Row(
+                            children: [
+                              Container(width: 8, height: 8,
+                                  decoration: BoxDecoration(
+                                    color: _pieColors[i % _pieColors.length],
+                                    borderRadius: BorderRadius.circular(2),
+                                  )),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(labels[i],
+                                        style: const TextStyle(fontSize: 9, color: Colors.black87),
+                                        overflow: TextOverflow.ellipsis),
+                                    Text('₹${_chartFormatNum(values[i])} ($pct%)',
+                                        style: TextStyle(fontSize: 8, color: Colors.grey.shade600)),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.all(8),
-            child: Text(
-              '${rows.length} result${rows.length == 1 ? '' : 's'} (${queryResult.formattedExecutionTime})',
-              style: const TextStyle(fontSize: 11, color: Colors.black45),
+        ],
+      ),
+    );
+  }
+
+  // ── Line Chart ──
+  Widget _buildLineChart(List<String> labels, List<double> values, String title,
+      {List<double>? values2, String? label1, String? label2}) {
+    final allVals = [...values, if (values2 != null) ...values2];
+    final maxVal = allVals.reduce(math.max);
+    final minVal = allVals.reduce(math.min);
+    final isDual = values2 != null && values2.isNotEmpty;
+
+    return Container(
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12, offset: const Offset(0, 2))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Title + legend
+          Row(
+            children: [
+              Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.5, color: Color(0xFF4A4A5A))),
+              const Spacer(),
+              if (isDual) ...[
+                Container(width: 10, height: 3, decoration: BoxDecoration(color: _cBlue, borderRadius: BorderRadius.circular(2))),
+                const SizedBox(width: 4),
+                Text(label1 ?? 'Series 1', style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w500, color: _cBlue)),
+                const SizedBox(width: 10),
+                Container(width: 10, height: 3, decoration: BoxDecoration(color: _cAmber, borderRadius: BorderRadius.circular(2))),
+                const SizedBox(width: 4),
+                Text(label2 ?? 'Series 2', style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w500, color: _cAmber)),
+              ],
+            ],
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 220,
+            child: LineChart(
+              LineChartData(
+                minY: minVal > 0 ? 0 : minVal * 1.1,
+                maxY: maxVal * 1.15,
+                lineTouchData: LineTouchData(
+                  touchTooltipData: LineTouchTooltipData(
+                    getTooltipColor: (_) => const Color(0xFF1A1A2E),
+                    getTooltipItems: (spots) => spots.map((s) {
+                      final idx = s.x.toInt();
+                      final monthLabel = idx < labels.length ? labels[idx] : '';
+                      final seriesLabel = isDual
+                          ? (s.barIndex == 0 ? (label1 ?? '') : (label2 ?? ''))
+                          : monthLabel;
+                      return LineTooltipItem(
+                        '$seriesLabel\n₹${_chartFormatNum(s.y)}',
+                        TextStyle(color: Colors.white, fontSize: 11,
+                            fontWeight: s.barIndex == 0 ? FontWeight.w600 : FontWeight.w400),
+                      );
+                    }).toList(),
+                  ),
+                ),
+                titlesData: FlTitlesData(
+                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 50,
+                      getTitlesWidget: (val, meta) => Text(
+                        _chartFormatNum(val),
+                        style: const TextStyle(fontSize: 9, color: _cTextSec),
+                      ),
+                    ),
+                  ),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 28,
+                      interval: labels.length > 6 ? 2 : 1,
+                      getTitlesWidget: (val, meta) {
+                        final idx = val.toInt();
+                        if (idx < 0 || idx >= labels.length) return const SizedBox.shrink();
+                        final parts = labels[idx].split(' ');
+                        final short = parts.length == 2
+                            ? "${parts[0].substring(0, math.min(3, parts[0].length))}'${parts[1].substring(math.max(0, parts[1].length - 2))}"
+                            : _truncLabel(labels[idx], 7);
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(short, style: const TextStyle(fontSize: 8, color: Colors.black87)),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  getDrawingHorizontalLine: (_) => FlLine(color: Colors.grey.shade200, strokeWidth: 0.5, dashArray: [5, 3]),
+                ),
+                borderData: FlBorderData(
+                  show: true,
+                  border: Border(
+                    bottom: BorderSide(color: Colors.grey.shade300, width: 0.5),
+                    left: BorderSide(color: Colors.grey.shade300, width: 0.5),
+                  ),
+                ),
+                lineBarsData: [
+                  // Line 1 (blue)
+                  LineChartBarData(
+                    spots: List.generate(values.length, (i) => FlSpot(i.toDouble(), values[i])),
+                    isCurved: true,
+                    curveSmoothness: 0.3,
+                    color: _cBlue,
+                    barWidth: 2.5,
+                    dotData: FlDotData(
+                      show: values.length <= 12,
+                      getDotPainter: (spot, pct, bar, idx) => FlDotCirclePainter(
+                        radius: 3, strokeWidth: 2, strokeColor: _cBlue, color: Colors.white,
+                      ),
+                    ),
+                    belowBarData: BarAreaData(
+                      show: !isDual, // area fill only for single line
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter, end: Alignment.bottomCenter,
+                        colors: [_cBlue.withValues(alpha: 0.3), _cBlue.withValues(alpha: 0.03)],
+                      ),
+                    ),
+                  ),
+                  // Line 2 (amber) — only if dual
+                  if (isDual)
+                    LineChartBarData(
+                      spots: List.generate(values2!.length, (i) => FlSpot(i.toDouble(), values2[i])),
+                      isCurved: true,
+                      curveSmoothness: 0.3,
+                      color: _cAmber,
+                      barWidth: 2.5,
+                      dotData: FlDotData(
+                        show: values2.length <= 12,
+                        getDotPainter: (spot, pct, bar, idx) => FlDotCirclePainter(
+                          radius: 3, strokeWidth: 2, strokeColor: _cAmber, color: Colors.white,
+                        ),
+                      ),
+                      belowBarData: BarAreaData(show: false),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Aging Bucket Chart (row-based) ──
+  Widget _buildAgingChart(List<Map<String, dynamic>> rows, List<String> colLower, List<String> columns) {
+    final bucketOrder = ['0-30 days', '31-60 days', '61-90 days', '90+ days'];
+    final bucketTotals = <String, double>{};
+    final bucketCounts = <String, int>{};
+    final amtCol = colLower.contains('bill_outstanding')
+        ? columns[colLower.indexOf('bill_outstanding')]
+        : null;
+    final bucketCol = colLower.contains('aging_bucket')
+        ? columns[colLower.indexOf('aging_bucket')]
+        : null;
+
+    if (amtCol == null || bucketCol == null) return const SizedBox.shrink();
+
+    for (final row in rows) {
+      final bucket = row[bucketCol]?.toString() ?? '?';
+      final amt = row[amtCol];
+      final val = (amt is num) ? amt.toDouble().abs() : 0.0;
+      bucketTotals[bucket] = (bucketTotals[bucket] ?? 0) + val;
+      bucketCounts[bucket] = (bucketCounts[bucket] ?? 0) + 1;
+    }
+
+    final buckets = bucketOrder.where((b) => bucketTotals.containsKey(b)).toList();
+    if (buckets.isEmpty) return const SizedBox.shrink();
+    final maxVal = buckets.map((b) => bucketTotals[b]!).reduce(math.max);
+    if (maxVal == 0) return const SizedBox.shrink();
+
+    final agingColors = {
+      '0-30 days': _cGreen,
+      '31-60 days': _cAmber,
+      '61-90 days': _cRed,
+      '90+ days': const Color(0xFFDC2626),
+    };
+
+    return Container(
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Aging Analysis', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.black54)),
+          const SizedBox(height: 10),
+          ...buckets.map((bucket) {
+            final value = bucketTotals[bucket]!;
+            final count = bucketCounts[bucket]!;
+            final fraction = value / maxVal;
+            final color = agingColors[bucket] ?? Colors.grey;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Container(width: 10, height: 10,
+                              decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2))),
+                          const SizedBox(width: 6),
+                          Text(bucket, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.black87)),
+                          Text('  ($count bills)', style: const TextStyle(fontSize: 9, color: Colors.black45)),
+                        ],
+                      ),
+                      Text('₹${_chartFormatNum(value)}',
+                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: color)),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Stack(
+                    children: [
+                      Container(
+                        height: 14,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(7),
+                        ),
+                      ),
+                      FractionallySizedBox(
+                        widthFactor: fraction.clamp(0.03, 1.0),
+                        child: Container(
+                          height: 14,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(colors: [color, color.withValues(alpha: 0.7)]),
+                            borderRadius: BorderRadius.circular(7),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  // ── Receipts vs Payments Chart (row-based) ──
+  Widget _buildReceiptsPaymentsChart(Map<String, dynamic> row) {
+    final receipts = ((row['total_receipts'] ?? 0) as num).toDouble();
+    final payments = ((row['total_payments'] ?? 0) as num).toDouble();
+    if (receipts == 0 && payments == 0) return const SizedBox.shrink();
+
+    final maxVal = math.max(receipts, payments);
+    if (maxVal == 0) return const SizedBox.shrink();
+    final net = receipts - payments;
+
+    final items = [
+      ('Receipts', receipts, _cGreen),
+      ('Payments', payments, _cRed),
+      ('Net Cash Flow', net.abs(), net >= 0 ? _cBlue : _cRed),
+    ];
+
+    return Container(
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white, borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Receipts vs Payments', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.black54)),
+          const SizedBox(height: 10),
+          ...items.map((item) {
+            final fraction = maxVal > 0 ? item.$2 / maxVal : 0.0;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                children: [
+                  SizedBox(width: 80, child: Text(item.$1,
+                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: item.$3),
+                      textAlign: TextAlign.right)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Stack(children: [
+                      Container(height: 14, decoration: BoxDecoration(
+                          color: Colors.grey.shade100, borderRadius: BorderRadius.circular(7))),
+                      FractionallySizedBox(
+                        widthFactor: fraction.clamp(0.03, 1.0),
+                        child: Container(height: 14, decoration: BoxDecoration(
+                            gradient: LinearGradient(colors: [item.$3, item.$3.withValues(alpha: 0.6)]),
+                            borderRadius: BorderRadius.circular(7))),
+                      ),
+                    ]),
+                  ),
+                  const SizedBox(width: 6),
+                  SizedBox(width: 62, child: Text('₹${_chartFormatNum(item.$2)}',
+                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: item.$3),
+                      textAlign: TextAlign.right)),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  // ── P&L Summary Chart (row-based) ──
+  Widget _buildPLChart(Map<String, dynamic> row) {
+    final sales = ((row['net_sales'] ?? 0) as num).toDouble().abs();
+    final purchase = ((row['net_purchase'] ?? 0) as num).toDouble().abs();
+    final profit = ((row['gross_profit'] ?? 0) as num).toDouble();
+    if (sales == 0 && purchase == 0) return const SizedBox.shrink();
+
+    final maxVal = math.max(sales, math.max(purchase, profit.abs()));
+    if (maxVal == 0) return const SizedBox.shrink();
+    final profitColor = profit >= 0 ? _cBlue : _cRed;
+
+    final items = [
+      ('Net Sales', sales, _cGreen),
+      ('Net Purchase', purchase, _cAmber),
+      ('Gross Profit', profit.abs(), profitColor),
+    ];
+
+    return Container(
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white, borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Profit & Loss', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.black54)),
+          const SizedBox(height: 10),
+          ...items.map((item) {
+            final fraction = item.$2 / maxVal;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                children: [
+                  SizedBox(width: 80, child: Text(item.$1,
+                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: item.$3),
+                      textAlign: TextAlign.right)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Stack(children: [
+                      Container(height: 16, decoration: BoxDecoration(
+                          color: Colors.grey.shade100, borderRadius: BorderRadius.circular(8))),
+                      FractionallySizedBox(
+                        widthFactor: fraction.clamp(0.03, 1.0),
+                        child: Container(height: 16, decoration: BoxDecoration(
+                            gradient: LinearGradient(colors: [item.$3, item.$3.withValues(alpha: 0.6)]),
+                            borderRadius: BorderRadius.circular(8))),
+                      ),
+                    ]),
+                  ),
+                  const SizedBox(width: 6),
+                  SizedBox(width: 62, child: Text('₹${_chartFormatNum(item.$2)}',
+                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: item.$3),
+                      textAlign: TextAlign.right)),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+
+  /// Visual card for single-value aggregate results (total sales, total purchase)
+  Widget _buildSingleMetricCard(String label, double value, Color color, IconData icon,
+      {Map<String, String>? extras}) {
+    return Container(
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [color.withValues(alpha: 0.08), color.withValues(alpha: 0.02)],
+          begin: Alignment.topLeft, end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, size: 24, color: color),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: color)),
+                const SizedBox(height: 2),
+                Text('₹${_chartFormatNum(value)}',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: color)),
+                if (extras != null && extras.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Wrap(
+                    spacing: 10,
+                    children: extras.entries.map((e) => Text(
+                      '${e.key}: ${e.value}',
+                      style: const TextStyle(fontSize: 10, color: _cTextSec),
+                    )).toList(),
+                  ),
+                ],
+              ],
             ),
           ),
         ],
@@ -2277,19 +2988,31 @@ class _AIQueriesScreenState extends State<AIQueriesScreen> {
 
   String _formatIndianNumber(num value) {
     final absVal = value.abs();
-    if (absVal >= 10000000) return '${(absVal / 10000000).toStringAsFixed(2)} Cr';
-    if (absVal >= 100000) return '${(absVal / 100000).toStringAsFixed(2)} L';
-    final intVal = absVal.round();
-    final str = intVal.toString();
-    if (str.length <= 3) return str;
-    String result = str.substring(str.length - 3);
-    String remaining = str.substring(0, str.length - 3);
-    while (remaining.length > 2) {
-      result = '${remaining.substring(remaining.length - 2)},$result';
-      remaining = remaining.substring(0, remaining.length - 2);
+    // Format with 2 decimal places for fractional values
+    final hasFraction = absVal != absVal.roundToDouble();
+    final wholePart = absVal.truncate();
+    final str = wholePart.toString();
+
+    // Apply Indian number grouping (XX,XX,XXX)
+    String formatted;
+    if (str.length <= 3) {
+      formatted = str;
+    } else {
+      formatted = str.substring(str.length - 3);
+      String remaining = str.substring(0, str.length - 3);
+      while (remaining.length > 2) {
+        formatted = '${remaining.substring(remaining.length - 2)},$formatted';
+        remaining = remaining.substring(0, remaining.length - 2);
+      }
+      if (remaining.isNotEmpty) formatted = '$remaining,$formatted';
     }
-    if (remaining.isNotEmpty) result = '$remaining,$result';
-    return result;
+
+    // Append decimal part if present
+    if (hasFraction) {
+      final decimalPart = (absVal - wholePart).toStringAsFixed(2).substring(2);
+      formatted = '$formatted.$decimalPart';
+    }
+    return formatted;
   }
 
   bool _isSalaryQuery(String content) {
@@ -2301,6 +3024,44 @@ class _AIQueriesScreenState extends State<AIQueriesScreen> {
   bool _isTdsQuery(String content) {
     final q = content.toLowerCase();
     return q.contains('tds') || q.contains('professional tax') || q.contains('prof tax');
+  }
+
+  Widget _buildRelatedQuestions(String question) {
+    final related = QueryTemplates.relatedQuestions[question];
+    if (related == null || related.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.lightbulb_outline, size: 12, color: Colors.teal[400]),
+              const SizedBox(width: 4),
+              Text('Related', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.teal[600])),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 6,
+            runSpacing: 4,
+            children: related.map((q) => GestureDetector(
+              onTap: _isLoading ? null : () => _runPresetQuery(q),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.teal[50],
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.teal.withValues(alpha: 0.3)),
+                ),
+                child: Text(q, style: TextStyle(fontSize: 10, color: Colors.teal[700])),
+              ),
+            )).toList(),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildCalcNote(String text, IconData icon) {
@@ -2953,9 +3714,18 @@ class _AIQueriesScreenState extends State<AIQueriesScreen> {
             final fromDate = '${fyStart.year}${fyStart.month.toString().padLeft(2, '0')}${fyStart.day.toString().padLeft(2, '0')}';
             final toDate = '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
 
+            // Collect entities with dates + defaults from schema
+            final entities = <String, dynamic>{'from_date': fromDate, 'to_date': toDate};
+            for (final entry in t.parameterSchema.entries) {
+              final schema = entry.value as Map<String, dynamic>;
+              if (schema.containsKey('default') && !entities.containsKey(entry.key)) {
+                entities[entry.key] = schema['default'].toString();
+              }
+            }
+
             final sql = builder.build(
               template: t,
-              entities: {'from_date': fromDate, 'to_date': toDate},
+              entities: entities,
               companyGuid: widget.companyGuid,
             );
 
@@ -3067,9 +3837,9 @@ class _AIQueriesScreenState extends State<AIQueriesScreen> {
       }
     }
 
-    // No filters needed — execute directly
+    // No filters needed — try local template first, then fall back to AI
     _messageController.clear();
-    _executeQuestion(question);
+    _runPresetQuery(question);
   }
 
   /// Execute after filter selection (or direct if no filters)
@@ -3933,5 +4703,345 @@ formattedExecutionTime: '0ms',
     } catch (e) {
       return dateStr;
     }
+  }
+}
+
+// ─── Shared helpers for chart/table widgets ───
+String _fmtChartNum(double value) {
+  final abs = value.abs();
+  if (abs >= 10000000) return '${(abs / 10000000).toStringAsFixed(2)} Cr';
+  if (abs >= 100000) return '${(abs / 100000).toStringAsFixed(2)} L';
+  if (abs >= 1000) return '${(abs / 1000).toStringAsFixed(1)}K';
+  return abs.toStringAsFixed(0);
+}
+
+String _fmtCellValue(dynamic value) {
+  if (value == null) return '0';
+  if (value is double) {
+    if (value == value.truncateToDouble()) return value.toInt().toString();
+    return value.toStringAsFixed(2);
+  }
+  if (value is int) return value.toString();
+  final str = value.toString();
+  return str.isEmpty ? '0' : str;
+}
+
+const _barColors = [
+  Color(0xFF2D8BE0), Color(0xFF16A34A), Color(0xFFF59E0B), Color(0xFFEF4444),
+  Color(0xFF8B5CF6), Color(0xFF06B6D4), Color(0xFFEC4899), Color(0xFFD97706),
+];
+
+Widget _sortChip(String label, bool active, VoidCallback onTap) {
+  return GestureDetector(
+    onTap: onTap,
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: active ? const Color(0xFF2D8BE0) : const Color(0xFFF3F4F6),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(label, style: TextStyle(
+          fontSize: 9, fontWeight: FontWeight.w600,
+          color: active ? Colors.white : const Color(0xFF9CA3AF))),
+    ),
+  );
+}
+
+/// Sortable horizontal bar chart with toggle (Amount ↑↓ / Name)
+class _SortableBarChart extends StatefulWidget {
+  final List<String> labels;
+  final List<double> values;
+  final String title;
+  const _SortableBarChart({required this.labels, required this.values, required this.title});
+  @override
+  State<_SortableBarChart> createState() => _SortableBarChartState();
+}
+
+class _SortableBarChartState extends State<_SortableBarChart> {
+  int _sortMode = 0; // 0=amt desc, 1=amt asc, 2=name
+  String _search = '';
+  bool _showSearch = false;
+  final _searchCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    var items = List.generate(widget.labels.length, (i) => (i, widget.labels[i], widget.values[i]));
+
+    // Filter by search
+    if (_search.isNotEmpty) {
+      final q = _search.toLowerCase();
+      items = items.where((e) => e.$2.toLowerCase().contains(q)).toList();
+    }
+
+    // Sort
+    switch (_sortMode) {
+      case 0: items.sort((a, b) => b.$3.compareTo(a.$3)); break;
+      case 1: items.sort((a, b) => a.$3.compareTo(b.$3)); break;
+      case 2: items.sort((a, b) => a.$2.toLowerCase().compareTo(b.$2.toLowerCase())); break;
+    }
+
+    final maxVal = items.isEmpty ? 0.0 : items.map((e) => e.$3).reduce((a, b) => a > b ? a : b);
+    if (maxVal == 0 && _search.isEmpty) return const SizedBox.shrink();
+    final barH = items.length <= 5 ? 14.0 : 11.0;
+
+    return Container(
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12, offset: const Offset(0, 2))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header row
+          Row(
+            children: [
+              Expanded(child: Text(widget.title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.5, color: Color(0xFF4A4A5A)))),
+              _sortChip('High→Low', _sortMode == 0, () => setState(() { _sortMode = 0; _showSearch = false; })),
+              const SizedBox(width: 4),
+              _sortChip('Low→High', _sortMode == 1, () => setState(() { _sortMode = 1; _showSearch = false; })),
+              const SizedBox(width: 4),
+              GestureDetector(
+                onTap: () => setState(() { _sortMode = 2; _showSearch = !_showSearch; if (!_showSearch) { _search = ''; _searchCtrl.clear(); } }),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: _sortMode == 2 ? const Color(0xFF2D8BE0) : const Color(0xFFF3F4F6),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(_showSearch ? Icons.close : Icons.search, size: 10,
+                        color: _sortMode == 2 ? Colors.white : const Color(0xFF9CA3AF)),
+                    const SizedBox(width: 2),
+                    Text('Name', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600,
+                        color: _sortMode == 2 ? Colors.white : const Color(0xFF9CA3AF))),
+                  ]),
+                ),
+              ),
+            ],
+          ),
+          // Search field
+          if (_showSearch) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 32,
+              child: TextField(
+                controller: _searchCtrl,
+                onChanged: (v) => setState(() => _search = v),
+                style: const TextStyle(fontSize: 11),
+                decoration: InputDecoration(
+                  hintText: 'Search name...',
+                  hintStyle: const TextStyle(fontSize: 11, color: Color(0xFF9CA3AF)),
+                  prefixIcon: const Icon(Icons.search, size: 14, color: Color(0xFF9CA3AF)),
+                  prefixIconConstraints: const BoxConstraints(minWidth: 30),
+                  filled: true,
+                  fillColor: const Color(0xFFF3F4F6),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                  suffixIcon: _search.isNotEmpty
+                      ? GestureDetector(
+                          onTap: () => setState(() { _search = ''; _searchCtrl.clear(); }),
+                          child: const Icon(Icons.clear, size: 14, color: Color(0xFF9CA3AF)))
+                      : null,
+                  suffixIconConstraints: const BoxConstraints(minWidth: 30),
+                ),
+              ),
+            ),
+          ],
+          const SizedBox(height: 10),
+          // Bars
+          if (items.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Text('No match for "$_search"', style: const TextStyle(fontSize: 11, color: Color(0xFF9CA3AF))),
+            )
+          else
+            ...items.map((item) {
+              final fraction = maxVal > 0 ? item.$3 / maxVal : 0.0;
+              final color = _barColors[item.$1 % _barColors.length];
+              return Padding(
+                padding: EdgeInsets.only(bottom: items.length <= 5 ? 8 : 5),
+                child: Row(
+                  children: [
+                    SizedBox(width: 80, child: Text(item.$2,
+                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w500, color: Color(0xFF1A1A2E)),
+                        overflow: TextOverflow.ellipsis, textAlign: TextAlign.right)),
+                    const SizedBox(width: 8),
+                    Expanded(child: Stack(children: [
+                      Container(height: barH, decoration: BoxDecoration(
+                          color: const Color(0xFFF3F4F6), borderRadius: BorderRadius.circular(barH / 2))),
+                      FractionallySizedBox(
+                        widthFactor: fraction.clamp(0.02, 1.0),
+                        child: Container(height: barH, decoration: BoxDecoration(
+                            color: color, borderRadius: BorderRadius.circular(barH / 2))),
+                      ),
+                    ])),
+                    const SizedBox(width: 6),
+                    SizedBox(width: 62, child: Text('₹${_fmtChartNum(item.$3)}',
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: color),
+                        textAlign: TextAlign.right)),
+                  ],
+                ),
+              );
+            }),
+        ],
+      ),
+    );
+  }
+}
+
+/// Sortable data table — tap column header to sort asc/desc
+class _SortableTable extends StatefulWidget {
+  final List<String> columns;
+  final List<Map<String, dynamic>> rows;
+  final String executionTime;
+  const _SortableTable({required this.columns, required this.rows, required this.executionTime});
+  @override
+  State<_SortableTable> createState() => _SortableTableState();
+}
+
+class _SortableTableState extends State<_SortableTable> {
+  String? _sortCol;
+  bool _sortAsc = true;
+
+  late List<Map<String, dynamic>> _sortedRows;
+
+  @override
+  void initState() {
+    super.initState();
+    _sortedRows = List.from(widget.rows);
+  }
+
+  @override
+  void didUpdateWidget(_SortableTable old) {
+    super.didUpdateWidget(old);
+    if (old.rows != widget.rows) {
+      _sortedRows = List.from(widget.rows);
+      _sortCol = null;
+    }
+  }
+
+  void _onHeaderTap(String col) {
+    setState(() {
+      if (_sortCol == col) {
+        _sortAsc = !_sortAsc;
+      } else {
+        _sortCol = col;
+        _sortAsc = true;
+      }
+      _sortedRows = List.from(widget.rows);
+      _sortedRows.sort((a, b) {
+        final va = a[col];
+        final vb = b[col];
+        int cmp;
+        if (va is num && vb is num) {
+          cmp = va.compareTo(vb);
+        } else {
+          cmp = (va?.toString() ?? '').compareTo(vb?.toString() ?? '');
+        }
+        return _sortAsc ? cmp : -cmp;
+      });
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final columns = widget.columns;
+    final rows = _sortedRows;
+    final isLarge = rows.length > 50;
+    final tableH = isLarge ? 400.0 : (rows.length * 40.0 + 40.0).clamp(80.0, 400.0);
+
+    return Container(
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            height: tableH,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: SizedBox(
+                width: columns.length * 120.0 < 300 ? 300 : columns.length * 120.0,
+                child: Column(children: [
+                  // Header
+                  Container(
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      border: Border(bottom: BorderSide(color: Colors.grey[300]!)),
+                    ),
+                    child: Row(
+                      children: columns.map((col) {
+                        final isSorted = _sortCol == col;
+                        return Expanded(
+                          child: InkWell(
+                            onTap: () => _onHeaderTap(col),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              child: Row(
+                                children: [
+                                  Expanded(child: Text(col,
+                                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold,
+                                          color: isSorted ? const Color(0xFF2D8BE0) : Colors.black87),
+                                      overflow: TextOverflow.ellipsis)),
+                                  if (isSorted)
+                                    Icon(_sortAsc ? Icons.arrow_upward : Icons.arrow_downward,
+                                        size: 12, color: const Color(0xFF2D8BE0)),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                  // Rows
+                  Expanded(
+                    child: ListView.builder(
+                      physics: const ClampingScrollPhysics(),
+                      itemCount: rows.length,
+                      itemExtent: 40,
+                      itemBuilder: (context, index) {
+                        final row = rows[index];
+                        return Container(
+                          decoration: BoxDecoration(
+                            color: index.isEven ? Colors.white : Colors.grey[50],
+                            border: Border(bottom: BorderSide(color: Colors.grey[200]!)),
+                          ),
+                          child: Row(
+                            children: columns.map((col) => Expanded(
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                                child: Text(_fmtCellValue(row[col]),
+                                    style: const TextStyle(fontSize: 12, color: Colors.black87),
+                                    maxLines: 2, overflow: TextOverflow.ellipsis),
+                              ),
+                            )).toList(),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ]),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(8),
+            child: Text('${rows.length} result${rows.length == 1 ? '' : 's'} (${widget.executionTime})',
+                style: const TextStyle(fontSize: 11, color: Colors.black45)),
+          ),
+        ],
+      ),
+    );
   }
 }

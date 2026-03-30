@@ -128,7 +128,7 @@ import 'screens/auth/login_screen.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/mobile/dashboard_screen.dart';
 import 'screens/main.dart';
-import 'screens/models/company_model.dart';
+import 'models/company_model.dart';
 import 'database/database_helper.dart';
 import 'utils/secure_storage.dart';
 import 'services/auth_service.dart';
@@ -141,9 +141,9 @@ import 'screens/Analysis/analysis_home_screen.dart';
 import 'screens/mobile/reports_overview_screen.dart';
 import 'screens/mobile/mobile_profile_tab.dart';
 import 'screens/theme/app_theme.dart';
-import 'ai/di/ai_dependencies.dart';
+import 'config/ai_dependencies.dart';
 import 'config/api_config.dart';
-import './ai/config/ai_endpoints.dart';
+import 'config/ai_endpoints.dart';
 import 'utils/date_utils.dart' as app_date;
 
 void main() async {

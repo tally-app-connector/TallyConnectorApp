@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import '../../database/database_helper.dart';
+import '../../services/queries/query_service.dart';
 
 class TrialBalanceScreen extends StatefulWidget {
   @override
@@ -65,34 +66,9 @@ class _TrialBalanceScreenState extends State<TrialBalanceScreen> {
   }
   
   Future<void> _fetchTrialBalance() async {
-    final db = await _db.database;
-    
-    final result = await db.rawQuery('''
-      SELECT 
-        l.name as ledger_name,
-        l.parent as group_name,
-        l.opening_balance,
-        COALESCE(SUM(CASE WHEN vle.amount < 0 THEN ABS(vle.amount) ELSE 0 END), 0) as debit_total,
-        COALESCE(SUM(CASE WHEN vle.amount > 0 THEN vle.amount ELSE 0 END), 0) as credit_total,
-        (l.opening_balance + 
-         COALESCE(SUM(CASE WHEN vle.amount > 0 THEN vle.amount ELSE 0 END), 0) - 
-         COALESCE(SUM(CASE WHEN vle.amount < 0 THEN ABS(vle.amount) ELSE 0 END), 0)) as closing_balance
-      FROM ledgers l
-      LEFT JOIN voucher_ledger_entries vle ON vle.ledger_name = l.name
-      LEFT JOIN vouchers v ON v.voucher_guid = vle.voucher_guid 
-        AND v.company_guid = l.company_guid
-        AND v.is_deleted = 0
-        AND v.is_cancelled = 0
-        AND v.is_optional = 0
-        AND v.date >= ?
-        AND v.date <= ?
-      WHERE l.company_guid = ?
-        AND l.is_deleted = 0
-      GROUP BY l.name, l.parent, l.opening_balance
-      ORDER BY l.parent, l.name
-    ''', [_fromDate, _toDate, _companyGuid]);
-    
-    _ledgers = result;
+    _ledgers = await QueryService.getTrialBalance(
+      _companyGuid!, _fromDate, _toDate,
+    );
   }
   
   @override

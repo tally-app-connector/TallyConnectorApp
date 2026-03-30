@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../database/database_helper.dart';
+import '../../services/queries/query_service.dart';
 import 'bill_wise_detail_screen.dart';
 
 class BillWiseOutstandingScreen extends StatefulWidget {
@@ -93,92 +94,11 @@ class _BillWiseOutstandingScreenState extends State<BillWiseOutstandingScreen> {
   }
 
   Future<void> _loadLedgers() async {
-    final db = await _db.database;
-    
     final groupName = _selectedType == 'Receivables' ? 'Sundry Debtors' : 'Sundry Creditors';
-    
-    final result = await db.rawQuery('''
-      WITH RECURSIVE group_tree AS (
-        SELECT group_guid, name
-        FROM groups
-        WHERE company_guid = ?
-          AND (name = ? OR reserved_name = ?)
-          AND is_deleted = 0
-        
-        UNION ALL
-        
-        SELECT g.group_guid, g.name
-        FROM groups g
-        INNER JOIN group_tree gt ON g.parent_guid = gt.group_guid
-        WHERE g.company_guid = ?
-          AND g.is_deleted = 0
-      ),
-      base_data AS (
-        SELECT 
-          l.name as ledger_name,
-          l.parent as group_name,
-          l.opening_balance as ledger_opening_balance,
-          COALESCE(SUM(CASE 
-            WHEN v.date < ? AND vle.amount > 0 THEN vle.amount 
-            ELSE 0 
-          END), 0) as credit_before,
-          COALESCE(SUM(CASE 
-            WHEN v.date < ? AND vle.amount < 0 THEN ABS(vle.amount) 
-            ELSE 0 
-          END), 0) as debit_before,
-          COALESCE(SUM(CASE 
-            WHEN v.date >= ? AND v.date <= ? AND vle.amount > 0 THEN vle.amount 
-            ELSE 0 
-          END), 0) as credit_total,
-          COALESCE(SUM(CASE 
-            WHEN v.date >= ? AND v.date <= ? AND vle.amount < 0 THEN ABS(vle.amount) 
-            ELSE 0 
-          END), 0) as debit_total,
-          COUNT(DISTINCT CASE 
-            WHEN v.date >= ? AND v.date <= ? THEN v.voucher_guid 
-            ELSE NULL 
-          END) as transaction_count
-        FROM ledgers l
-        INNER JOIN group_tree gt ON l.parent = gt.name
-        LEFT JOIN voucher_ledger_entries vle ON vle.ledger_name = l.name
-        LEFT JOIN vouchers v ON v.voucher_guid = vle.voucher_guid
-          AND v.company_guid = l.company_guid
-          AND v.is_deleted = 0
-          AND v.is_cancelled = 0
-          AND v.is_optional = 0
-        WHERE l.company_guid = ?
-          AND l.is_deleted = 0
-        GROUP BY l.name, l.parent, l.opening_balance
-      )
-      SELECT 
-        ledger_name,
-        group_name,
-        ledger_opening_balance,
-        credit_before,
-        debit_before,
-        (ledger_opening_balance + credit_before - debit_before) as opening_balance,
-        credit_total,
-        debit_total,
-        (ledger_opening_balance + credit_before - debit_before + credit_total - debit_total) as outstanding,
-        transaction_count
-      FROM base_data
-      WHERE ABS(ledger_opening_balance + credit_before - debit_before + credit_total - debit_total) > 0.01
-      ORDER BY ABS(ledger_opening_balance + credit_before - debit_before + credit_total - debit_total) DESC
-    ''', [
-      _companyGuid,
-      groupName,
-      groupName,
-      _companyGuid,
-      _fromDate,
-      _fromDate,
-      _fromDate,
-      _toDate,
-      _fromDate,
-      _toDate,
-      _fromDate,
-      _toDate,
-      _companyGuid,
-    ]);
+
+    final result = await QueryService.getBillWiseOutstandingLedgers(
+      _companyGuid!, groupName, _fromDate!, _toDate!,
+    );
 
       // prettyPrint(result);
 

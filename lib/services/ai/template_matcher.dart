@@ -1,4 +1,4 @@
-import '../models/query_template.dart';
+import '../../models/ai/query_template.dart';
 
 class TemplateMatcher {
   final List<QueryTemplate> templates;

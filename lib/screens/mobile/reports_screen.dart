@@ -7,22 +7,22 @@ import 'package:image_picker/image_picker.dart';
 import 'package:screenshot/screenshot.dart';
 import '../theme/app_theme.dart';
 import '../icons/app_icons.dart';
-import '../models/report_data.dart';
-import '../widgets/report_widgets.dart';
-import '../widgets/detail_widgets.dart';
+import '../../models/report_data.dart';
+import '../../widgets/report_widgets.dart';
+import '../../widgets/detail_widgets.dart';
 // import '../widgets/charts/report_chart.dart';
 
-import '../service/sales/sales_service.dart';
-import '../service/company_logo_service.dart';
+import '../../services/sales_service.dart';
+import '../../services/company_logo_service.dart';
 import '../../database/database_helper.dart';
 import '../main.dart';
-import '../models/company_model.dart';
-import '../utils/secure_storage.dart';
-import '../utils/amount_formatter.dart';
-import '../widgets/charts/sales_purchase_combo_chart.dart';
-import '../widgets/charts/report_chart.dart' hide SalesPurchaseComboChart;
+import '../../models/company_model.dart';
+import '../../utils/secure_storage.dart';
+import '../../utils/amount_formatter.dart';
+import '../../widgets/charts/sales_purchase_combo_chart.dart';
+import '../../widgets/charts/report_chart.dart' hide SalesPurchaseComboChart;
 import 'pdf_export_screen.dart';
-import '../service/excel_export_service.dart';
+import '../../services/excel_export_service.dart';
 import 'excel_export_screen.dart';
 
 class ReportsScreen extends StatefulWidget {

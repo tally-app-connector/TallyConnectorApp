@@ -2,18 +2,18 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
-import '../di/ai_dependencies.dart';
+import '../../config/ai_dependencies.dart';
 import '../../database/database_helper.dart';
-import '../models/chat_message.dart';
-import '../models/query_result.dart';
-import '../config/ai_endpoints.dart';
-import '../services/prompt_builder.dart';
-import '../services/entity_extractor.dart';
-import '../services/claude_service.dart';
-import '../services/ai_provider_service.dart';
-import '../services/query_templates.dart';
-import '../services/query_builder.dart';
-import '../services/template_matcher.dart';
+import '../../models/ai/chat_message.dart';
+import '../../models/ai/query_result.dart';
+import '../../config/ai_endpoints.dart';
+import 'prompt_builder.dart';
+import 'entity_extractor.dart';
+import 'claude_service.dart';
+import 'ai_provider_service.dart';
+import 'query_templates.dart';
+import 'query_builder.dart';
+import 'template_matcher.dart';
 
 /// AI Q&A Service - Handles local AI query generation and execution
 class AiQaService {

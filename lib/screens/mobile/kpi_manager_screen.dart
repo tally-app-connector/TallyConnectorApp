@@ -5,9 +5,9 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
 import '../icons/app_icons.dart';
-import '../models/kpi_metric.dart';
-import '../widgets/kpi_widgets.dart';
-import '../widgets/detail_widgets.dart';
+import '../../models/kpi_metric.dart';
+import '../../widgets/kpi_widgets.dart';
+import '../../widgets/detail_widgets.dart';
 
 class KpiManagerScreen extends StatefulWidget {
   final List<KpiConfig> currentConfigs;

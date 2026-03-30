@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../models/report_data.dart';
-import '../../utils/amount_formatter.dart';
-import '../../../database/database_helper.dart';
+import '../models/report_data.dart';
+import '../utils/amount_formatter.dart';
+import '../database/database_helper.dart';
 
 class SalesAnalyticsService {
   final DatabaseHelper _db = DatabaseHelper.instance;

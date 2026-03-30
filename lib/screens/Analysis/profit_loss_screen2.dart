@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../models/data_model.dart';
 import '../../database/database_helper.dart';
 import '../../utils/date_utils.dart';
+import '../../services/queries/query_service.dart';
 import 'group_detail_screen.dart';
 import 'stock_summary_screen.dart';
 
@@ -121,119 +122,16 @@ class _ProfitLossScreenState extends State<ProfitLossScreen>
 
   Future<List<String>> getAllChildVoucherTypes(
       String companyGuid, String voucherTypeName) async {
-    final db = await _db.database;
-    final result = await db.rawQuery('''
-      WITH RECURSIVE voucher_type_tree AS (
-        SELECT voucher_type_guid, name
-        FROM voucher_types
-        WHERE company_guid = ?
-          AND (name = ? OR reserved_name = ?)
-          AND is_deleted = 0
-        UNION ALL
-        SELECT vt.voucher_type_guid, vt.name
-        FROM voucher_types vt
-        INNER JOIN voucher_type_tree vtt ON vt.parent_guid = vtt.voucher_type_guid
-        WHERE vt.company_guid = ?
-          AND vt.is_deleted = 0
-          AND vt.voucher_type_guid != vt.parent_guid
-      )
-      SELECT name FROM voucher_type_tree ORDER BY name
-    ''', [companyGuid, voucherTypeName, voucherTypeName, companyGuid]);
-    return result.map((r) => r['name'] as String).toList();
+    return QueryService.getAllChildVoucherTypes(companyGuid, voucherTypeName);
   }
 
   Future<List<StockItemInfo>> fetchAllStockItems(String companyGuid) async {
-    final db = await _db.database;
-    final stockItemResults = await db.rawQuery('''
-      SELECT si.name as item_name, si.stock_item_guid,
-        COALESCE(si.costing_method, 'Avg. Cost') as costing_method,
-        COALESCE(si.base_units, '') as unit,
-        COALESCE(si.parent, '') as parent_name
-      FROM stock_items si
-      WHERE si.company_guid = ? AND si.is_deleted = 0
-        AND (
-          EXISTS (SELECT 1 FROM stock_item_batch_allocation siba WHERE siba.stock_item_guid = si.stock_item_guid)
-          OR EXISTS (SELECT 1 FROM voucher_inventory_entries vie WHERE vie.stock_item_guid = si.stock_item_guid AND vie.company_guid = si.company_guid)
-        )
-    ''', [companyGuid]);
-
-    final batchResults = await db.rawQuery('''
-      SELECT siba.stock_item_guid, COALESCE(siba.godown_name, '') as godown_name,
-        COALESCE(siba.batch_name, '') as batch_name,
-        COALESCE(siba.opening_value, 0) as amount,
-        COALESCE(siba.opening_balance, '') as actual_qty,
-        siba.opening_rate as batch_rate
-      FROM stock_item_batch_allocation siba
-      INNER JOIN stock_items si ON siba.stock_item_guid = si.stock_item_guid
-      WHERE si.company_guid = ? AND si.is_deleted = 0
-    ''', [companyGuid]);
-
-    final Map<String, List<BatchAllocation>> batchMap = {};
-    for (final row in batchResults) {
-      final guid = row['stock_item_guid'] as String;
-      batchMap.putIfAbsent(guid, () => []).add(BatchAllocation(
-        godownName: row['godown_name'] as String,
-        trackingNumber: 'Not Applicable',
-        batchName: row['batch_name'] as String,
-        amount: (row['amount'] as num?)?.toDouble() ?? 0.0,
-        actualQty: row['actual_qty']?.toString() ?? '',
-        billedQty: row['actual_qty']?.toString() ?? '',
-        batchRate: (row['batch_rate'] as num?)?.toDouble(),
-      ));
-    }
-
-    return stockItemResults.map((row) {
-      final guid = row['stock_item_guid'] as String;
-      return StockItemInfo(
-        itemName: row['item_name'] as String,
-        stockItemGuid: guid,
-        costingMethod: row['costing_method'] as String,
-        unit: row['unit'] as String,
-        parentName: row['parent_name'] as String,
-        closingRate: 0.0, closingQty: 0.0, closingValue: 0.0,
-        openingData: batchMap[guid] ?? [],
-      );
-    }).toList();
+    return QueryService.fetchAllStockItemsWithBatches(companyGuid);
   }
 
   Future<List<StockTransaction>> fetchTransactionsForStockItem(
       String companyGuid, String stockItemGuid, String endDate) async {
-    final db = await _db.database;
-    final results = await db.rawQuery('''
-      SELECT v.voucher_guid, v.voucher_key as voucher_id, v.date as voucher_date,
-        v.voucher_number, vba.godown_name, v.voucher_type,
-        vba.actual_qty as stock, COALESCE(vba.batch_rate, 0) as rate,
-        vba.amount, vba.is_deemed_positive as is_inward,
-        COALESCE(vba.batch_name, '') as batch_name,
-        COALESCE(vba.destination_godown_name, '') as destination_godown,
-        COALESCE(vba.tracking_number, 'Not Applicable') as tracking_number
-      FROM vouchers v
-      INNER JOIN voucher_batch_allocations vba ON vba.voucher_guid = v.voucher_guid
-      WHERE vba.stock_item_guid = ? AND v.company_guid = ?
-        AND v.date <= ? AND v.is_deleted = 0 AND v.is_cancelled = 0 AND v.is_optional = 0
-      ORDER BY v.date, v.master_id
-    ''', [stockItemGuid, companyGuid, endDate]);
-
-    return results.map((row) {
-      final stockStr = (row['stock'] as String?) ?? '0';
-      final parts    = stockStr.split(' ');
-      final stock    = double.tryParse(parts[0]) ?? 0.0;
-      return StockTransaction(
-        voucherGuid: row['voucher_guid'] as String,
-        voucherId: (row['voucher_id'] as int?) ?? 0,
-        voucherDate: row['voucher_date'] as String,
-        voucherNumber: row['voucher_number'] as String,
-        godownName: (row['godown_name'] as String?) ?? 'Primary',
-        voucherType: row['voucher_type'] as String,
-        stock: stock,
-        rate: (row['rate'] as num?)?.toDouble() ?? 0.0,
-        amount: (row['amount'] as num?)?.toDouble() ?? 0.0,
-        isInward: (row['is_inward'] as int) == 1,
-        batchName: row['batch_name'] as String,
-        destinationGodown: row['destination_godown'] as String,
-        trackingNumber: row['tracking_number'] as String,
-      );
-    }).toList();
+    return QueryService.fetchTransactionsForStockItem(companyGuid, stockItemGuid, endDate);
   }
 
   Future<Map<String, Map<String, Map<String, List<StockTransaction>>>>>
@@ -252,246 +150,21 @@ class _ProfitLossScreenState extends State<ProfitLossScreen>
     return directory;
   }
 
-Future<List<StockItemInfo>> fetchAllClosingStock(
-    String companyGuid, String? closingDate) async {
-  final db = await _db.database;
-
-  final stockItemResults = await db.rawQuery('''
-    SELECT 
-      si.name as item_name,
-      si.stock_item_guid,
-      COALESCE(si.costing_method, 'Avg. Cost') as costing_method,
-      COALESCE(si.base_units, '') as unit,
-      COALESCE(cb.closing_balance, 0.0) as closing_balance,
-      COALESCE(cb.closing_value, 0.0) as closing_value,
-      COALESCE(cb.closing_rate, 0.0) as closing_rate,
-      COALESCE(si.parent, '') as parent_name
-    FROM stock_items si
-    INNER JOIN (
-      SELECT DISTINCT stock_item_guid FROM stock_item_batch_allocation
-      UNION
-      SELECT DISTINCT stock_item_guid FROM voucher_inventory_entries WHERE company_guid = ?
-    ) active ON active.stock_item_guid = si.stock_item_guid
-    LEFT JOIN stock_item_closing_balance cb
-      ON cb.stock_item_guid = si.stock_item_guid
-      AND cb.company_guid = ?
-      AND cb.closing_date = ?
-    WHERE si.company_guid = ?
-      AND si.is_deleted = 0
-    ORDER BY si.name ASC
-  ''', [companyGuid, companyGuid, closingDate ?? '', companyGuid]);
-
-  return stockItemResults.map((row) => StockItemInfo(
-    itemName: row['item_name'] as String,
-    stockItemGuid: row['stock_item_guid'] as String,
-    costingMethod: row['costing_method'] as String,
-    unit: row['unit'] as String,
-    parentName: row['parent_name'] as String,
-    closingRate: (row['closing_rate'] as num?)?.toDouble() ?? 0.0,
-    closingQty: (row['closing_balance'] as num?)?.toDouble() ?? 0.0,
-    closingValue: (row['closing_value'] as num?)?.toDouble() ?? 0.0,
-    openingData: [],
-  )).toList();
-}
+  Future<List<StockItemInfo>> fetchAllClosingStock(
+      String companyGuid, String? closingDate) async {
+    return QueryService.fetchAllClosingStock(companyGuid, closingDate);
+  }
   // ── P&L query (unchanged logic) ────────────────────────────────────────────
 
   Future<Map<String, dynamic>> _getProfitLossDetailed(
       String companyGuid, DateTime fromDate, DateTime toDate) async {
-    final db = await _db.database;
     final fromStr = dateToString(fromDate);
-    final toStr   = dateToString(toDate);
-
-    String groupTree(String seedField, String seedValue) => '''
-      WITH RECURSIVE group_tree AS (
-        SELECT group_guid, name FROM groups
-        WHERE company_guid = ? AND $seedField = '$seedValue' AND is_deleted = 0
-        UNION ALL
-        SELECT g.group_guid, g.name FROM groups g
-        INNER JOIN group_tree gt ON g.parent_guid = gt.group_guid
-        WHERE g.company_guid = ? AND g.is_deleted = 0
-      )
-    ''';
-
-    // Purchase
-    final purchResult = await db.rawQuery('''
-      ${groupTree('reserved_name','Purchase Accounts')}
-      SELECT SUM(debit_amount) as debit_total, SUM(credit_total2) as credit_total, SUM(net_amount) as net_purchase
-      FROM (
-        SELECT SUM(CASE WHEN vle.amount < 0 THEN ABS(vle.amount) ELSE 0 END) as debit_amount,
-               SUM(CASE WHEN vle.amount > 0 THEN vle.amount ELSE 0 END) as credit_total2,
-               (SUM(CASE WHEN vle.amount < 0 THEN ABS(vle.amount) ELSE 0 END) - SUM(CASE WHEN vle.amount > 0 THEN vle.amount ELSE 0 END)) as net_amount
-        FROM vouchers v INNER JOIN voucher_ledger_entries vle ON vle.voucher_guid = v.voucher_guid
-        INNER JOIN ledgers l ON l.name = vle.ledger_name AND l.company_guid = v.company_guid
-        INNER JOIN group_tree gt ON l.parent = gt.name
-        WHERE v.company_guid = ? AND v.is_deleted = 0 AND v.is_cancelled = 0 AND v.is_optional = 0
-          AND v.date >= ? AND v.date <= ?
-        GROUP BY v.voucher_guid
-      ) t
-    ''', [companyGuid, companyGuid, companyGuid, fromStr, toStr]);
-
-    final netPurchase = (purchResult.first['net_purchase'] as num?)?.toDouble() ?? 0.0;
-
-    // Sales
-    final salesResult = await db.rawQuery('''
-      ${groupTree('reserved_name','Sales Accounts')}
-      SELECT
-        SUM(CASE WHEN vle.is_deemed_positive = 1 THEN ABS(vle.amount) ELSE 0 END) as credit_total,
-        SUM(CASE WHEN vle.is_deemed_positive = 0 THEN ABS(vle.amount) ELSE 0 END) as debit_total,
-        SUM(ABS(vle.amount)) as net_sales,
-        COUNT(DISTINCT v.voucher_guid) as vouchers
-      FROM voucher_ledger_entries vle
-      INNER JOIN vouchers v ON v.voucher_guid = vle.voucher_guid
-      INNER JOIN ledgers l ON l.name = vle.ledger_name AND l.company_guid = v.company_guid
-      INNER JOIN group_tree gt ON l.parent_guid = gt.group_guid
-      WHERE v.company_guid = ? AND v.is_deleted = 0 AND v.is_cancelled = 0 AND v.is_optional = 0
-        AND v.date >= ? AND v.date <= ?
-    ''', [companyGuid, companyGuid, companyGuid, fromStr, toStr]);
-
-    final netSales = (salesResult.first['net_sales'] as num?)?.toDouble() ?? 0.0;
-
-    // Helper to fetch ledger group totals
-    Future<List<Map<String, dynamic>>> fetchGroup(String groupName) => db.rawQuery('''
-      WITH RECURSIVE group_tree AS (
-        SELECT group_guid, name FROM groups
-        WHERE company_guid = ? AND name = '$groupName' AND is_deleted = 0
-        UNION ALL
-        SELECT g.group_guid, g.name FROM groups g
-        INNER JOIN group_tree gt ON g.parent_guid = gt.group_guid
-        WHERE g.company_guid = ? AND g.is_deleted = 0
-      )
-      SELECT l.name as ledger_name, l.opening_balance,
-        COALESCE(SUM(CASE WHEN vle.amount < 0 THEN ABS(vle.amount) ELSE 0 END), 0) as debit_total,
-        COALESCE(SUM(CASE WHEN vle.amount > 0 THEN vle.amount ELSE 0 END), 0) as credit_total,
-        (l.opening_balance + COALESCE(SUM(CASE WHEN vle.amount > 0 THEN vle.amount ELSE 0 END), 0) -
-         COALESCE(SUM(CASE WHEN vle.amount < 0 THEN ABS(vle.amount) ELSE 0 END), 0)) as closing_balance
-      FROM ledgers l INNER JOIN group_tree gt ON l.parent = gt.name
-      INNER JOIN voucher_ledger_entries vle ON vle.ledger_name = l.name
-      INNER JOIN vouchers v ON v.voucher_guid = vle.voucher_guid AND v.company_guid = l.company_guid
-        AND v.is_deleted = 0 AND v.is_cancelled = 0 AND v.is_optional = 0
-        AND v.date >= ? AND v.date <= ?
-      WHERE l.company_guid = ? AND l.is_deleted = 0
-      GROUP BY l.name, l.opening_balance ORDER BY closing_balance DESC
-    ''', [companyGuid, companyGuid, fromStr, toStr, companyGuid]);
-
-    Future<List<Map<String, dynamic>>> fetchIncomeGroup(String groupName) => db.rawQuery('''
-      WITH RECURSIVE group_tree AS (
-        SELECT group_guid, name FROM groups
-        WHERE company_guid = ? AND name = '$groupName' AND is_deleted = 0
-        UNION ALL
-        SELECT g.group_guid, g.name FROM groups g
-        INNER JOIN group_tree gt ON g.parent_guid = gt.group_guid
-        WHERE g.company_guid = ? AND g.is_deleted = 0
-      )
-      SELECT l.name as ledger_name, l.opening_balance,
-        COALESCE(SUM(CASE WHEN v.voucher_guid IS NOT NULL AND vle.amount > 0 THEN vle.amount ELSE 0 END), 0) as credit_total,
-        COALESCE(SUM(CASE WHEN v.voucher_guid IS NOT NULL AND vle.amount < 0 THEN ABS(vle.amount) ELSE 0 END), 0) as debit_total,
-        (l.opening_balance +
-         COALESCE(SUM(CASE WHEN v.voucher_guid IS NOT NULL AND vle.amount > 0 THEN vle.amount ELSE 0 END), 0) -
-         COALESCE(SUM(CASE WHEN v.voucher_guid IS NOT NULL AND vle.amount < 0 THEN ABS(vle.amount) ELSE 0 END), 0)) as closing_balance
-      FROM ledgers l INNER JOIN group_tree gt ON l.parent = gt.name
-      INNER JOIN voucher_ledger_entries vle ON vle.ledger_name = l.name
-      INNER JOIN vouchers v ON v.voucher_guid = vle.voucher_guid AND v.company_guid = l.company_guid
-        AND v.is_deleted = 0 AND v.is_cancelled = 0 AND v.is_optional = 0
-        AND v.date >= ? AND v.date <= ?
-      WHERE l.company_guid = ? AND l.is_deleted = 0
-      GROUP BY l.name, l.opening_balance
-      HAVING l.opening_balance != 0 OR COUNT(v.voucher_guid) > 0
-      ORDER BY closing_balance DESC
-    ''', [companyGuid, companyGuid, fromStr, toStr, companyGuid]);
-
-    final directExpenses   = await fetchGroup('Direct Expenses');
-    final indirectExpenses = await fetchGroup('Indirect Expenses');
-    final directIncomes    = await fetchIncomeGroup('Direct Incomes');
-    final indirectIncomes  = await fetchIncomeGroup('Indirect Incomes');
-
-    double sum(List<Map<String, dynamic>> rows) =>
-        rows.fold(0.0, (s, r) => s + ((r['closing_balance'] as num?)?.toDouble() ?? 0.0));
-
-    final totalDE  = sum(directExpenses).abs();
-    final totalIE  = sum(indirectExpenses).abs();
-    final totalDI  = sum(directIncomes);
-    final totalII  = sum(indirectIncomes);
-
-    double totalClosingStock = 0.0;
-    double totalOpeningStock = 0.0;
-
-    if (_isMaintainInventory) {
-      // ── Inventory mode: use pre-calculated closing balances from stock_item_closing_balance ──
-      final allItemClosings = await fetchAllClosingStock(_companyGuid!, toStr);
-      totalClosingStock = allItemClosings.fold(0.0, (sum, item) => sum + item.closingValue);
-
-      final prevDay = fromStr.compareTo(_companyStartDate) <= 0
-          ? fromStr
-          : getPreviousDate(fromStr);
-
-      final allItemOpening = await fetchAllClosingStock(_companyGuid!, prevDay);
-      totalOpeningStock = allItemOpening.fold(0.0, (sum, item) => sum + item.closingValue);
-    } else {
-      // ── Non-inventory mode: derive stock from ledger closing balances ──
-      final closingResult = await db.rawQuery('''
-        WITH RECURSIVE stock_groups AS (
-          SELECT group_guid, name FROM groups
-          WHERE company_guid = ? AND (reserved_name='Stock-in-Hand' OR name='Stock-in-Hand') AND is_deleted=0
-          UNION ALL
-          SELECT g.group_guid, g.name FROM groups g
-          INNER JOIN stock_groups sg ON g.parent_guid = sg.group_guid
-          WHERE g.company_guid = ? AND g.is_deleted = 0
-        ),
-        latest_balances AS (
-          SELECT lcb.ledger_guid, lcb.amount * -1 as closing_amount,
-                 ROW_NUMBER() OVER (PARTITION BY lcb.ledger_guid ORDER BY lcb.closing_date DESC) as rn
-          FROM ledger_closing_balances lcb
-          INNER JOIN ledgers l ON l.ledger_guid = lcb.ledger_guid
-          INNER JOIN stock_groups sg ON l.parent = sg.name
-          WHERE lcb.company_guid = ? AND lcb.closing_date <= ? AND l.is_deleted = 0
-        )
-        SELECT COALESCE(SUM(closing_amount), 0) as total_closing_stock FROM latest_balances WHERE rn = 1
-      ''', [companyGuid, companyGuid, companyGuid, toStr]);
-      totalClosingStock = (closingResult.first['total_closing_stock'] as num?)?.toDouble() ?? 0.0;
-
-      final prevDay = fromStr.compareTo(_companyStartDate) <= 0 ? _companyStartDate : getPreviousDate(fromStr);
-      final openingResult = await db.rawQuery('''
-        WITH RECURSIVE stock_groups AS (
-          SELECT group_guid, name FROM groups
-          WHERE company_guid = ? AND (reserved_name='Stock-in-Hand' OR name='Stock-in-Hand') AND is_deleted=0
-          UNION ALL
-          SELECT g.group_guid, g.name FROM groups g
-          INNER JOIN stock_groups sg ON g.parent_guid = sg.group_guid
-          WHERE g.company_guid = ? AND g.is_deleted = 0
-        ),
-        latest_balances AS (
-          SELECT l.ledger_guid, COALESCE(lcb.amount, l.opening_balance) * -1 as opening_amount,
-                 ROW_NUMBER() OVER (PARTITION BY l.ledger_guid ORDER BY lcb.closing_date DESC NULLS LAST) as rn
-          FROM ledgers l INNER JOIN stock_groups sg ON l.parent = sg.name
-          LEFT JOIN ledger_closing_balances lcb ON lcb.ledger_guid = l.ledger_guid
-            AND lcb.company_guid = ? AND lcb.closing_date <= ?
-          WHERE l.company_guid = ? AND l.is_deleted = 0
-        )
-        SELECT COALESCE(SUM(opening_amount), 0) as total_opening_stock FROM latest_balances WHERE rn = 1
-      ''', [companyGuid, companyGuid, companyGuid, prevDay, companyGuid]);
-      totalOpeningStock = (openingResult.first['total_opening_stock'] as num?)?.toDouble() ?? 0.0;
-    }
-
-    final grossProfit = (netSales + totalDI + totalClosingStock) -
-        (totalOpeningStock + netPurchase + totalDE);
-    final netProfit = grossProfit + totalII - totalIE;
-
-    return {
-      'opening_stock': totalOpeningStock,
-      'purchase': netPurchase,
-      'direct_expenses': directExpenses,
-      'direct_expenses_total': totalDE,
-      'gross_profit': grossProfit,
-      'closing_stock': totalClosingStock,
-      'sales': netSales,
-      'indirect_expenses': indirectExpenses,
-      'indirect_expenses_total': totalIE,
-      'indirect_incomes': indirectIncomes,
-      'indirect_incomes_total': totalII,
-      'direct_incomes': directIncomes,
-      'direct_incomes_total': totalDI,
-      'net_profit': netProfit,
-    };
+    final toStr = dateToString(toDate);
+    return QueryService.getProfitLossDetailed(
+      companyGuid, fromStr, toStr,
+      isMaintainInventory: _isMaintainInventory,
+      companyStartDate: _companyStartDate,
+    );
   }
 
   // ── Navigation ─────────────────────────────────────────────────────────────

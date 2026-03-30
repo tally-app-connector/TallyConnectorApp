@@ -1,9 +1,9 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
-import '../models/company_model.dart';
-import '../models/report_data.dart';
-import '../service/pdf_export_service.dart';
+import '../../models/company_model.dart';
+import '../../models/report_data.dart';
+import '../../services/pdf_export_service.dart';
 import '../theme/app_theme.dart';
 
 class PdfExportScreen extends StatelessWidget {

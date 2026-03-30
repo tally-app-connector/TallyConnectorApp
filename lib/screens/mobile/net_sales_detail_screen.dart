@@ -3,13 +3,13 @@ import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../theme/app_theme.dart';
 import '../icons/app_icons.dart';
-import '../widgets/dashboard_widgets.dart';
-import '../widgets/detail_widgets.dart';
-import '../widgets/charts/sales_bar_chart.dart';
-import '../models/sales_data.dart';
-import '../models/report_data.dart' hide ChartPeriod;
-import '../utils/amount_formatter.dart';
-import '../service/sales/sales_service.dart';
+import '../../widgets/dashboard_widgets.dart';
+import '../../widgets/detail_widgets.dart';
+import '../../widgets/charts/sales_bar_chart.dart';
+import '../../models/sales_data.dart';
+import '../../models/report_data.dart' hide ChartPeriod;
+import '../../utils/amount_formatter.dart';
+import '../../services/sales_service.dart';
 import '../main.dart';
 
 class NetSalesDetailScreen extends StatefulWidget {
