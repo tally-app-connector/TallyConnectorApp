@@ -183,6 +183,75 @@ LIMIT 20''',
       },
       sampleQuestions: ['Item wise sales summary', 'Top selling items'],
     ),
+    // 5. Day wise sales this month
+    const QueryTemplate(
+      templateId: 'tmpl-sales-005',
+      category: 'sales',
+      intentKeywords: ['day wise sales', 'daily sales', 'highest sales day'],
+      description: 'Day wise sales with daily totals',
+      sqlTemplate: '''WITH RECURSIVE group_tree AS (
+  SELECT group_guid, name FROM groups WHERE company_guid = '{{company_guid}}' AND reserved_name = 'Sales Accounts' AND is_deleted = 0
+  UNION ALL SELECT g.group_guid, g.name FROM groups g INNER JOIN group_tree gt ON g.parent_guid = gt.group_guid WHERE g.company_guid = '{{company_guid}}' AND g.is_deleted = 0
+)
+SELECT v.date,
+  (SUM(CASE WHEN vle.amount > 0 THEN vle.amount ELSE 0 END) - SUM(CASE WHEN vle.amount < 0 THEN ABS(vle.amount) ELSE 0 END)) as net_sales,
+  COUNT(DISTINCT v.voucher_guid) as vouchers
+FROM voucher_ledger_entries vle
+INNER JOIN vouchers v ON v.voucher_guid = vle.voucher_guid
+INNER JOIN ledgers l ON l.name = vle.ledger_name AND l.company_guid = v.company_guid
+INNER JOIN group_tree gt ON l.parent = gt.name
+WHERE v.company_guid = '{{company_guid}}' AND v.is_deleted = 0 AND v.is_cancelled = 0 AND v.is_optional = 0
+  AND v.date >= '{{from_date}}' AND v.date <= '{{to_date}}'
+GROUP BY v.date ORDER BY net_sales DESC''',
+      parameterSchema: {
+        'company_guid': {'type': 'string', 'required': true},
+        'from_date': {'type': 'date_tally', 'required': true},
+        'to_date': {'type': 'date_tally', 'required': true},
+      },
+      sampleQuestions: ['Day wise sales this month', 'Which day had highest sales'],
+    ),
+    // 6. Sales return total
+    const QueryTemplate(
+      templateId: 'tmpl-sales-006',
+      category: 'sales',
+      intentKeywords: ['sales return', 'credit note', 'sales return total'],
+      description: 'Total sales returns (credit notes)',
+      sqlTemplate: '''SELECT COUNT(DISTINCT v.voucher_guid) as return_count,
+  SUM(CASE WHEN vle.amount < 0 THEN ABS(vle.amount) ELSE 0 END) as debit_total,
+  SUM(CASE WHEN vle.amount > 0 THEN vle.amount ELSE 0 END) as credit_total
+FROM vouchers v
+INNER JOIN voucher_ledger_entries vle ON vle.voucher_guid = v.voucher_guid
+WHERE v.company_guid = '{{company_guid}}' AND v.voucher_type = 'Credit Note'
+  AND v.is_deleted = 0 AND v.is_cancelled = 0 AND v.is_optional = 0
+  AND v.date >= '{{from_date}}' AND v.date <= '{{to_date}}' ''',
+      parameterSchema: {
+        'company_guid': {'type': 'string', 'required': true},
+        'from_date': {'type': 'date_tally', 'required': true},
+        'to_date': {'type': 'date_tally', 'required': true},
+      },
+      sampleQuestions: ['Total sales return this year', 'Credit note summary'],
+    ),
+    // 7. Cancelled/deleted sales
+    const QueryTemplate(
+      templateId: 'tmpl-sales-007',
+      category: 'sales',
+      intentKeywords: ['cancelled sales', 'deleted sales'],
+      description: 'Cancelled or deleted sales entries',
+      sqlTemplate: '''SELECT v.date, v.voucher_number, v.party_ledger_name, v.narration,
+  CASE WHEN v.is_cancelled = 1 THEN 'Cancelled' ELSE 'Deleted' END as status,
+  ABS(v.amount) as amount
+FROM vouchers v
+WHERE v.company_guid = '{{company_guid}}' AND v.voucher_type IN ('Sales', 'Credit Note')
+  AND (v.is_deleted = 1 OR v.is_cancelled = 1)
+  AND v.date >= '{{from_date}}' AND v.date <= '{{to_date}}'
+ORDER BY v.date DESC LIMIT 50''',
+      parameterSchema: {
+        'company_guid': {'type': 'string', 'required': true},
+        'from_date': {'type': 'date_tally', 'required': true},
+        'to_date': {'type': 'date_tally', 'required': true},
+      },
+      sampleQuestions: ['Cancelled or deleted sales entries'],
+    ),
   ];
 
   // ─── Purchase ───
@@ -337,6 +406,69 @@ LIMIT 20''',
         'to_date': {'type': 'date_tally', 'required': true},
       },
       sampleQuestions: ['Item wise purchase summary', 'Top purchased items'],
+    ),
+    // 5. Purchase return total
+    const QueryTemplate(
+      templateId: 'tmpl-purchase-005',
+      category: 'purchase',
+      intentKeywords: ['purchase return', 'debit note', 'purchase return total'],
+      description: 'Total purchase returns (debit notes)',
+      sqlTemplate: '''SELECT COUNT(DISTINCT v.voucher_guid) as return_count,
+  SUM(CASE WHEN vle.amount < 0 THEN ABS(vle.amount) ELSE 0 END) as debit_total,
+  SUM(CASE WHEN vle.amount > 0 THEN vle.amount ELSE 0 END) as credit_total
+FROM vouchers v
+INNER JOIN voucher_ledger_entries vle ON vle.voucher_guid = v.voucher_guid
+WHERE v.company_guid = '{{company_guid}}' AND v.voucher_type = 'Debit Note'
+  AND v.is_deleted = 0 AND v.is_cancelled = 0 AND v.is_optional = 0
+  AND v.date >= '{{from_date}}' AND v.date <= '{{to_date}}' ''',
+      parameterSchema: {
+        'company_guid': {'type': 'string', 'required': true},
+        'from_date': {'type': 'date_tally', 'required': true},
+        'to_date': {'type': 'date_tally', 'required': true},
+      },
+      sampleQuestions: ['Total purchase return this year', 'Debit note summary'],
+    ),
+    // 6. Purchase to sales ratio
+    const QueryTemplate(
+      templateId: 'tmpl-purchase-006',
+      category: 'purchase',
+      intentKeywords: ['purchase to sales ratio', 'purchase sales ratio'],
+      description: 'Purchase to sales ratio this period',
+      sqlTemplate: '''WITH RECURSIVE
+sales_groups AS (
+  SELECT group_guid, name FROM groups WHERE company_guid = '{{company_guid}}' AND reserved_name = 'Sales Accounts' AND is_deleted = 0
+  UNION ALL SELECT g.group_guid, g.name FROM groups g INNER JOIN sales_groups sg ON g.parent_guid = sg.group_guid WHERE g.company_guid = '{{company_guid}}' AND g.is_deleted = 0
+),
+purchase_groups AS (
+  SELECT group_guid, name FROM groups WHERE company_guid = '{{company_guid}}' AND reserved_name = 'Purchase Accounts' AND is_deleted = 0
+  UNION ALL SELECT g.group_guid, g.name FROM groups g INNER JOIN purchase_groups pg ON g.parent_guid = pg.group_guid WHERE g.company_guid = '{{company_guid}}' AND g.is_deleted = 0
+),
+s AS (
+  SELECT (SUM(CASE WHEN vle.amount > 0 THEN vle.amount ELSE 0 END) - SUM(CASE WHEN vle.amount < 0 THEN ABS(vle.amount) ELSE 0 END)) as net_sales
+  FROM voucher_ledger_entries vle INNER JOIN vouchers v ON v.voucher_guid = vle.voucher_guid
+  INNER JOIN ledgers l ON l.name = vle.ledger_name AND l.company_guid = v.company_guid
+  INNER JOIN sales_groups sg ON l.parent = sg.name
+  WHERE v.company_guid = '{{company_guid}}' AND v.is_deleted = 0 AND v.is_cancelled = 0 AND v.is_optional = 0
+    AND v.date >= '{{from_date}}' AND v.date <= '{{to_date}}'
+),
+p AS (
+  SELECT COALESCE(SUM(n), 0) as net_purchase FROM (
+    SELECT (SUM(CASE WHEN vle.amount < 0 THEN ABS(vle.amount) ELSE 0 END) - SUM(CASE WHEN vle.amount > 0 THEN vle.amount ELSE 0 END)) as n
+    FROM vouchers v INNER JOIN voucher_ledger_entries vle ON vle.voucher_guid = v.voucher_guid
+    INNER JOIN ledgers l ON l.name = vle.ledger_name AND l.company_guid = v.company_guid
+    INNER JOIN purchase_groups pg ON l.parent = pg.name
+    WHERE v.company_guid = '{{company_guid}}' AND v.is_deleted = 0 AND v.is_cancelled = 0 AND v.is_optional = 0
+      AND v.date >= '{{from_date}}' AND v.date <= '{{to_date}}'
+    GROUP BY v.voucher_guid)
+)
+SELECT (SELECT net_sales FROM s) as net_sales, (SELECT net_purchase FROM p) as net_purchase,
+  CASE WHEN (SELECT net_sales FROM s) > 0 THEN ROUND((SELECT net_purchase FROM p) * 100.0 / (SELECT net_sales FROM s), 2) ELSE 0 END as purchase_to_sales_pct''',
+      parameterSchema: {
+        'company_guid': {'type': 'string', 'required': true},
+        'from_date': {'type': 'date_tally', 'required': true},
+        'to_date': {'type': 'date_tally', 'required': true},
+      },
+      sampleQuestions: ['Purchase to sales ratio'],
     ),
   ];
 
@@ -529,6 +661,87 @@ ORDER BY days_overdue DESC''',
         'to_date': {'type': 'date_tally', 'required': true},
       },
       sampleQuestions: ['Overdue receivables above 90 days', 'Long overdue debtors'],
+    ),
+    // 5. Overdue receivables above 30 days
+    const QueryTemplate(
+      templateId: 'tmpl-receivables-005',
+      category: 'receivables',
+      intentKeywords: ['overdue 30', 'receivable 30 days'],
+      description: 'Overdue receivables above 30 days',
+      sqlTemplate: '''WITH RECURSIVE group_tree AS (
+  SELECT group_guid, name FROM groups WHERE company_guid = '{{company_guid}}' AND (name = 'Sundry Debtors' OR reserved_name = 'Sundry Debtors') AND is_deleted = 0
+  UNION ALL SELECT g.group_guid, g.name FROM groups g INNER JOIN group_tree gt ON g.parent_guid = gt.group_guid WHERE g.company_guid = '{{company_guid}}' AND g.is_deleted = 0
+)
+SELECT vle.ledger_name as party_name, vle.bill_name, vle.bill_date,
+  SUM(vle.bill_amount) as bill_outstanding,
+  CAST(julianday('now') - julianday(SUBSTR(vle.bill_date,1,4)||'-'||SUBSTR(vle.bill_date,5,2)||'-'||SUBSTR(vle.bill_date,7,2)) AS INTEGER) as days_overdue
+FROM voucher_ledger_entries vle
+INNER JOIN vouchers v ON v.voucher_guid = vle.voucher_guid
+INNER JOIN ledgers l ON l.name = vle.ledger_name AND l.company_guid = v.company_guid
+INNER JOIN group_tree gt ON l.parent = gt.name
+WHERE v.company_guid = '{{company_guid}}' AND v.is_deleted = 0 AND v.is_cancelled = 0 AND v.is_optional = 0
+  AND vle.bill_name IS NOT NULL AND vle.bill_name != '' AND v.date >= '{{from_date}}' AND v.date <= '{{to_date}}'
+GROUP BY vle.ledger_name, vle.bill_name, vle.bill_date
+HAVING bill_outstanding > 0.01 AND days_overdue > 30
+ORDER BY days_overdue DESC''',
+      parameterSchema: {
+        'company_guid': {'type': 'string', 'required': true},
+        'from_date': {'type': 'date_tally', 'required': true},
+        'to_date': {'type': 'date_tally', 'required': true},
+      },
+      sampleQuestions: ['Overdue receivables above 30 days'],
+    ),
+    // 6. Overdue receivables above 60 days
+    const QueryTemplate(
+      templateId: 'tmpl-receivables-006',
+      category: 'receivables',
+      intentKeywords: ['overdue 60', 'receivable 60 days'],
+      description: 'Overdue receivables above 60 days',
+      sqlTemplate: '''WITH RECURSIVE group_tree AS (
+  SELECT group_guid, name FROM groups WHERE company_guid = '{{company_guid}}' AND (name = 'Sundry Debtors' OR reserved_name = 'Sundry Debtors') AND is_deleted = 0
+  UNION ALL SELECT g.group_guid, g.name FROM groups g INNER JOIN group_tree gt ON g.parent_guid = gt.group_guid WHERE g.company_guid = '{{company_guid}}' AND g.is_deleted = 0
+)
+SELECT vle.ledger_name as party_name, vle.bill_name, vle.bill_date,
+  SUM(vle.bill_amount) as bill_outstanding,
+  CAST(julianday('now') - julianday(SUBSTR(vle.bill_date,1,4)||'-'||SUBSTR(vle.bill_date,5,2)||'-'||SUBSTR(vle.bill_date,7,2)) AS INTEGER) as days_overdue
+FROM voucher_ledger_entries vle
+INNER JOIN vouchers v ON v.voucher_guid = vle.voucher_guid
+INNER JOIN ledgers l ON l.name = vle.ledger_name AND l.company_guid = v.company_guid
+INNER JOIN group_tree gt ON l.parent = gt.name
+WHERE v.company_guid = '{{company_guid}}' AND v.is_deleted = 0 AND v.is_cancelled = 0 AND v.is_optional = 0
+  AND vle.bill_name IS NOT NULL AND vle.bill_name != '' AND v.date >= '{{from_date}}' AND v.date <= '{{to_date}}'
+GROUP BY vle.ledger_name, vle.bill_name, vle.bill_date
+HAVING bill_outstanding > 0.01 AND days_overdue > 60
+ORDER BY days_overdue DESC''',
+      parameterSchema: {
+        'company_guid': {'type': 'string', 'required': true},
+        'from_date': {'type': 'date_tally', 'required': true},
+        'to_date': {'type': 'date_tally', 'required': true},
+      },
+      sampleQuestions: ['Overdue receivables above 60 days'],
+    ),
+    // 7. Customer who paid the most this month
+    const QueryTemplate(
+      templateId: 'tmpl-receivables-007',
+      category: 'receivables',
+      intentKeywords: ['customer paid most', 'highest collection', 'payment collection'],
+      description: 'Top customers by receipt collection',
+      sqlTemplate: '''SELECT v.party_ledger_name as party_name,
+  SUM(CASE WHEN vle.amount > 0 THEN vle.amount ELSE 0 END) as total_received,
+  COUNT(DISTINCT v.voucher_guid) as receipt_count
+FROM vouchers v
+INNER JOIN voucher_ledger_entries vle ON v.voucher_guid = vle.voucher_guid
+WHERE v.company_guid = '{{company_guid}}' AND v.voucher_type = 'Receipt'
+  AND v.is_deleted = 0 AND v.is_cancelled = 0 AND v.is_optional = 0
+  AND v.date >= '{{from_date}}' AND v.date <= '{{to_date}}'
+  AND v.party_ledger_name IS NOT NULL AND v.party_ledger_name != ''
+GROUP BY v.party_ledger_name ORDER BY total_received DESC LIMIT 10''',
+      parameterSchema: {
+        'company_guid': {'type': 'string', 'required': true},
+        'from_date': {'type': 'date_tally', 'required': true},
+        'to_date': {'type': 'date_tally', 'required': true},
+      },
+      sampleQuestions: ['Top customers by collection', 'Who paid the most'],
     ),
   ];
 
@@ -866,6 +1079,75 @@ ORDER BY total_value DESC''',
       },
       sampleQuestions: ['Stock group wise summary', 'Show inventory by category'],
     ),
+    // 5. Items with negative stock
+    const QueryTemplate(
+      templateId: 'tmpl-stock-005',
+      category: 'stock',
+      intentKeywords: ['negative stock', 'minus stock'],
+      description: 'Items with negative stock quantity',
+      sqlTemplate: '''SELECT si.name as item_name, COALESCE(si.parent, '') as stock_group, COALESCE(si.base_units, '') as unit,
+  COALESCE(cb.closing_balance, 0.0) as closing_qty, COALESCE(cb.closing_value, 0.0) as closing_value
+FROM stock_items si
+INNER JOIN (SELECT DISTINCT stock_item_guid FROM stock_item_batch_allocation UNION SELECT DISTINCT stock_item_guid FROM voucher_inventory_entries WHERE company_guid = '{{company_guid}}') active ON active.stock_item_guid = si.stock_item_guid
+LEFT JOIN stock_item_closing_balance cb ON cb.stock_item_guid = si.stock_item_guid AND cb.company_guid = '{{company_guid}}'
+  AND cb.closing_date = (SELECT MAX(closing_date) FROM stock_item_closing_balance WHERE company_guid = '{{company_guid}}' AND closing_date <= '{{to_date}}')
+WHERE si.company_guid = '{{company_guid}}' AND si.is_deleted = 0 AND COALESCE(cb.closing_balance, 0.0) < 0
+ORDER BY cb.closing_balance ASC''',
+      parameterSchema: {
+        'company_guid': {'type': 'string', 'required': true},
+        'to_date': {'type': 'date_tally', 'required': true},
+      },
+      sampleQuestions: ['Items with negative stock'],
+    ),
+    // 6. Top 10 selling stock items (by qty from inventory entries)
+    const QueryTemplate(
+      templateId: 'tmpl-stock-006',
+      category: 'stock',
+      intentKeywords: ['top selling item', 'fastest moving', 'best seller'],
+      description: 'Top selling stock items by quantity',
+      sqlTemplate: '''SELECT vie.stock_item_name as item_name,
+  SUM(CAST(REPLACE(REPLACE(vie.actual_qty, ' Nos', ''), ' Pcs', '') AS REAL)) as total_qty_sold,
+  SUM(ABS(vie.amount)) as total_amount, COUNT(DISTINCT v.voucher_guid) as invoices
+FROM vouchers v INNER JOIN voucher_inventory_entries vie ON vie.voucher_guid = v.voucher_guid
+WHERE v.company_guid = '{{company_guid}}' AND v.voucher_type IN ('Sales', 'Credit Note')
+  AND v.is_deleted = 0 AND v.is_cancelled = 0 AND v.is_optional = 0
+  AND v.date >= '{{from_date}}' AND v.date <= '{{to_date}}'
+GROUP BY vie.stock_item_name ORDER BY total_qty_sold DESC LIMIT 10''',
+      parameterSchema: {
+        'company_guid': {'type': 'string', 'required': true},
+        'from_date': {'type': 'date_tally', 'required': true},
+        'to_date': {'type': 'date_tally', 'required': true},
+      },
+      sampleQuestions: ['Top 10 selling items by quantity', 'Best selling items'],
+    ),
+    // 7. Items with zero movement in 90 days
+    const QueryTemplate(
+      templateId: 'tmpl-stock-007',
+      category: 'stock',
+      intentKeywords: ['zero movement', 'no movement', 'dead stock', 'slow moving', 'non moving'],
+      description: 'Stock items with zero movement in period',
+      sqlTemplate: '''SELECT si.name as item_name, COALESCE(si.parent, '') as stock_group,
+  COALESCE(cb.closing_balance, 0.0) as closing_qty, COALESCE(cb.closing_value, 0.0) as closing_value
+FROM stock_items si
+INNER JOIN (SELECT DISTINCT stock_item_guid FROM stock_item_batch_allocation UNION SELECT DISTINCT stock_item_guid FROM voucher_inventory_entries WHERE company_guid = '{{company_guid}}') active ON active.stock_item_guid = si.stock_item_guid
+LEFT JOIN stock_item_closing_balance cb ON cb.stock_item_guid = si.stock_item_guid AND cb.company_guid = '{{company_guid}}'
+  AND cb.closing_date = (SELECT MAX(closing_date) FROM stock_item_closing_balance WHERE company_guid = '{{company_guid}}' AND closing_date <= '{{to_date}}')
+WHERE si.company_guid = '{{company_guid}}' AND si.is_deleted = 0
+  AND COALESCE(cb.closing_balance, 0.0) > 0
+  AND si.stock_item_guid NOT IN (
+    SELECT DISTINCT vie.stock_item_guid FROM voucher_inventory_entries vie
+    INNER JOIN vouchers v ON v.voucher_guid = vie.voucher_guid
+    WHERE v.company_guid = '{{company_guid}}' AND v.is_deleted = 0 AND v.is_cancelled = 0
+      AND v.date >= '{{from_date}}' AND v.date <= '{{to_date}}'
+  )
+ORDER BY cb.closing_value DESC''',
+      parameterSchema: {
+        'company_guid': {'type': 'string', 'required': true},
+        'from_date': {'type': 'date_tally', 'required': true},
+        'to_date': {'type': 'date_tally', 'required': true},
+      },
+      sampleQuestions: ['Items with zero movement', 'Dead stock items', 'Non moving stock'],
+    ),
   ];
 
   // ─── Expenses ───
@@ -1121,6 +1403,43 @@ SELECT
       },
       sampleQuestions: ['What is my gross profit?'],
     ),
+    // 3. Month wise profit trend
+    const QueryTemplate(
+      templateId: 'tmpl-pl-003',
+      category: 'profit_loss',
+      intentKeywords: ['month wise profit', 'monthly profit trend', 'profit trend'],
+      description: 'Month wise gross profit trend',
+      sqlTemplate: '''WITH RECURSIVE
+sg AS (SELECT group_guid, name FROM groups WHERE company_guid = '{{company_guid}}' AND reserved_name = 'Sales Accounts' AND is_deleted = 0
+  UNION ALL SELECT g.group_guid, g.name FROM groups g INNER JOIN sg ON g.parent_guid = sg.group_guid WHERE g.company_guid = '{{company_guid}}' AND g.is_deleted = 0),
+pg AS (SELECT group_guid, name FROM groups WHERE company_guid = '{{company_guid}}' AND reserved_name = 'Purchase Accounts' AND is_deleted = 0
+  UNION ALL SELECT g.group_guid, g.name FROM groups g INNER JOIN pg ON g.parent_guid = pg.group_guid WHERE g.company_guid = '{{company_guid}}' AND g.is_deleted = 0),
+ms AS (SELECT SUBSTR(v.date,1,6) as m,
+  (SUM(CASE WHEN vle.amount > 0 THEN vle.amount ELSE 0 END) - SUM(CASE WHEN vle.amount < 0 THEN ABS(vle.amount) ELSE 0 END)) as net_sales
+  FROM voucher_ledger_entries vle INNER JOIN vouchers v ON v.voucher_guid = vle.voucher_guid
+  INNER JOIN ledgers l ON l.name = vle.ledger_name AND l.company_guid = v.company_guid INNER JOIN sg ON l.parent = sg.name
+  WHERE v.company_guid = '{{company_guid}}' AND v.is_deleted = 0 AND v.is_cancelled = 0 AND v.is_optional = 0
+    AND v.date >= '{{from_date}}' AND v.date <= '{{to_date}}' GROUP BY SUBSTR(v.date,1,6)),
+mp AS (SELECT m, COALESCE(SUM(n),0) as net_purchase FROM (
+  SELECT SUBSTR(v.date,1,6) as m, (SUM(CASE WHEN vle.amount < 0 THEN ABS(vle.amount) ELSE 0 END) - SUM(CASE WHEN vle.amount > 0 THEN vle.amount ELSE 0 END)) as n
+  FROM vouchers v INNER JOIN voucher_ledger_entries vle ON vle.voucher_guid = v.voucher_guid
+  INNER JOIN ledgers l ON l.name = vle.ledger_name AND l.company_guid = v.company_guid INNER JOIN pg ON l.parent = pg.name
+  WHERE v.company_guid = '{{company_guid}}' AND v.is_deleted = 0 AND v.is_cancelled = 0 AND v.is_optional = 0
+    AND v.date >= '{{from_date}}' AND v.date <= '{{to_date}}' GROUP BY v.voucher_guid) GROUP BY m)
+SELECT ms.m as month_yyyymm,
+  CASE SUBSTR(ms.m,5,2) WHEN '01' THEN 'Jan' WHEN '02' THEN 'Feb' WHEN '03' THEN 'Mar' WHEN '04' THEN 'Apr' WHEN '05' THEN 'May' WHEN '06' THEN 'Jun'
+    WHEN '07' THEN 'Jul' WHEN '08' THEN 'Aug' WHEN '09' THEN 'Sep' WHEN '10' THEN 'Oct' WHEN '11' THEN 'Nov' WHEN '12' THEN 'Dec'
+  END || ' ' || SUBSTR(ms.m,3,2) as month_name,
+  COALESCE(ms.net_sales,0) as net_sales, COALESCE(mp.net_purchase,0) as net_purchase,
+  COALESCE(ms.net_sales,0) - COALESCE(mp.net_purchase,0) as gross_profit
+FROM ms LEFT JOIN mp ON ms.m = mp.m ORDER BY month_yyyymm ASC''',
+      parameterSchema: {
+        'company_guid': {'type': 'string', 'required': true},
+        'from_date': {'type': 'date_tally', 'required': true},
+        'to_date': {'type': 'date_tally', 'required': true},
+      },
+      sampleQuestions: ['Month wise profit trend'],
+    ),
   ];
 
   // ─── Trial Balance ───
@@ -1207,6 +1526,72 @@ LIMIT 50''',
         'to_date': {'type': 'date_tally', 'required': true},
       },
       sampleQuestions: ['Day book - recent transactions', 'Show all transactions'],
+    ),
+    // 4. Contra entries (fund transfers)
+    const QueryTemplate(
+      templateId: 'tmpl-tb-004',
+      category: 'trial_balance',
+      intentKeywords: ['contra', 'fund transfer', 'bank to cash'],
+      description: 'Contra entries (fund transfers)',
+      sqlTemplate: '''SELECT v.date, v.voucher_number, v.narration,
+  GROUP_CONCAT(DISTINCT CASE WHEN vle.amount < 0 THEN vle.ledger_name ELSE NULL END) as from_account,
+  GROUP_CONCAT(DISTINCT CASE WHEN vle.amount > 0 THEN vle.ledger_name ELSE NULL END) as to_account,
+  SUM(CASE WHEN vle.amount < 0 THEN ABS(vle.amount) ELSE 0 END) as amount
+FROM vouchers v INNER JOIN voucher_ledger_entries vle ON vle.voucher_guid = v.voucher_guid
+WHERE v.company_guid = '{{company_guid}}' AND v.voucher_type = 'Contra'
+  AND v.is_deleted = 0 AND v.is_cancelled = 0 AND v.is_optional = 0
+  AND v.date >= '{{from_date}}' AND v.date <= '{{to_date}}'
+GROUP BY v.voucher_guid, v.date, v.voucher_number, v.narration
+ORDER BY v.date DESC LIMIT 50''',
+      parameterSchema: {
+        'company_guid': {'type': 'string', 'required': true},
+        'from_date': {'type': 'date_tally', 'required': true},
+        'to_date': {'type': 'date_tally', 'required': true},
+      },
+      sampleQuestions: ['Contra entries this month', 'Fund transfers'],
+    ),
+    // 5. Debit note & credit note summary
+    const QueryTemplate(
+      templateId: 'tmpl-tb-005',
+      category: 'trial_balance',
+      intentKeywords: ['debit note', 'credit note summary', 'dn cn'],
+      description: 'Debit note and credit note summary',
+      sqlTemplate: '''SELECT v.voucher_type,
+  COUNT(DISTINCT v.voucher_guid) as count,
+  SUM(CASE WHEN vle.amount < 0 THEN ABS(vle.amount) ELSE 0 END) as total_debit,
+  SUM(CASE WHEN vle.amount > 0 THEN vle.amount ELSE 0 END) as total_credit
+FROM vouchers v INNER JOIN voucher_ledger_entries vle ON vle.voucher_guid = v.voucher_guid
+WHERE v.company_guid = '{{company_guid}}' AND v.voucher_type IN ('Debit Note', 'Credit Note')
+  AND v.is_deleted = 0 AND v.is_cancelled = 0 AND v.is_optional = 0
+  AND v.date >= '{{from_date}}' AND v.date <= '{{to_date}}'
+GROUP BY v.voucher_type''',
+      parameterSchema: {
+        'company_guid': {'type': 'string', 'required': true},
+        'from_date': {'type': 'date_tally', 'required': true},
+        'to_date': {'type': 'date_tally', 'required': true},
+      },
+      sampleQuestions: ['Debit note and credit note summary'],
+    ),
+    // 6. Ledger with most transactions
+    const QueryTemplate(
+      templateId: 'tmpl-tb-006',
+      category: 'trial_balance',
+      intentKeywords: ['most transactions', 'busiest ledger', 'active ledger'],
+      description: 'Ledgers with most transactions this period',
+      sqlTemplate: '''SELECT vle.ledger_name, COUNT(DISTINCT v.voucher_guid) as txn_count,
+  SUM(CASE WHEN vle.amount < 0 THEN ABS(vle.amount) ELSE 0 END) as total_debit,
+  SUM(CASE WHEN vle.amount > 0 THEN vle.amount ELSE 0 END) as total_credit
+FROM voucher_ledger_entries vle
+INNER JOIN vouchers v ON v.voucher_guid = vle.voucher_guid
+WHERE v.company_guid = '{{company_guid}}' AND v.is_deleted = 0 AND v.is_cancelled = 0 AND v.is_optional = 0
+  AND v.date >= '{{from_date}}' AND v.date <= '{{to_date}}'
+GROUP BY vle.ledger_name ORDER BY txn_count DESC LIMIT 20''',
+      parameterSchema: {
+        'company_guid': {'type': 'string', 'required': true},
+        'from_date': {'type': 'date_tally', 'required': true},
+        'to_date': {'type': 'date_tally', 'required': true},
+      },
+      sampleQuestions: ['Ledger with most transactions', 'Most active ledgers'],
     ),
   ];
 
@@ -1305,6 +1690,45 @@ ORDER BY ABS(l.closing_balance) DESC''',
         'company_guid': {'type': 'string', 'required': true},
       },
       sampleQuestions: ['Capital account details'],
+    ),
+    // 5. Total loans/debt outstanding
+    const QueryTemplate(
+      templateId: 'tmpl-bs-005',
+      category: 'balance_sheet',
+      intentKeywords: ['loans', 'debt', 'secured loans', 'unsecured loans', 'total debt'],
+      description: 'Total loans and debt outstanding',
+      sqlTemplate: '''WITH RECURSIVE group_tree AS (
+  SELECT group_guid, name FROM groups WHERE company_guid = '{{company_guid}}'
+    AND reserved_name IN ('Loans (Liability)', 'Secured Loans', 'Unsecured Loans') AND is_deleted = 0
+  UNION ALL SELECT g.group_guid, g.name FROM groups g INNER JOIN group_tree gt ON g.parent_guid = gt.group_guid WHERE g.company_guid = '{{company_guid}}' AND g.is_deleted = 0
+)
+SELECT l.name as ledger_name, l.parent as group_name, l.closing_balance
+FROM ledgers l INNER JOIN group_tree gt ON l.parent = gt.name
+WHERE l.company_guid = '{{company_guid}}' AND l.is_deleted = 0 AND l.closing_balance != 0
+ORDER BY ABS(l.closing_balance) DESC''',
+      parameterSchema: {
+        'company_guid': {'type': 'string', 'required': true},
+      },
+      sampleQuestions: ['Total loans outstanding', 'Total debt'],
+    ),
+    // 6. Current liabilities breakdown
+    const QueryTemplate(
+      templateId: 'tmpl-bs-006',
+      category: 'balance_sheet',
+      intentKeywords: ['current liabilities'],
+      description: 'Current liabilities ledger breakdown',
+      sqlTemplate: '''WITH RECURSIVE group_tree AS (
+  SELECT group_guid, name FROM groups WHERE company_guid = '{{company_guid}}' AND reserved_name = 'Current Liabilities' AND is_deleted = 0
+  UNION ALL SELECT g.group_guid, g.name FROM groups g INNER JOIN group_tree gt ON g.parent_guid = gt.group_guid WHERE g.company_guid = '{{company_guid}}' AND g.is_deleted = 0
+)
+SELECT l.name as ledger_name, l.parent as group_name, l.closing_balance
+FROM ledgers l INNER JOIN group_tree gt ON l.parent = gt.name
+WHERE l.company_guid = '{{company_guid}}' AND l.is_deleted = 0 AND l.closing_balance != 0
+ORDER BY ABS(l.closing_balance) DESC''',
+      parameterSchema: {
+        'company_guid': {'type': 'string', 'required': true},
+      },
+      sampleQuestions: ['Current liabilities breakdown'],
     ),
   ];
 
@@ -1525,6 +1949,87 @@ ORDER BY taxable_value DESC''',
       },
       sampleQuestions: ['GST ledger wise breakup', 'HSN summary'],
     ),
+    // 5. Tax collected vs tax paid (input vs output)
+    const QueryTemplate(
+      templateId: 'tmpl-gst-005',
+      category: 'gst',
+      intentKeywords: ['tax collected vs paid', 'input vs output gst', 'itc', 'input tax credit'],
+      description: 'Tax collected (output) vs tax paid (input)',
+      sqlTemplate: '''SELECT
+  'Output GST (Sales)' as category,
+  SUM(COALESCE(vie.cgst_amount, 0)) as cgst,
+  SUM(COALESCE(vie.sgst_amount, 0)) as sgst,
+  SUM(COALESCE(vie.igst_amount, 0)) as igst,
+  SUM(COALESCE(vie.cgst_amount, 0) + COALESCE(vie.sgst_amount, 0) + COALESCE(vie.igst_amount, 0)) as total_gst
+FROM vouchers v INNER JOIN voucher_inventory_entries vie ON vie.voucher_guid = v.voucher_guid
+WHERE v.company_guid = '{{company_guid}}' AND v.voucher_type = 'Sales'
+  AND v.is_deleted = 0 AND v.is_cancelled = 0 AND v.is_optional = 0
+  AND v.date >= '{{from_date}}' AND v.date <= '{{to_date}}'
+UNION ALL
+SELECT 'Input GST (Purchase)',
+  SUM(COALESCE(vie.cgst_amount, 0)), SUM(COALESCE(vie.sgst_amount, 0)),
+  SUM(COALESCE(vie.igst_amount, 0)),
+  SUM(COALESCE(vie.cgst_amount, 0) + COALESCE(vie.sgst_amount, 0) + COALESCE(vie.igst_amount, 0))
+FROM vouchers v INNER JOIN voucher_inventory_entries vie ON vie.voucher_guid = v.voucher_guid
+WHERE v.company_guid = '{{company_guid}}' AND v.voucher_type = 'Purchase'
+  AND v.is_deleted = 0 AND v.is_cancelled = 0 AND v.is_optional = 0
+  AND v.date >= '{{from_date}}' AND v.date <= '{{to_date}}' ''',
+      parameterSchema: {
+        'company_guid': {'type': 'string', 'required': true},
+        'from_date': {'type': 'date_tally', 'required': true},
+        'to_date': {'type': 'date_tally', 'required': true},
+      },
+      sampleQuestions: ['Tax collected vs tax paid', 'Input vs output GST', 'Total ITC this month'],
+    ),
+    // 6. State-wise GST breakup
+    const QueryTemplate(
+      templateId: 'tmpl-gst-006',
+      category: 'gst',
+      intentKeywords: ['state wise gst', 'gst by state'],
+      description: 'State-wise GST breakup from sales',
+      sqlTemplate: '''SELECT COALESCE(v.place_of_supply, v.state_name, 'Unknown') as state,
+  COUNT(DISTINCT v.voucher_guid) as invoices,
+  SUM(ABS(vie.amount)) as taxable_value,
+  SUM(COALESCE(vie.cgst_amount, 0)) as cgst,
+  SUM(COALESCE(vie.sgst_amount, 0)) as sgst,
+  SUM(COALESCE(vie.igst_amount, 0)) as igst
+FROM vouchers v INNER JOIN voucher_inventory_entries vie ON vie.voucher_guid = v.voucher_guid
+WHERE v.company_guid = '{{company_guid}}' AND v.voucher_type = 'Sales'
+  AND v.is_deleted = 0 AND v.is_cancelled = 0 AND v.is_optional = 0
+  AND v.date >= '{{from_date}}' AND v.date <= '{{to_date}}'
+GROUP BY COALESCE(v.place_of_supply, v.state_name, 'Unknown')
+ORDER BY taxable_value DESC''',
+      parameterSchema: {
+        'company_guid': {'type': 'string', 'required': true},
+        'from_date': {'type': 'date_tally', 'required': true},
+        'to_date': {'type': 'date_tally', 'required': true},
+      },
+      sampleQuestions: ['State wise GST breakup'],
+    ),
+    // 7. Invoices with missing GSTIN
+    const QueryTemplate(
+      templateId: 'tmpl-gst-007',
+      category: 'gst',
+      intentKeywords: ['missing gstin', 'no gstin', 'gstin missing'],
+      description: 'Sales invoices with missing party GSTIN',
+      sqlTemplate: '''SELECT v.date, v.voucher_number, v.party_ledger_name,
+  SUM(CASE WHEN vle.amount > 0 THEN vle.amount ELSE 0 END) as invoice_amount
+FROM vouchers v
+INNER JOIN voucher_ledger_entries vle ON vle.voucher_guid = v.voucher_guid
+WHERE v.company_guid = '{{company_guid}}' AND v.voucher_type = 'Sales'
+  AND v.is_deleted = 0 AND v.is_cancelled = 0 AND v.is_optional = 0
+  AND v.date >= '{{from_date}}' AND v.date <= '{{to_date}}'
+  AND (v.party_gstin IS NULL OR v.party_gstin = '')
+  AND v.party_ledger_name IS NOT NULL AND v.party_ledger_name != ''
+GROUP BY v.voucher_guid, v.date, v.voucher_number, v.party_ledger_name
+ORDER BY v.date DESC LIMIT 50''',
+      parameterSchema: {
+        'company_guid': {'type': 'string', 'required': true},
+        'from_date': {'type': 'date_tally', 'required': true},
+        'to_date': {'type': 'date_tally', 'required': true},
+      },
+      sampleQuestions: ['Invoices with missing GSTIN'],
+    ),
   ];
 
   // ─── Bank / Cash Balance ───
@@ -1671,9 +2176,8 @@ monthly_sales AS (
   GROUP BY SUBSTR(v.date, 1, 6)
 ),
 monthly_purchase AS (
-  SELECT SUBSTR(v.date, 1, 6) as m,
-    COALESCE(SUM(net_amount), 0) as net_purchase FROM (
-      SELECT v.date, (SUM(CASE WHEN vle.amount < 0 THEN ABS(vle.amount) ELSE 0 END) -
+  SELECT m, COALESCE(SUM(net_amount), 0) as net_purchase FROM (
+      SELECT SUBSTR(v.date, 1, 6) as m, (SUM(CASE WHEN vle.amount < 0 THEN ABS(vle.amount) ELSE 0 END) -
        SUM(CASE WHEN vle.amount > 0 THEN vle.amount ELSE 0 END)) as net_amount
       FROM vouchers v INNER JOIN voucher_ledger_entries vle ON vle.voucher_guid = v.voucher_guid
       INNER JOIN ledgers l ON l.name = vle.ledger_name AND l.company_guid = v.company_guid
@@ -1681,7 +2185,7 @@ monthly_purchase AS (
       WHERE v.company_guid = '{{company_guid}}' AND v.is_deleted = 0 AND v.is_cancelled = 0 AND v.is_optional = 0
         AND v.date >= '{{from_date}}' AND v.date <= '{{to_date}}'
       GROUP BY v.voucher_guid
-    ) GROUP BY SUBSTR(date, 1, 6)
+    ) GROUP BY m
 )
 SELECT s.m as month_yyyymm,
   CASE SUBSTR(s.m, 5, 2)
@@ -1710,57 +2214,77 @@ ORDER BY month_yyyymm ASC''',
     // Sales
     'Total sales this year': ['Top 10 customers by sales', 'Month wise sales breakdown', 'Month wise sales vs purchase', 'Show full P&L statement'],
     'Top 10 customers by sales': ['Total sales this year', 'All outstanding receivables', 'Item wise sales summary'],
-    'Month wise sales breakdown': ['Month wise purchase breakdown', 'Month wise sales vs expenses', 'Month wise expense trend'],
-    'Item wise sales summary': ['GST on sales - HSN wise', 'Top 10 customers by sales', 'Item wise purchase summary'],
+    'Month wise sales breakdown': ['Month wise purchase breakdown', 'Month wise sales vs expenses', 'Month wise profit trend'],
+    'Item wise sales summary': ['GST on sales - HSN wise', 'Top 10 customers by sales', 'Top 10 selling items by quantity'],
+    'Day wise sales this month': ['Month wise sales breakdown', 'Total sales this year', 'Top 10 customers by sales'],
+    'Total sales return this year': ['Total purchase return this year', 'Total sales this year', 'Debit note and credit note summary'],
+    'Cancelled or deleted sales entries': ['Total sales this year', 'Day book - recent transactions'],
     // Purchase
-    'Total purchases this year': ['Top 10 suppliers by purchase', 'Month wise purchase breakdown', 'Show full P&L statement'],
+    'Total purchases this year': ['Top 10 suppliers by purchase', 'Month wise purchase breakdown', 'Purchase to sales ratio'],
     'Top 10 suppliers by purchase': ['Total purchases this year', 'All outstanding payables', 'Item wise purchase summary'],
     'Month wise purchase breakdown': ['Month wise sales breakdown', 'Month wise sales vs purchase', 'Month wise expense trend'],
     'Item wise purchase summary': ['GST on purchases - HSN wise', 'Top 10 suppliers by purchase', 'Item wise sales summary'],
+    'Total purchase return this year': ['Total sales return this year', 'Total purchases this year', 'Debit note and credit note summary'],
+    'Purchase to sales ratio': ['Show full P&L statement', 'Total sales this year', 'Total purchases this year'],
     // P&L
-    'Show full P&L statement': ['Direct expenses breakdown', 'Indirect expenses breakdown', 'Month wise sales vs expenses', 'Total sales this year'],
-    'What is my gross profit?': ['Show full P&L statement', 'Month wise sales vs purchase', 'Direct expenses breakdown'],
+    'Show full P&L statement': ['Direct expenses breakdown', 'Indirect expenses breakdown', 'Month wise profit trend', 'Month wise sales vs expenses'],
+    'What is my gross profit?': ['Show full P&L statement', 'Month wise profit trend', 'Direct expenses breakdown'],
     'Direct expenses breakdown': ['Indirect expenses breakdown', 'Top 10 expense ledgers', 'Show full P&L statement'],
     'Indirect expenses breakdown': ['Direct expenses breakdown', 'Top 10 expense ledgers', 'Month wise expense trend'],
+    'Month wise profit trend': ['Month wise sales vs purchase', 'Month wise sales vs expenses', 'Show full P&L statement'],
     // Receivables
     'All outstanding receivables': ['Top 10 debtors by amount', 'Bill wise aging analysis', 'Overdue receivables above 90 days'],
-    'Top 10 debtors by amount': ['All outstanding receivables', 'Bill wise aging analysis', 'Top 10 customers by sales'],
-    'Bill wise aging analysis': ['Overdue receivables above 90 days', 'Top 10 debtors by amount', 'All outstanding receivables'],
-    'Overdue receivables above 90 days': ['Bill wise aging analysis', 'All outstanding receivables', 'Total receipts and payments'],
+    'Top 10 debtors by amount': ['All outstanding receivables', 'Bill wise aging analysis', 'Top customers by collection'],
+    'Bill wise aging analysis': ['Overdue receivables above 90 days', 'Overdue receivables above 60 days', 'Top 10 debtors by amount'],
+    'Overdue receivables above 90 days': ['Overdue receivables above 60 days', 'Bill wise aging analysis', 'Total receipts and payments'],
+    'Overdue receivables above 60 days': ['Overdue receivables above 30 days', 'Overdue receivables above 90 days', 'Bill wise aging analysis'],
+    'Overdue receivables above 30 days': ['Overdue receivables above 60 days', 'All outstanding receivables', 'Top customers by collection'],
+    'Top customers by collection': ['All outstanding receivables', 'Recent receipt vouchers', 'Top 10 customers by sales'],
     // Payables
     'All outstanding payables': ['Top 10 creditors by amount', 'Bill wise payable aging', 'Overdue payables above 90 days'],
     'Top 10 creditors by amount': ['All outstanding payables', 'Bill wise payable aging', 'Top 10 suppliers by purchase'],
     'Bill wise payable aging': ['Overdue payables above 90 days', 'Top 10 creditors by amount', 'All outstanding payables'],
-    'Overdue payables above 90 days': ['Bill wise payable aging', 'All outstanding payables', 'Total receipts and payments'],
+    'Overdue payables above 90 days': ['Bill wise payable aging', 'All outstanding payables', 'Recent payment vouchers'],
     // Stock
     'Closing stock summary': ['Top 10 stock items by value', 'Stock group wise summary', 'Zero or out of stock items'],
-    'Top 10 stock items by value': ['Closing stock summary', 'Stock group wise summary', 'Item wise sales summary'],
-    'Zero or out of stock items': ['Closing stock summary', 'Item wise purchase summary', 'Stock group wise summary'],
-    'Stock group wise summary': ['Closing stock summary', 'Top 10 stock items by value', 'Zero or out of stock items'],
+    'Top 10 stock items by value': ['Closing stock summary', 'Stock group wise summary', 'Top 10 selling items by quantity'],
+    'Zero or out of stock items': ['Items with negative stock', 'Items with zero movement', 'Closing stock summary'],
+    'Stock group wise summary': ['Closing stock summary', 'Top 10 stock items by value', 'Item wise sales summary'],
+    'Items with negative stock': ['Zero or out of stock items', 'Closing stock summary', 'Items with zero movement'],
+    'Top 10 selling items by quantity': ['Item wise sales summary', 'Items with zero movement', 'Top 10 stock items by value'],
+    'Items with zero movement': ['Zero or out of stock items', 'Items with negative stock', 'Top 10 selling items by quantity'],
     // Expenses
     'Top 10 expense ledgers': ['Direct expenses breakdown', 'Indirect expenses breakdown', 'Month wise expense trend'],
     'Month wise expense trend': ['Month wise sales vs expenses', 'Top 10 expense ledgers', 'Show full P&L statement'],
     // Cash Flow
     'Total receipts and payments': ['Cash and bank balance', 'Recent payment vouchers', 'Recent receipt vouchers'],
-    'Cash and bank balance': ['Total receipts and payments', 'Show balance sheet', 'Recent payment vouchers'],
+    'Cash and bank balance': ['Total receipts and payments', 'Show balance sheet', 'Total loans outstanding'],
     'Recent payment vouchers': ['Recent receipt vouchers', 'Total receipts and payments', 'All outstanding payables'],
-    'Recent receipt vouchers': ['Recent payment vouchers', 'Total receipts and payments', 'All outstanding receivables'],
+    'Recent receipt vouchers': ['Recent payment vouchers', 'Top customers by collection', 'All outstanding receivables'],
     // Balance Sheet
-    'Show balance sheet': ['Current assets breakdown', 'Fixed assets breakdown', 'Capital account details'],
+    'Show balance sheet': ['Current assets breakdown', 'Fixed assets breakdown', 'Total loans outstanding'],
     'Current assets breakdown': ['Show balance sheet', 'Cash and bank balance', 'All outstanding receivables'],
     'Fixed assets breakdown': ['Show balance sheet', 'Current assets breakdown', 'Capital account details'],
-    'Capital account details': ['Show balance sheet', 'Show full P&L statement', 'Fixed assets breakdown'],
+    'Capital account details': ['Show balance sheet', 'Show full P&L statement', 'Total loans outstanding'],
+    'Total loans outstanding': ['Show balance sheet', 'Current liabilities breakdown', 'Cash and bank balance'],
+    'Current liabilities breakdown': ['Show balance sheet', 'All outstanding payables', 'Total loans outstanding'],
     // GST
-    'GST on sales - HSN wise': ['GST on purchases - HSN wise', 'Duties and taxes summary', 'Item wise sales summary'],
-    'GST on purchases - HSN wise': ['GST on sales - HSN wise', 'Duties and taxes summary', 'Item wise purchase summary'],
-    'Duties and taxes summary': ['GST on sales - HSN wise', 'GST on purchases - HSN wise', 'GST ledger wise breakup'],
-    'GST ledger wise breakup': ['Duties and taxes summary', 'GST on sales - HSN wise', 'GST on purchases - HSN wise'],
+    'GST on sales - HSN wise': ['GST on purchases - HSN wise', 'Tax collected vs tax paid', 'State wise GST breakup'],
+    'GST on purchases - HSN wise': ['GST on sales - HSN wise', 'Tax collected vs tax paid', 'Invoices with missing GSTIN'],
+    'Duties and taxes summary': ['Tax collected vs tax paid', 'GST on sales - HSN wise', 'GST ledger wise breakup'],
+    'GST ledger wise breakup': ['Duties and taxes summary', 'State wise GST breakup', 'Tax collected vs tax paid'],
+    'Tax collected vs tax paid': ['GST on sales - HSN wise', 'GST on purchases - HSN wise', 'Duties and taxes summary'],
+    'State wise GST breakup': ['GST on sales - HSN wise', 'GST ledger wise breakup', 'Tax collected vs tax paid'],
+    'Invoices with missing GSTIN': ['GST on sales - HSN wise', 'State wise GST breakup', 'Duties and taxes summary'],
     // Trial Balance
-    'Show trial balance': ['Voucher type summary', 'Show balance sheet', 'Show full P&L statement'],
-    'Voucher type summary': ['Day book - recent transactions', 'Show trial balance', 'Total receipts and payments'],
+    'Show trial balance': ['Voucher type summary', 'Show balance sheet', 'Ledger with most transactions'],
+    'Voucher type summary': ['Day book - recent transactions', 'Debit note and credit note summary', 'Show trial balance'],
     'Day book - recent transactions': ['Voucher type summary', 'Recent payment vouchers', 'Recent receipt vouchers'],
+    'Contra entries this month': ['Cash and bank balance', 'Day book - recent transactions', 'Voucher type summary'],
+    'Debit note and credit note summary': ['Total sales return this year', 'Total purchase return this year', 'Voucher type summary'],
+    'Ledger with most transactions': ['Show trial balance', 'Voucher type summary', 'Day book - recent transactions'],
     // Combos
-    'Month wise sales vs expenses': ['Month wise sales breakdown', 'Month wise expense trend', 'Show full P&L statement'],
-    'Month wise sales vs purchase': ['Month wise sales breakdown', 'Month wise purchase breakdown', 'What is my gross profit?'],
+    'Month wise sales vs expenses': ['Month wise sales breakdown', 'Month wise expense trend', 'Month wise profit trend'],
+    'Month wise sales vs purchase': ['Month wise sales breakdown', 'Month wise purchase breakdown', 'Month wise profit trend'],
   };
 }

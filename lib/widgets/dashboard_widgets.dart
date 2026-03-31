@@ -1,7 +1,10 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../screens/theme/app_theme.dart';
+import '../screens/home/ai_queries_screen.dart';
 import '../models/kpi_metric.dart';
+import '../utils/secure_storage.dart';
 
 // ─────────────────────────────────────────────
 //  METRIC CARD (2×2 grid item)
@@ -183,28 +186,56 @@ class RevenueBreakdown extends StatelessWidget {
 class AiAskBar extends StatelessWidget {
   const AiAskBar({Key? key}) : super(key: key);
 
+  Future<void> _openAI(BuildContext context) async {
+    final companyGuid = await SecureStorage.getSelectedCompanyGuid();
+    if (companyGuid == null) return;
+    final token = await SecureStorage.getToken() ?? '';
+    final userData = await SecureStorage.getUser();
+    String userId = '';
+    if (userData != null) {
+      try {
+        final userMap = jsonDecode(userData) as Map<String, dynamic>;
+        userId = (userMap['user_id'] ?? '').toString();
+      } catch (_) {}
+    }
+    if (!context.mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AIQueriesScreen(
+          companyGuid: companyGuid,
+          userId: userId,
+          token: token,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: AppSpacing.pagePadding),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppRadius.card),
-        border: Border.all(color: AppColors.divider),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.auto_awesome, size: 20, color: AppColors.purple),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              'Ask anything about your business...',
-              style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+    return GestureDetector(
+      onTap: () => _openAI(context),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: AppSpacing.pagePadding),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(AppRadius.card),
+          border: Border.all(color: AppColors.divider),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.auto_awesome, size: 20, color: AppColors.purple),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Ask anything about your business...',
+                style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+              ),
             ),
-          ),
-          Icon(Icons.arrow_forward_ios, size: 14, color: AppColors.textSecondary),
-        ],
+            Icon(Icons.arrow_forward_ios, size: 14, color: AppColors.textSecondary),
+          ],
+        ),
       ),
     );
   }

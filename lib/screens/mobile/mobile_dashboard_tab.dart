@@ -5,6 +5,7 @@ import '../../utils/amount_formatter.dart';
 import '../../utils/secure_storage.dart';
 import '../../models/user_model.dart';
 import '../theme/app_theme.dart';
+import '../home/ai_queries_screen.dart';
 import 'dart:convert';
 
 class MobileDashboardTab extends StatefulWidget {
@@ -239,11 +240,77 @@ class _MobileDashboardTabState extends State<MobileDashboardTab> {
                             ),
                           ],
                         ),
+                        const SizedBox(height: 20),
+
+                        // Ask AI
+                        GestureDetector(
+                          onTap: _openAIQueries,
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF0D9488), Color(0xFF14B8A6)],
+                              ),
+                              borderRadius: BorderRadius.circular(14),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFF14B8A6).withValues(alpha: 0.3),
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.2),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: const Icon(Icons.auto_awesome, color: Colors.white, size: 24),
+                                ),
+                                const SizedBox(width: 14),
+                                const Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text('Ask AI',
+                                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                                      SizedBox(height: 2),
+                                      Text('Query your Tally data instantly',
+                                          style: TextStyle(fontSize: 12, color: Colors.white70)),
+                                    ],
+                                  ),
+                                ),
+                                const Icon(Icons.arrow_forward_ios, color: Colors.white70, size: 16),
+                              ],
+                            ),
+                          ),
+                        ),
                         const SizedBox(height: 24),
                       ],
                     ),
                   ),
                 ),
+    );
+  }
+
+  Future<void> _openAIQueries() async {
+    if (_companyGuid == null) return;
+    final token = await SecureStorage.getToken() ?? '';
+    if (!mounted) return;
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AIQueriesScreen(
+          companyGuid: _companyGuid!,
+          userId: _currentUser?.userId.toString() ?? '',
+          token: token,
+        ),
+      ),
     );
   }
 

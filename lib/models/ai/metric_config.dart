@@ -17,7 +17,7 @@ class MetricConfig {
     required this.description,
   });
 
-  /// All available metrics
+  /// All available metrics — existing presets first, new ones after
   static final List<MetricConfig> allMetrics = [
     const MetricConfig(
       name: 'Sales',
@@ -29,6 +29,9 @@ class MetricConfig {
         'Top 10 customers by sales',
         'Month wise sales breakdown',
         'Item wise sales summary',
+        'Day wise sales this month',
+        'Total sales return this year',
+        'Cancelled or deleted sales entries',
       ],
     ),
     const MetricConfig(
@@ -41,6 +44,8 @@ class MetricConfig {
         'Top 10 suppliers by purchase',
         'Month wise purchase breakdown',
         'Item wise purchase summary',
+        'Total purchase return this year',
+        'Purchase to sales ratio',
       ],
     ),
     const MetricConfig(
@@ -53,6 +58,7 @@ class MetricConfig {
         'What is my gross profit?',
         'Direct expenses breakdown',
         'Indirect expenses breakdown',
+        'Month wise profit trend',
       ],
     ),
     const MetricConfig(
@@ -65,6 +71,9 @@ class MetricConfig {
         'Top 10 debtors by amount',
         'Bill wise aging analysis',
         'Overdue receivables above 90 days',
+        'Overdue receivables above 60 days',
+        'Overdue receivables above 30 days',
+        'Top customers by collection',
       ],
     ),
     const MetricConfig(
@@ -89,6 +98,9 @@ class MetricConfig {
         'Top 10 stock items by value',
         'Zero or out of stock items',
         'Stock group wise summary',
+        'Items with negative stock',
+        'Top 10 selling items by quantity',
+        'Items with zero movement',
       ],
     ),
     const MetricConfig(
@@ -125,6 +137,8 @@ class MetricConfig {
         'Current assets breakdown',
         'Fixed assets breakdown',
         'Capital account details',
+        'Total loans outstanding',
+        'Current liabilities breakdown',
       ],
     ),
     const MetricConfig(
@@ -137,6 +151,9 @@ class MetricConfig {
         'GST on purchases - HSN wise',
         'Duties and taxes summary',
         'GST ledger wise breakup',
+        'Tax collected vs tax paid',
+        'State wise GST breakup',
+        'Invoices with missing GSTIN',
       ],
     ),
     const MetricConfig(
@@ -148,6 +165,9 @@ class MetricConfig {
         'Show trial balance',
         'Voucher type summary',
         'Day book - recent transactions',
+        'Contra entries this month',
+        'Debit note and credit note summary',
+        'Ledger with most transactions',
       ],
     ),
   ];
