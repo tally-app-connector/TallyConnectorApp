@@ -148,7 +148,13 @@ import 'utils/date_utils.dart' as app_date;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await AuthService.init();
+  try {
+    await AuthService.init();
+  } catch (e) {
+    debugPrint('AuthService.init() failed: $e');
+  }
+  await fontScaleNotifier.load();
+  await themeModeNotifier.load();
   AiDependencies.apiBaseUrl = ApiConfig.baseUrl;
   AiDependencies.databaseProvider = () => DatabaseHelper.instance.database;
   AiDependencies.claudeApiKey = AiConfig.claudeApiKey;
@@ -283,14 +289,47 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Tally Connector',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        useMaterial3: true,
-      ),
-      home: const SplashScreen(),
+    return ValueListenableBuilder<double>(
+      valueListenable: fontScaleNotifier,
+      builder: (context, scale, _) {
+        return ValueListenableBuilder<ThemeMode>(
+          valueListenable: themeModeNotifier,
+          builder: (context, themeMode, _) {
+            return MaterialApp(
+              title: 'Tally Connector',
+              debugShowCheckedModeBanner: false,
+              themeMode: themeMode,
+              theme: ThemeData(
+                brightness: Brightness.light,
+                primarySwatch: Colors.blue,
+                useMaterial3: true,
+              ),
+              darkTheme: ThemeData(
+                brightness: Brightness.dark,
+                primarySwatch: Colors.blue,
+                useMaterial3: true,
+                scaffoldBackgroundColor: const Color(0xFF121218),
+              ),
+              builder: (context, child) {
+                setAppBrightness(Theme.of(context).brightness);
+
+                final systemScale = MediaQuery.of(context).textScaler.scale(1.0);
+                final systemBoost = systemScale > 1.0
+                    ? ((systemScale - 1.0) * 0.15)
+                    : 0.0;
+                final effectiveScale = (scale + systemBoost).clamp(0.85, 1.50);
+                return MediaQuery(
+                  data: MediaQuery.of(context).copyWith(
+                    textScaler: TextScaler.linear(effectiveScale),
+                  ),
+                  child: child!,
+                );
+              },
+              home: const SplashScreen(),
+            );
+          },
+        );
+      },
     );
   }
 }
@@ -473,9 +512,9 @@ class _AppShellState extends State<AppShell> with SingleTickerProviderStateMixin
   TabController? _tabController;
 
   // ── Design tokens ────────────────────────────────────────────────────────────
-  static const Color _primary   = Color(0xFF1A6FD8);
-  static const Color _textMuted = Color(0xFF8A94A6);
-  static const Color _cardBg    = Colors.white;
+  static const Color _primary = Color(0xFF1A6FD8);
+  static Color get _textMuted => AppColors.textSecondary;
+  static Color get _cardBg => AppColors.surface;
 
   // ── Desktop destinations (5 tabs in top TabBar) ──────────────────────────────
   static const List<_Dest> _desktopDestinations = [
@@ -561,7 +600,7 @@ class _AppShellState extends State<AppShell> with SingleTickerProviderStateMixin
 
   Widget _buildDesktopShell() {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FB),
+      backgroundColor: AppColors.background,
       body: Column(
         children: [
           // ── Shared TabBar strip ──────────────────────────────────────────

@@ -144,33 +144,36 @@ class ChartTypeSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: availableTypes.map((type) {
-        final isSelected = type == selected;
-        return GestureDetector(
-          onTap: () => onChanged(type),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            margin: const EdgeInsets.only(right: 6),
-            decoration: BoxDecoration(
-              color: isSelected ? AppColors.blue.withValues(alpha: 0.12) : Colors.transparent,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: isSelected ? AppColors.blue : AppColors.divider,
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: availableTypes.map((type) {
+          final isSelected = type == selected;
+          return GestureDetector(
+            onTap: () => onChanged(type),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              margin: const EdgeInsets.only(right: 6),
+              decoration: BoxDecoration(
+                color: isSelected ? AppColors.blue.withValues(alpha: 0.12) : Colors.transparent,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: isSelected ? AppColors.blue : AppColors.divider,
+                ),
+              ),
+              child: Text(
+                type.name.toUpperCase(),
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: isSelected ? AppColors.blue : AppColors.textSecondary,
+                ),
               ),
             ),
-            child: Text(
-              type.name.toUpperCase(),
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: isSelected ? AppColors.blue : AppColors.textSecondary,
-              ),
-            ),
-          ),
-        );
-      }).toList(),
+          );
+        }).toList(),
+      ),
     );
   }
 }
