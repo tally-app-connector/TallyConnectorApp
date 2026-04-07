@@ -540,6 +540,7 @@ import 'dart:convert';
 import '../../utils/message_helper.dart';
 import '../../services/sync_service.dart';
 import './ai_queries_screen.dart';
+import '../theme/app_theme.dart';
 
 
 class HomeScreen extends StatefulWidget {
@@ -561,10 +562,6 @@ class _HomeScreenState extends State<HomeScreen>
   // ── Design Tokens ──────────────────────────────────────────────────────────
   static const Color _primary   = Color(0xFF1A6FD8);
   static const Color _accent    = Color(0xFF00C9A7);
-  static const Color _bg        = Color(0xFFF4F6FB);
-  static const Color _cardBg    = Colors.white;
-  static const Color _textDark  = Color(0xFF1A2340);
-  static const Color _textMuted = Color(0xFF8A94A6);
   static const Color _danger    = Color(0xFFE53935);
   static const Color _warning   = Color(0xFFFFA000);
 
@@ -722,15 +719,17 @@ class _HomeScreenState extends State<HomeScreen>
 
   @override
   Widget build(BuildContext context) {
+    syncBrightness(context);
+
     if (_isLoading) {
-      return const Scaffold(
-        backgroundColor: _bg,
-        body: Center(child: CircularProgressIndicator(color: _primary)),
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        body: const Center(child: CircularProgressIndicator(color: _primary)),
       );
     }
 
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: AppColors.background,
       body: FadeTransition(
         opacity: _fadeAnimation,
         child: CustomScrollView(
@@ -764,14 +763,14 @@ class _HomeScreenState extends State<HomeScreen>
                       onTap: _openAIQueriesScreen,
                     ),
                     const SizedBox(height: 16),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 24),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
                     child: Text(
                       'Companies will appear once you sync from the Windows app',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                           fontSize: 13,
-                          color: _textMuted,
+                          color: AppColors.textSecondary,
                           fontStyle: FontStyle.italic),
                     ),
                   ),
@@ -793,7 +792,7 @@ class _HomeScreenState extends State<HomeScreen>
       snap: true,
       elevation: 0,
       surfaceTintColor: Colors.transparent,
-      backgroundColor: _cardBg,
+      backgroundColor: AppColors.surface,
       title: Row(children: [
         Container(
           width: 30,
@@ -809,12 +808,12 @@ class _HomeScreenState extends State<HomeScreen>
           child: const Icon(Icons.bolt_rounded, color: Colors.white, size: 18),
         ),
         const SizedBox(width: 9),
-        const Text(
+        Text(
           'Tally Connector',
           style: TextStyle(
               fontWeight: FontWeight.w800,
               fontSize: 17,
-              color: _textDark,
+              color: AppColors.textPrimary,
               letterSpacing: -0.3),
         ),
       ]),
@@ -835,7 +834,7 @@ class _HomeScreenState extends State<HomeScreen>
       ],
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(1),
-        child: Container(height: 1, color: Colors.grey.shade100),
+        child: Container(height: 1, color: AppColors.divider),
       ),
     );
   }
@@ -1043,10 +1042,10 @@ class _HomeScreenState extends State<HomeScreen>
         ),
         const SizedBox(width: 10),
         Text(title,
-            style: const TextStyle(
+            style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w800,
-                color: _textDark,
+                color: AppColors.textPrimary,
                 letterSpacing: -0.2)),
       ]),
     );
@@ -1133,7 +1132,7 @@ class _HomeScreenState extends State<HomeScreen>
                       description,
                       style: TextStyle(
                         fontSize: 12,
-                        color: Colors.grey.shade600,
+                        color: AppColors.textSecondary,
                       ),
                     ),
                   ],
@@ -1142,7 +1141,7 @@ class _HomeScreenState extends State<HomeScreen>
               Icon(
                 Icons.arrow_forward_ios,
                 size: 16,
-                color: Colors.grey.shade400,
+                color: AppColors.textSecondary,
               ),
             ],
           ),
@@ -1159,7 +1158,7 @@ class _HomeScreenState extends State<HomeScreen>
         padding:
             const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
         decoration: BoxDecoration(
-          color: _cardBg,
+          color: AppColors.surface,
           borderRadius: BorderRadius.circular(14),
           boxShadow: [
             BoxShadow(
@@ -1180,15 +1179,15 @@ class _HomeScreenState extends State<HomeScreen>
           ),
           const SizedBox(height: 10),
           Text(c.label,
-              style: const TextStyle(
+              style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
-                  color: _textDark),
+                  color: AppColors.textPrimary),
               textAlign: TextAlign.center),
           const SizedBox(height: 2),
           Text(c.sublabel,
               style:
-                  const TextStyle(fontSize: 10, color: _textMuted),
+                  TextStyle(fontSize: 10, color: AppColors.textSecondary),
               textAlign: TextAlign.center),
         ]),
       ),
@@ -1210,7 +1209,7 @@ class _HomeScreenState extends State<HomeScreen>
         margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: _cardBg,
+          color: AppColors.surface,
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
@@ -1234,23 +1233,23 @@ class _HomeScreenState extends State<HomeScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(title,
-                      style: const TextStyle(
+                      style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
-                          color: _textDark)),
+                          color: AppColors.textPrimary)),
                   const SizedBox(height: 3),
                   Text(subtitle,
-                      style: const TextStyle(
-                          fontSize: 12, color: _textMuted)),
+                      style: TextStyle(
+                          fontSize: 12, color: AppColors.textSecondary)),
                 ]),
           ),
           Container(
             width: 32,
             height: 32,
             decoration:
-                const BoxDecoration(color: _bg, shape: BoxShape.circle),
-            child: const Icon(Icons.arrow_forward_ios_rounded,
-                size: 14, color: _textMuted),
+                BoxDecoration(color: AppColors.background, shape: BoxShape.circle),
+            child: Icon(Icons.arrow_forward_ios_rounded,
+                size: 14, color: AppColors.textSecondary),
           ),
         ]),
       ),

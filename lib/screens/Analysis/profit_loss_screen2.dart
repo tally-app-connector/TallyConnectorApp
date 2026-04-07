@@ -3,6 +3,7 @@ import '../../models/data_model.dart';
 import '../../database/database_helper.dart';
 import '../../utils/date_utils.dart';
 import '../../services/queries/query_service.dart';
+import '../theme/app_theme.dart';
 import 'group_detail_screen.dart';
 import 'stock_summary_screen.dart';
 
@@ -46,17 +47,13 @@ class _ProfitLossScreenState extends State<ProfitLossScreen>
   // ── Design tokens ──────────────────────────────────────────────────────────
   static const Color _primary   = Color(0xFF1A6FD8);
   static const Color _accent    = Color(0xFF00C9A7);
-  static const Color _bg        = Color(0xFFF4F6FB);
-  static const Color _cardBg    = Colors.white;
-  static const Color _textDark  = Color(0xFF1A2340);
-  static const Color _textMuted = Color(0xFF8A94A6);
   static const Color _debitCol  = Color(0xFFD32F2F);
   static const Color _creditCol = Color(0xFF1B8A5A);
-  static const Color _grossBg   = Color(0xFFFFF8E1);
+  static Color get _grossBg   => AppColors.iconBgAmber;
   static const Color _grossC    = Color(0xFFB45309);
-  static const Color _netBg     = Color(0xFFE8F5EE);
+  static Color get _netBg     => AppColors.iconBgGreen;
   static const Color _netC      = Color(0xFF1B8A5A);
-  static const Color _netLossBg = Color(0xFFFFEBEB);
+  static Color get _netLossBg => AppColors.iconBgRed;
   static const Color _netLossC  = Color(0xFFD32F2F);
 
   @override
@@ -213,12 +210,12 @@ class _ProfitLossScreenState extends State<ProfitLossScreen>
                       decoration: BoxDecoration(color: _primary.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
                       child: const Icon(Icons.date_range_rounded, color: _primary, size: 20)),
                     const SizedBox(width: 12),
-                    const Text('Select Period', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: _textDark)),
+                    Text('Select Period', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
                   ]),
                   const SizedBox(height: 20),
 
                   // Quick filter chips
-                  const Text('Quick Select', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _textMuted, letterSpacing: 0.4)),
+                  Text('Quick Select', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textSecondary, letterSpacing: 0.4)),
                   const SizedBox(height: 10),
                   Wrap(spacing: 8, runSpacing: 8, children: [
                     _qChip('This Month', () { final n = DateTime.now(); setDs(() { tempFrom = DateTime(n.year, n.month, 1); tempTo = DateTime(n.year, n.month+1, 0); }); }),
@@ -231,14 +228,14 @@ class _ProfitLossScreenState extends State<ProfitLossScreen>
                   ]),
 
                   const SizedBox(height: 22),
-                  const Text('Custom Range', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _textMuted, letterSpacing: 0.4)),
+                  Text('Custom Range', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textSecondary, letterSpacing: 0.4)),
                   const SizedBox(height: 10),
 
                   // From date
                   _datePickerTile('From', tempFrom, () async {
                     final p = await showDatePicker(context: ctx,
                       initialDate: tempFrom, firstDate: DateTime(2000), lastDate: DateTime(2100),
-                      builder: (c,child) => Theme(data: Theme.of(c).copyWith(colorScheme: const ColorScheme.light(primary: _primary, onPrimary: Colors.white, onSurface: _textDark)), child: child!));
+                      builder: (c,child) { final dk = Theme.of(c).brightness == Brightness.dark; return Theme(data: Theme.of(c).copyWith(colorScheme: dk ? ColorScheme.dark(primary: _primary, onPrimary: Colors.white, surface: AppColors.surface, onSurface: AppColors.textPrimary) : ColorScheme.light(primary: _primary, onPrimary: Colors.white, onSurface: AppColors.textPrimary)), child: child!); });
                     if (p != null) setDs(() => tempFrom = p);
                   }),
                   const SizedBox(height: 10),
@@ -247,7 +244,7 @@ class _ProfitLossScreenState extends State<ProfitLossScreen>
                   _datePickerTile('To', tempTo, () async {
                     final p = await showDatePicker(context: ctx,
                       initialDate: tempTo, firstDate: DateTime(2000), lastDate: DateTime(2100),
-                      builder: (c,child) => Theme(data: Theme.of(c).copyWith(colorScheme: const ColorScheme.light(primary: _primary, onPrimary: Colors.white, onSurface: _textDark)), child: child!));
+                      builder: (c,child) { final dk = Theme.of(c).brightness == Brightness.dark; return Theme(data: Theme.of(c).copyWith(colorScheme: dk ? ColorScheme.dark(primary: _primary, onPrimary: Colors.white, surface: AppColors.surface, onSurface: AppColors.textPrimary) : ColorScheme.light(primary: _primary, onPrimary: Colors.white, onSurface: AppColors.textPrimary)), child: child!); });
                     if (p != null) setDs(() => tempTo = p);
                   }),
 
@@ -255,7 +252,7 @@ class _ProfitLossScreenState extends State<ProfitLossScreen>
                   Row(children: [
                     Expanded(child: OutlinedButton(
                       onPressed: () => Navigator.pop(ctx),
-                      style: OutlinedButton.styleFrom(foregroundColor: _textMuted,
+                      style: OutlinedButton.styleFrom(foregroundColor: AppColors.textSecondary,
                         side: BorderSide(color: Colors.grey.shade200),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
                       child: const Text('Cancel'))),
@@ -308,15 +305,15 @@ class _ProfitLossScreenState extends State<ProfitLossScreen>
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(color: _bg, borderRadius: BorderRadius.circular(10),
+        decoration: BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.circular(10),
           border: Border.all(color: Colors.grey.shade200)),
         child: Row(children: [
           const Icon(Icons.calendar_today_rounded, size: 16, color: _primary),
           const SizedBox(width: 10),
           Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(label, style: const TextStyle(fontSize: 10, color: _textMuted)),
+            Text(label, style: TextStyle(fontSize: 10, color: AppColors.textSecondary)),
             const SizedBox(height: 2),
-            Text(_displayDate(date), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _textDark)),
+            Text(_displayDate(date), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
           ]),
         ]),
       ),
@@ -352,9 +349,10 @@ class _ProfitLossScreenState extends State<ProfitLossScreen>
 
   @override
   Widget build(BuildContext context) {
+    syncBrightness(context);
     if (_loading) {
       return Scaffold(
-        backgroundColor: _bg,
+        backgroundColor: AppColors.background,
         appBar: _buildAppBar(),
         body: const Center(child: CircularProgressIndicator(color: _primary)),
       );
@@ -365,7 +363,7 @@ class _ProfitLossScreenState extends State<ProfitLossScreen>
     final isProfit    = netProfit >= 0;
 
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: AppColors.background,
       appBar: _buildAppBar(),
       body: FadeTransition(
         opacity: _fadeAnim,
@@ -456,15 +454,15 @@ class _ProfitLossScreenState extends State<ProfitLossScreen>
 
   AppBar _buildAppBar() {
     return AppBar(
-      backgroundColor: _cardBg,
+      backgroundColor: AppColors.surface,
       elevation: 0,
       surfaceTintColor: Colors.transparent,
       leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: _textDark),
+        icon: Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: AppColors.textPrimary),
         onPressed: () => Navigator.pop(context),
       ),
-      title: const Text('Profit & Loss A/c',
-          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: _textDark)),
+      title: Text('Profit & Loss A/c',
+          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
       actions: [
         // Period pill — tap to change
         GestureDetector(
@@ -488,7 +486,7 @@ class _ProfitLossScreenState extends State<ProfitLossScreen>
           ),
         ),
         IconButton(
-          icon: const Icon(Icons.refresh_rounded, color: _textMuted, size: 20),
+          icon: Icon(Icons.refresh_rounded, color: AppColors.textSecondary, size: 20),
           onPressed: _loadData,
         ),
       ],
@@ -571,7 +569,7 @@ class _ProfitLossScreenState extends State<ProfitLossScreen>
             borderRadius: BorderRadius.circular(2)),
         ),
         const SizedBox(width: 10),
-        Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: _textDark, letterSpacing: -0.2)),
+        Text(title, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary, letterSpacing: -0.2)),
       ]),
     );
   }
@@ -586,7 +584,7 @@ class _ProfitLossScreenState extends State<ProfitLossScreen>
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
-        color: _cardBg,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0,3))],
       ),
@@ -602,7 +600,7 @@ class _ProfitLossScreenState extends State<ProfitLossScreen>
               ],
             )),
             // Vertical divider
-            Container(width: 1, color: Colors.grey.shade100),
+            Container(width: 1, color: AppColors.divider),
             // Right
             Expanded(child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -638,11 +636,11 @@ class _ProfitLossScreenState extends State<ProfitLossScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFFF0F3FA),
+        color: AppColors.pillBg,
         borderRadius: const BorderRadius.only(topLeft: Radius.circular(16), topRight: Radius.circular(16)),
       ),
       child: Text(label,
-          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: _textMuted, letterSpacing: 0.5)),
+          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: AppColors.textSecondary, letterSpacing: 0.5)),
     );
   }
 
@@ -653,11 +651,11 @@ class _ProfitLossScreenState extends State<ProfitLossScreen>
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
         child: Row(children: [
           Expanded(child: Text(label,
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: _textDark))),
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.textPrimary))),
           if (onTap != null) Icon(Icons.chevron_right_rounded, size: 14, color: Colors.grey.shade300),
           const SizedBox(width: 4),
           Text(_fmt(amount),
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _textDark)),
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
         ]),
       ),
     );
@@ -684,9 +682,9 @@ class _ProfitLossScreenState extends State<ProfitLossScreen>
             ),
             const SizedBox(width: 6),
             Expanded(child: Text(label,
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _textDark))),
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary))),
             Icon(expanded ? Icons.expand_less_rounded : Icons.expand_more_rounded,
-                size: 16, color: _textMuted),
+                size: 16, color: AppColors.textSecondary),
             const SizedBox(width: 4),
             Text(_fmt(total),
                 style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
@@ -700,7 +698,7 @@ class _ProfitLossScreenState extends State<ProfitLossScreen>
           padding: const EdgeInsets.only(left: 28, right: 12, bottom: 6),
           child: Row(children: [
             Expanded(child: Text(r['ledger_name'] as String? ?? '',
-                style: const TextStyle(fontSize: 11, color: _textMuted),
+                style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
                 maxLines: 1, overflow: TextOverflow.ellipsis)),
             Text(_fmt(closing.abs()),
                 style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500,

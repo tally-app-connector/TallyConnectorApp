@@ -213,6 +213,7 @@ class _DatabaseOverviewScreenState extends State<DatabaseOverviewScreen>
 
   @override
   Widget build(BuildContext context) {
+    syncBrightness(context);
     return Scaffold(
       backgroundColor: _T.bg,
       body: SafeArea(
@@ -238,27 +239,20 @@ class _DatabaseOverviewScreenState extends State<DatabaseOverviewScreen>
       decoration: BoxDecoration(
         color: _T.cardBg,
         border: Border(bottom: BorderSide(color: _T.border)),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 2)),
-        ],
+        boxShadow: AppShadows.card,
       ),
       child: Row(children: [
-        // Back button
-        _iconBtn(Icons.arrow_back_ios_new_rounded, () {
-          if (_view != 'overview') {
+        // Back button (only in sub-views)
+        if (_view != 'overview') ...[
+          _iconBtn(Icons.arrow_back_ios_new_rounded, () {
             setState(() {
               _view = _view == 'data' ? 'table' : 'overview';
               _fadeCtrl.reset();
               _fadeCtrl.forward();
             });
-          } else {
-            Navigator.pop(context);
-          }
-        }),
-        const SizedBox(width: 12),
+          }),
+          const SizedBox(width: 12),
+        ],
 
         // Title
         Expanded(
@@ -427,12 +421,7 @@ class _DatabaseOverviewScreenState extends State<DatabaseOverviewScreen>
         color: _T.cardBg,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: _T.border),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 2)),
-        ],
+        boxShadow: AppShadows.card,
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _sectionLabel('Row Distribution'),
@@ -550,12 +539,7 @@ class _DatabaseOverviewScreenState extends State<DatabaseOverviewScreen>
           color: _T.cardBg,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: _T.border),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withOpacity(0.03),
-                blurRadius: 6,
-                offset: const Offset(0, 2)),
-          ],
+          boxShadow: AppShadows.headerIcon,
         ),
         child: Row(children: [
           // Color bar
@@ -619,7 +603,7 @@ class _DatabaseOverviewScreenState extends State<DatabaseOverviewScreen>
           ),
           const SizedBox(width: 8),
           Icon(Icons.chevron_right_rounded,
-              size: 18, color: Colors.grey.shade300),
+              size: 18, color: _T.textLight),
         ]),
       ),
     );
@@ -992,7 +976,7 @@ class _DatabaseOverviewScreenState extends State<DatabaseOverviewScreen>
     if (_tableRows.isEmpty) {
       return Center(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Icon(Icons.inbox_outlined, size: 48, color: Colors.grey.shade300),
+          Icon(Icons.inbox_outlined, size: 48, color: _T.textLight),
           const SizedBox(height: 14),
           Text('No rows found',
               style: TextStyle(color: _T.textMuted, fontSize: 15)),

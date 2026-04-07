@@ -1122,6 +1122,7 @@
 import 'package:flutter/material.dart';
 import '../../database/database_helper.dart';
 import '../../services/queries/query_service.dart';
+import '../theme/app_theme.dart';
 
 class AnalysisHomeScreen extends StatefulWidget {
   @override
@@ -1149,20 +1150,19 @@ class _AnalysisHomeScreenState extends State<AnalysisHomeScreen>
   // ── Design tokens ──────────────────────────────────────────────────────────
   static const Color _primary    = Color(0xFF1A6FD8);
   static const Color _accent     = Color(0xFF00C9A7);
-  static const Color _bg         = Color(0xFFF4F6FB);
-  static const Color _cardBg     = Colors.white;
-  static const Color _textDark   = Color(0xFF1A2340);
-  static const Color _textMuted  = Color(0xFF8A94A6);
   static const Color _positiveC  = Color(0xFF1B8A5A);
-  static const Color _positiveBg = Color(0xFFE8F5EE);
   static const Color _negativeC  = Color(0xFFD32F2F);
-  static const Color _negativeBg = Color(0xFFFFEBEB);
   static const Color _amberC     = Color(0xFFB45309);
-  static const Color _amberBg    = Color(0xFFFFF7E6);
   static const Color _purpleC    = Color(0xFF7B2FBE);
-  static const Color _purpleBg   = Color(0xFFF3E8FF);
   static const Color _tealC      = Color(0xFF0891B2);
-  static const Color _tealBg     = Color(0xFFE0F7FA);
+
+  // Pastel backgrounds — dimmed for dark mode
+  bool get _dk => Theme.of(context).brightness == Brightness.dark;
+  Color get _positiveBg => _dk ? const Color(0xFF152E20) : const Color(0xFFE8F5EE);
+  Color get _negativeBg => _dk ? const Color(0xFF2E1515) : const Color(0xFFFFEBEB);
+  Color get _amberBg    => _dk ? const Color(0xFF2E2510) : const Color(0xFFFFF7E6);
+  Color get _purpleBg   => _dk ? const Color(0xFF201A35) : const Color(0xFFF3E8FF);
+  Color get _tealBg     => _dk ? const Color(0xFF0A2A30) : const Color(0xFFE0F7FA);
 
   @override
   void initState() {
@@ -1251,18 +1251,18 @@ class _AnalysisHomeScreenState extends State<AnalysisHomeScreen>
                           color: _primary, size: 20),
                     ),
                     const SizedBox(width: 12),
-                    const Text('Select Period',
+                    Text('Select Period',
                         style: TextStyle(
                             fontSize: 17,
                             fontWeight: FontWeight.w800,
-                            color: _textDark)),
+                            color: AppColors.textPrimary)),
                   ]),
                   const SizedBox(height: 20),
-                  const Text('Quick Select',
+                  Text('Quick Select',
                       style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
-                          color: _textMuted,
+                          color: AppColors.textSecondary,
                           letterSpacing: 0.4)),
                   const SizedBox(height: 10),
                   Wrap(spacing: 8, runSpacing: 8, children: [
@@ -1281,11 +1281,11 @@ class _AnalysisHomeScreenState extends State<AnalysisHomeScreen>
                     _qChip('Full FY', () { setDs(() { tempFrom = _selectedFromDate!; tempTo = _selectedToDate!; }); }),
                   ]),
                   const SizedBox(height: 22),
-                  const Text('Custom Range',
+                  Text('Custom Range',
                       style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
-                          color: _textMuted,
+                          color: AppColors.textSecondary,
                           letterSpacing: 0.4)),
                   const SizedBox(height: 10),
                   _dateTile('From', tempFrom, () async {
@@ -1293,7 +1293,7 @@ class _AnalysisHomeScreenState extends State<AnalysisHomeScreen>
                         initialDate: tempFrom,
                         firstDate: DateTime(2000), lastDate: DateTime(2100),
                         builder: (c, child) => Theme(
-                            data: Theme.of(c).copyWith(colorScheme: const ColorScheme.light(primary: _primary, onPrimary: Colors.white, onSurface: _textDark)),
+                            data: Theme.of(c).copyWith(colorScheme: Theme.of(c).brightness == Brightness.dark ? ColorScheme.dark(primary: _primary, onPrimary: Colors.white, surface: AppColors.surface, onSurface: AppColors.textPrimary) : ColorScheme.light(primary: _primary, onPrimary: Colors.white, onSurface: AppColors.textPrimary)),
                             child: child!));
                     if (p != null) setDs(() => tempFrom = p);
                   }),
@@ -1303,7 +1303,7 @@ class _AnalysisHomeScreenState extends State<AnalysisHomeScreen>
                         initialDate: tempTo,
                         firstDate: DateTime(2000), lastDate: DateTime(2100),
                         builder: (c, child) => Theme(
-                            data: Theme.of(c).copyWith(colorScheme: const ColorScheme.light(primary: _primary, onPrimary: Colors.white, onSurface: _textDark)),
+                            data: Theme.of(c).copyWith(colorScheme: Theme.of(c).brightness == Brightness.dark ? ColorScheme.dark(primary: _primary, onPrimary: Colors.white, surface: AppColors.surface, onSurface: AppColors.textPrimary) : ColorScheme.light(primary: _primary, onPrimary: Colors.white, onSurface: AppColors.textPrimary)),
                             child: child!));
                     if (p != null) setDs(() => tempTo = p);
                   }),
@@ -1312,7 +1312,7 @@ class _AnalysisHomeScreenState extends State<AnalysisHomeScreen>
                     Expanded(child: OutlinedButton(
                       onPressed: () => Navigator.pop(ctx),
                       style: OutlinedButton.styleFrom(
-                          foregroundColor: _textMuted,
+                          foregroundColor: AppColors.textSecondary,
                           side: BorderSide(color: Colors.grey.shade200),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
                       child: const Text('Cancel'))),
@@ -1364,7 +1364,7 @@ class _AnalysisHomeScreenState extends State<AnalysisHomeScreen>
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
-              color: _bg,
+              color: AppColors.background,
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: Colors.grey.shade200)),
           child: Row(children: [
@@ -1373,13 +1373,13 @@ class _AnalysisHomeScreenState extends State<AnalysisHomeScreen>
             const SizedBox(width: 10),
             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(label,
-                  style: const TextStyle(fontSize: 10, color: _textMuted)),
+                  style: TextStyle(fontSize: 10, color: AppColors.textSecondary)),
               const SizedBox(height: 2),
               Text(_displayDate(date),
-                  style: const TextStyle(
+                  style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
-                      color: _textDark)),
+                      color: AppColors.textPrimary)),
             ]),
           ]),
         ),
@@ -1408,15 +1408,16 @@ class _AnalysisHomeScreenState extends State<AnalysisHomeScreen>
 
   @override
   Widget build(BuildContext context) {
+    syncBrightness(context);
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: AppColors.background,
       appBar: _buildAppBar(),
       body: _loading
           ? const Center(child: CircularProgressIndicator(color: _primary))
           : _data == null
-              ? const Center(
+              ? Center(
                   child: Text('No data available',
-                      style: TextStyle(color: _textMuted)))
+                      style: TextStyle(color: AppColors.textSecondary)))
               : FadeTransition(
                   opacity: _fadeAnim,
                   child: RefreshIndicator(
@@ -1455,21 +1456,17 @@ class _AnalysisHomeScreenState extends State<AnalysisHomeScreen>
 
   AppBar _buildAppBar() {
     return AppBar(
-      backgroundColor: _cardBg,
+      backgroundColor: AppColors.surface,
       elevation: 0,
       surfaceTintColor: Colors.transparent,
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios_new_rounded,
-            size: 18, color: _textDark),
-        onPressed: () => Navigator.pop(context),
-      ),
+      automaticallyImplyLeading: false,
       title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('Business Analysis',
+        Text('Business Analysis',
             style: TextStyle(
-                fontSize: 16, fontWeight: FontWeight.w800, color: _textDark)),
+                fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
         if (_companyName != null)
           Text(_companyName!,
-              style: const TextStyle(fontSize: 11, color: _textMuted)),
+              style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
       ]),
       actions: [
         // Period pill
@@ -1500,7 +1497,7 @@ class _AnalysisHomeScreenState extends State<AnalysisHomeScreen>
           ),
         ),
         IconButton(
-          icon: const Icon(Icons.refresh_rounded, color: _textMuted, size: 20),
+          icon: Icon(Icons.refresh_rounded, color: AppColors.textSecondary, size: 20),
           onPressed: _loadData,
         ),
       ],
@@ -1605,9 +1602,9 @@ class _AnalysisHomeScreenState extends State<AnalysisHomeScreen>
           ),
           const SizedBox(width: 10),
           Text(title,
-              style: const TextStyle(
+              style: TextStyle(
                   fontSize: 16, fontWeight: FontWeight.w800,
-                  color: _textDark, letterSpacing: -0.2)),
+                  color: AppColors.textPrimary, letterSpacing: -0.2)),
         ]),
       );
 
@@ -1645,7 +1642,7 @@ class _AnalysisHomeScreenState extends State<AnalysisHomeScreen>
   Widget _kpiCard(_KpiItem item) => Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: _cardBg,
+          color: AppColors.surface,
           borderRadius: BorderRadius.circular(14),
           boxShadow: [
             BoxShadow(
@@ -1667,10 +1664,10 @@ class _AnalysisHomeScreenState extends State<AnalysisHomeScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(item.label,
-                      style: const TextStyle(
+                      style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
-                          color: _textMuted)),
+                          color: AppColors.textSecondary)),
                   const SizedBox(height: 3),
                   Text(_fmt(item.value),
                       style: TextStyle(
@@ -1721,7 +1718,7 @@ class _AnalysisHomeScreenState extends State<AnalysisHomeScreen>
         ),
         Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
           Text('Gross Profit',
-              style: const TextStyle(fontSize: 10, color: _textMuted)),
+              style: TextStyle(fontSize: 10, color: AppColors.textSecondary)),
           const SizedBox(height: 2),
           Text(_fmt(_d('gross_profit')),
               style: TextStyle(
@@ -1766,7 +1763,7 @@ class _AnalysisHomeScreenState extends State<AnalysisHomeScreen>
       Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: _cardBg,
+          color: AppColors.surface,
           borderRadius: BorderRadius.circular(14),
           boxShadow: [
             BoxShadow(
@@ -1826,18 +1823,18 @@ class _AnalysisHomeScreenState extends State<AnalysisHomeScreen>
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
-            color: _cardBg,
+            color: AppColors.surface,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: Colors.grey.shade200),
           ),
           child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Net Cash Flow',
+                Text('Net Cash Flow',
                     style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
-                        color: _textDark)),
+                        color: AppColors.textPrimary)),
                 Text(
                   _fmt(net),
                   style: TextStyle(

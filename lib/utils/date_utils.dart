@@ -118,3 +118,31 @@ String getFyLabel(DateTime date) {
 String getCurrentFyLabel() {
   return getFyLabel(DateTime.now());
 }
+
+// ============================================
+// ADAPTIVE FY HELPERS (early-year fallback)
+// ============================================
+
+/// True when we're in April or May — new FY has barely started,
+/// so queries should default to previous FY for meaningful data.
+bool isEarlyInFy([DateTime? date]) {
+  final d = date ?? DateTime.now();
+  return d.month == 4 || d.month == 5;
+}
+
+/// Previous financial year start date (e.g. 01-Apr-2025 when current FY is 2026-27)
+DateTime getPrevFyStartDate([DateTime? date]) {
+  final currentFyStart = getFyStartDate(date ?? DateTime.now());
+  return DateTime(currentFyStart.year - 1, fyStartMonth, fyStartDay);
+}
+
+/// Previous financial year end date (e.g. 31-Mar-2026 when current FY is 2026-27)
+DateTime getPrevFyEndDate([DateTime? date]) {
+  final currentFyStart = getFyStartDate(date ?? DateTime.now());
+  return DateTime(currentFyStart.year, 3, 31);
+}
+
+/// Previous FY label (e.g. "2025-26")
+String getPrevFyLabel([DateTime? date]) {
+  return getFyLabel(getPrevFyStartDate(date));
+}

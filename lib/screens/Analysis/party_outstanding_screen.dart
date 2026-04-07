@@ -799,6 +799,7 @@ import 'package:flutter/material.dart';
 import '../../database/database_helper.dart';
 import '../../services/queries/query_service.dart';
 import 'ledger_detail_screen.dart';
+import '../theme/app_theme.dart';
 
 class PartyOutstandingScreen extends StatefulWidget {
   @override
@@ -827,15 +828,10 @@ class _PartyOutstandingScreenState extends State<PartyOutstandingScreen>
   // ── Design tokens ──────────────────────────────────────────────────────────
   static const Color _primary    = Color(0xFF1A6FD8);
   static const Color _accent     = Color(0xFF00C9A7);
-  static const Color _bg         = Color(0xFFF4F6FB);
-  static const Color _cardBg     = Colors.white;
-  static const Color _textDark   = Color(0xFF1A2340);
-  static const Color _textMuted  = Color(0xFF8A94A6);
   static const Color _positiveC  = Color(0xFF1B8A5A);
   static const Color _positiveBg = Color(0xFFE8F5EE);
   static const Color _negativeC  = Color(0xFFD32F2F);
   static const Color _negativeBg = Color(0xFFFFEBEB);
-  static const Color _tableBg    = Color(0xFFF0F3FA);
 
   @override
   void initState() {
@@ -906,8 +902,9 @@ class _PartyOutstandingScreenState extends State<PartyOutstandingScreen>
 
   @override
   Widget build(BuildContext context) {
+    syncBrightness(context);
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: AppColors.background,
       appBar: _buildAppBar(),
       body: _loading
           ? const Center(child: CircularProgressIndicator(color: _primary))
@@ -929,32 +926,32 @@ class _PartyOutstandingScreenState extends State<PartyOutstandingScreen>
 
   AppBar _buildAppBar() {
     return AppBar(
-      backgroundColor: _cardBg,
+      backgroundColor: AppColors.surface,
       elevation: 0,
       surfaceTintColor: Colors.transparent,
       leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios_new_rounded,
-            size: 18, color: _textDark),
+        icon: Icon(Icons.arrow_back_ios_new_rounded,
+            size: 18, color: AppColors.textPrimary),
         onPressed: () => Navigator.pop(context),
       ),
       title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('Party Outstanding',
+        Text('Party Outstanding',
             style: TextStyle(
-                fontSize: 16, fontWeight: FontWeight.w800, color: _textDark)),
+                fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
         Text(
           '${_formatTallyDate(_fromDate)} → ${_formatTallyDate(_toDate)}',
-          style: const TextStyle(fontSize: 11, color: _textMuted),
+          style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
         ),
       ]),
       actions: [
         IconButton(
-          icon: const Icon(Icons.refresh_rounded, color: _textMuted, size: 20),
+          icon: Icon(Icons.refresh_rounded, color: AppColors.textSecondary, size: 20),
           onPressed: _loadData,
         ),
       ],
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(1),
-        child: Container(height: 1, color: Colors.grey.shade100),
+        child: Container(height: 1, color: AppColors.divider),
       ),
     );
   }
@@ -1066,7 +1063,7 @@ class _PartyOutstandingScreenState extends State<PartyOutstandingScreen>
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: active ? color.withOpacity(0.08) : _cardBg,
+          color: active ? color.withOpacity(0.08) : AppColors.surface,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
               color: active ? color : Colors.grey.shade200,
@@ -1092,7 +1089,7 @@ class _PartyOutstandingScreenState extends State<PartyOutstandingScreen>
                   style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
-                      color: active ? color : _textMuted)),
+                      color: active ? color : AppColors.textSecondary)),
               const SizedBox(height: 3),
               Text(_fmt(amount),
                   style: TextStyle(
@@ -1103,7 +1100,7 @@ class _PartyOutstandingScreenState extends State<PartyOutstandingScreen>
                   overflow: TextOverflow.ellipsis),
               const SizedBox(height: 2),
               Text('$count ${count == 1 ? 'party' : 'parties'}',
-                  style: const TextStyle(fontSize: 10, color: _textMuted)),
+                  style: TextStyle(fontSize: 10, color: AppColors.textSecondary)),
             ]),
           ),
         ]),
@@ -1118,7 +1115,7 @@ class _PartyOutstandingScreenState extends State<PartyOutstandingScreen>
       margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
       height: 40,
       decoration: BoxDecoration(
-        color: _tableBg,
+        color: AppColors.pillBg,
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(children: [
@@ -1145,7 +1142,7 @@ class _PartyOutstandingScreenState extends State<PartyOutstandingScreen>
                 style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
-                    color: active ? Colors.white : _textMuted)),
+                    color: active ? Colors.white : AppColors.textSecondary)),
           ),
         ),
       ),
@@ -1156,7 +1153,7 @@ class _PartyOutstandingScreenState extends State<PartyOutstandingScreen>
 
   Widget _buildTableHeader() {
     return Container(
-      color: _tableBg,
+      color: AppColors.pillBg,
       margin: const EdgeInsets.only(top: 10),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
       child: Row(children: [
@@ -1182,7 +1179,7 @@ class _PartyOutstandingScreenState extends State<PartyOutstandingScreen>
           const SizedBox(height: 14),
           Text(
             'No outstanding ${isRec ? 'receivables' : 'payables'}',
-            style: const TextStyle(fontSize: 15, color: _textMuted),
+            style: TextStyle(fontSize: 15, color: AppColors.textSecondary),
           ),
         ]),
       );
@@ -1217,7 +1214,7 @@ class _PartyOutstandingScreenState extends State<PartyOutstandingScreen>
       ),
       child: Container(
         decoration: BoxDecoration(
-          color: index.isEven ? _cardBg : _bg,
+          color: index.isEven ? AppColors.surface : AppColors.background,
           border: Border(
               bottom: BorderSide(color: Colors.grey.shade100, width: 0.8)),
         ),
@@ -1228,16 +1225,16 @@ class _PartyOutstandingScreenState extends State<PartyOutstandingScreen>
             flex: 3,
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(partyName,
-                  style: const TextStyle(
+                  style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
-                      color: _textDark),
+                      color: AppColors.textPrimary),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis),
               if (groupName.isNotEmpty) ...[
                 const SizedBox(height: 2),
                 Text(groupName,
-                    style: const TextStyle(fontSize: 11, color: _textMuted),
+                    style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis),
               ],
@@ -1309,7 +1306,7 @@ class _PartyOutstandingScreenState extends State<PartyOutstandingScreen>
 
     return Container(
       decoration: BoxDecoration(
-        color: _cardBg,
+        color: AppColors.surface,
         border: Border(top: BorderSide(color: Colors.grey.shade200)),
         boxShadow: [
           BoxShadow(
@@ -1323,18 +1320,18 @@ class _PartyOutstandingScreenState extends State<PartyOutstandingScreen>
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
           decoration: BoxDecoration(
-              color: _bg, borderRadius: BorderRadius.circular(8)),
+              color: AppColors.background, borderRadius: BorderRadius.circular(8)),
           child: Text(
             '${parties.length} ${parties.length == 1 ? 'party' : 'parties'}',
-            style: const TextStyle(
-                fontSize: 12, fontWeight: FontWeight.w700, color: _textMuted),
+            style: TextStyle(
+                fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textSecondary),
           ),
         ),
         const Spacer(),
         Column(crossAxisAlignment: CrossAxisAlignment.end, mainAxisSize: MainAxisSize.min, children: [
           Text(
             'Total ${isRec ? 'Receivables' : 'Payables'}',
-            style: const TextStyle(fontSize: 10, color: _textMuted),
+            style: TextStyle(fontSize: 10, color: AppColors.textSecondary),
           ),
           const SizedBox(height: 2),
           Text(_fmt(total),
@@ -1359,10 +1356,10 @@ class _hCell extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = Text(label,
         textAlign: align,
-        style: const TextStyle(
+        style: TextStyle(
             fontSize: 10,
             fontWeight: FontWeight.w800,
-            color: Color(0xFF8A94A6),
+            color: AppColors.textSecondary,
             letterSpacing: 0.3));
     if (flex == 0) return text;
     return Expanded(flex: flex, child: text);

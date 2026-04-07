@@ -217,6 +217,7 @@ class _BillWiseDetailScreenState extends State<BillWiseDetailScreen> {
                           ),
                         ),
                       ),
+                      
                     ),
                   ],
                 ),

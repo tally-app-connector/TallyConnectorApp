@@ -1105,6 +1105,7 @@ import '../Analysis/party_outstanding_screen.dart';
 import '../../database/database_helper.dart';
 import '../Analysis/payment_screen.dart';
 import '../Analysis/receipt_screen.dart';
+import '../theme/app_theme.dart';
 
 class AnalyticsDashboard extends StatefulWidget {
   @override
@@ -1134,10 +1135,6 @@ class _AnalyticsDashboardState extends State<AnalyticsDashboard>
   // ── Design tokens ────────────────────────────────────────────────────────────
   static const Color _primary    = Color(0xFF1A6FD8);
   static const Color _accent     = Color(0xFF00C9A7);
-  static const Color _bg         = Color(0xFFF4F6FB);
-  static const Color _cardBg     = Colors.white;
-  static const Color _textDark   = Color(0xFF1A2340);
-  static const Color _textMuted  = Color(0xFF8A94A6);
   static const Color _positiveC  = Color(0xFF1B8A5A);
   static const Color _negativeC  = Color(0xFFD32F2F);
 
@@ -1346,22 +1343,22 @@ class _AnalyticsDashboardState extends State<AnalyticsDashboard>
                             color: _primary, size: 20),
                       ),
                       const SizedBox(width: 12),
-                      const Text('Date Range',
+                      Text('Date Range',
                           style: TextStyle(
                               fontSize: 17,
                               fontWeight: FontWeight.w800,
-                              color: _textDark)),
+                              color: AppColors.textPrimary)),
                     ],
                   ),
 
                   const SizedBox(height: 20),
 
                   // Quick filters
-                  const Text('Quick Filters',
+                  Text('Quick Filters',
                       style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
-                          color: _textMuted,
+                          color: AppColors.textSecondary,
                           letterSpacing: 0.4)),
                   const SizedBox(height: 10),
                   Wrap(
@@ -1409,11 +1406,11 @@ class _AnalyticsDashboardState extends State<AnalyticsDashboard>
                   const SizedBox(height: 22),
 
                   // Custom range
-                  const Text('Custom Range',
+                  Text('Custom Range',
                       style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
-                          color: _textMuted,
+                          color: AppColors.textSecondary,
                           letterSpacing: 0.4)),
                   const SizedBox(height: 10),
 
@@ -1470,7 +1467,7 @@ class _AnalyticsDashboardState extends State<AnalyticsDashboard>
                         child: OutlinedButton(
                           onPressed: () => Navigator.pop(context),
                           style: OutlinedButton.styleFrom(
-                            foregroundColor: _textMuted,
+                            foregroundColor: AppColors.textSecondary,
                             side: BorderSide(color: Colors.grey.shade200),
                             shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(10)),
@@ -1549,9 +1546,9 @@ class _AnalyticsDashboardState extends State<AnalyticsDashboard>
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: const Color(0xFFF4F6FB),
+          color: AppColors.pillBg,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: Colors.grey.shade200),
+          border: Border.all(color: AppColors.divider),
         ),
         child: Row(
           children: [
@@ -1562,14 +1559,14 @@ class _AnalyticsDashboardState extends State<AnalyticsDashboard>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(label,
-                    style: const TextStyle(
-                        fontSize: 10, color: _textMuted)),
+                    style: TextStyle(
+                        fontSize: 10, color: AppColors.textSecondary)),
                 const SizedBox(height: 2),
                 Text(_formatDateDisplay(date),
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
-                        color: _textDark)),
+                        color: AppColors.textPrimary)),
               ],
             ),
           ],
@@ -1579,6 +1576,7 @@ class _AnalyticsDashboardState extends State<AnalyticsDashboard>
   }
 
   Future<DateTime?> _pickDate(BuildContext ctx, DateTime initial) {
+    final isDark = Theme.of(ctx).brightness == Brightness.dark;
     return showDatePicker(
       context: ctx,
       initialDate: initial,
@@ -1586,11 +1584,18 @@ class _AnalyticsDashboardState extends State<AnalyticsDashboard>
       lastDate:  DateTime(2100),
       builder: (context, child) => Theme(
         data: Theme.of(context).copyWith(
-          colorScheme: const ColorScheme.light(
-            primary: _primary,
-            onPrimary: Colors.white,
-            onSurface: _textDark,
-          ),
+          colorScheme: isDark
+              ? ColorScheme.dark(
+                  primary: _primary,
+                  onPrimary: Colors.white,
+                  surface: AppColors.surface,
+                  onSurface: AppColors.textPrimary,
+                )
+              : ColorScheme.light(
+                  primary: _primary,
+                  onPrimary: Colors.white,
+                  onSurface: AppColors.textPrimary,
+                ),
         ),
         child: child!,
       ),
@@ -1638,8 +1643,9 @@ class _AnalyticsDashboardState extends State<AnalyticsDashboard>
 
   @override
   Widget build(BuildContext context) {
+    syncBrightness(context);
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: AppColors.background,
       body: _loading
           ? const Center(child: CircularProgressIndicator(color: _primary))
           : FadeTransition(
@@ -1683,11 +1689,7 @@ class _AnalyticsDashboardState extends State<AnalyticsDashboard>
       pinned: true,
       backgroundColor: _primary,
       elevation: 0,
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios_new_rounded,
-            size: 18, color: Colors.white),
-        onPressed: () => Navigator.pop(context),
-      ),
+      automaticallyImplyLeading: false,
       actions: [
         IconButton(
           icon: const Icon(Icons.tune_rounded, color: Colors.white, size: 22),
@@ -1821,7 +1823,7 @@ class _AnalyticsDashboardState extends State<AnalyticsDashboard>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       decoration: BoxDecoration(
-        color: _cardBg,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
@@ -1862,10 +1864,10 @@ class _AnalyticsDashboardState extends State<AnalyticsDashboard>
           const SizedBox(height: 3),
           // Label
           Text(kpi.label,
-              style: const TextStyle(
+              style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w600,
-                  color: _textMuted)),
+                  color: AppColors.textSecondary)),
         ],
       ),
     );
@@ -1892,10 +1894,10 @@ class _AnalyticsDashboardState extends State<AnalyticsDashboard>
           ),
           const SizedBox(width: 10),
           Text(title,
-              style: const TextStyle(
+              style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w800,
-                  color: _textDark,
+                  color: AppColors.textPrimary,
                   letterSpacing: -0.2)),
         ],
       ),
@@ -1951,7 +1953,7 @@ class _AnalyticsDashboardState extends State<AnalyticsDashboard>
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: _cardBg,
+          color: AppColors.surface,
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
@@ -1977,14 +1979,14 @@ class _AnalyticsDashboardState extends State<AnalyticsDashboard>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(r.title,
-                      style: const TextStyle(
+                      style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
-                          color: _textDark)),
+                          color: AppColors.textPrimary)),
                   const SizedBox(height: 3),
                   Text(r.subtitle,
-                      style: const TextStyle(
-                          fontSize: 12, color: _textMuted)),
+                      style: TextStyle(
+                          fontSize: 12, color: AppColors.textSecondary)),
                 ],
               ),
             ),
@@ -1994,8 +1996,8 @@ class _AnalyticsDashboardState extends State<AnalyticsDashboard>
               decoration: BoxDecoration(
                   color: const Color(0xFFF4F6FB),
                   shape: BoxShape.circle),
-              child: const Icon(Icons.arrow_forward_ios_rounded,
-                  size: 13, color: _textMuted),
+              child: Icon(Icons.arrow_forward_ios_rounded,
+                  size: 13, color: AppColors.textSecondary),
             ),
           ],
         ),
@@ -2020,7 +2022,7 @@ class _AnalyticsDashboardState extends State<AnalyticsDashboard>
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
-        color: _cardBg,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -2058,10 +2060,10 @@ class _AnalyticsDashboardState extends State<AnalyticsDashboard>
                       const SizedBox(width: 14),
                       Expanded(
                         child: Text(t.title,
-                            style: const TextStyle(
+                            style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
-                                color: _textDark)),
+                                color: AppColors.textPrimary)),
                       ),
                       Icon(Icons.chevron_right_rounded,
                           size: 18, color: Colors.grey.shade300),

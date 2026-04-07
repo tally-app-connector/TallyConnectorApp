@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import '../../database/database_helper.dart';
+import '../theme/app_theme.dart';
 
 class DatabaseViewerScreen extends StatefulWidget {
   const DatabaseViewerScreen({Key? key}) : super(key: key);
@@ -135,8 +136,11 @@ class _DatabaseViewerScreenState extends State<DatabaseViewerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    syncBrightness(context);
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         title: const Text('Database Viewer'),
         actions: [
           IconButton(
@@ -151,12 +155,12 @@ class _DatabaseViewerScreenState extends State<DatabaseViewerScreen> {
           // Table Selector
           Container(
             padding: const EdgeInsets.all(16),
-            color: Colors.grey[200],
+            color: AppColors.pillBg,
             child: Row(
               children: [
-                const Text(
+                Text(
                   'Select Table:',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.textPrimary),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -181,7 +185,7 @@ class _DatabaseViewerScreenState extends State<DatabaseViewerScreen> {
                 const SizedBox(width: 16),
                 Chip(
                   label: Text('${_tableData.length} rows'),
-                  backgroundColor: Colors.blue[100],
+                  backgroundColor: AppColors.iconBgBlue,
                 ),
               ],
             ),
@@ -190,7 +194,7 @@ class _DatabaseViewerScreenState extends State<DatabaseViewerScreen> {
           // Search Bar
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            color: Colors.white,
+            color: AppColors.surface,
             child: Row(
               children: [
                 Expanded(
@@ -239,10 +243,10 @@ class _DatabaseViewerScreenState extends State<DatabaseViewerScreen> {
           if (_isSearching)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              color: Colors.blue[50],
+              color: AppColors.iconBgBlue,
               child: Row(
                 children: [
-                  const Icon(Icons.filter_alt, size: 16, color: Colors.blue),
+                  const Icon(Icons.filter_alt, size: 16, color: AppColors.blue),
                   const SizedBox(width: 8),
                   Text(
                     'Filtering by GUID: "$_searchQuery"',
@@ -277,14 +281,14 @@ class _DatabaseViewerScreenState extends State<DatabaseViewerScreen> {
                             Icon(
                               _isSearching ? Icons.search_off : Icons.inbox,
                               size: 64,
-                              color: Colors.grey[400],
+                              color: AppColors.textSecondary,
                             ),
                             const SizedBox(height: 16),
                             Text(
                               _isSearching 
                                   ? 'No results found for "$_searchQuery"'
                                   : 'No data available',
-                              style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+                              style: TextStyle(fontSize: 18, color: AppColors.textSecondary),
                             ),
                             if (_isSearching) ...[
                               const SizedBox(height: 8),
@@ -301,8 +305,8 @@ class _DatabaseViewerScreenState extends State<DatabaseViewerScreen> {
                         child: SingleChildScrollView(
                           scrollDirection: Axis.vertical,
                           child: DataTable(
-                            headingRowColor: MaterialStateProperty.all(Colors.blue[50]),
-                            border: TableBorder.all(color: Colors.grey[300]!),
+                            headingRowColor: WidgetStateProperty.all(AppColors.iconBgBlue),
+                            border: TableBorder.all(color: AppColors.divider),
                             columnSpacing: 20,
                             horizontalMargin: 10,
                             columns: _columnNames.map((column) {
@@ -311,9 +315,10 @@ class _DatabaseViewerScreenState extends State<DatabaseViewerScreen> {
                                   children: [
                                     Text(
                                       column,
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontWeight: FontWeight.bold,
                                         fontSize: 14,
+                                        color: AppColors.textPrimary,
                                       ),
                                     ),
                                     if (column.toLowerCase() == 'guid')
@@ -322,7 +327,7 @@ class _DatabaseViewerScreenState extends State<DatabaseViewerScreen> {
                                         child: Icon(
                                           Icons.search,
                                           size: 14,
-                                          color: Colors.blue[700],
+                                          color: AppColors.blue,
                                         ),
                                       ),
                                   ],
@@ -348,8 +353,8 @@ class _DatabaseViewerScreenState extends State<DatabaseViewerScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.grey[100],
-              border: Border(top: BorderSide(color: Colors.grey[300]!)),
+              color: AppColors.pillBg,
+              border: Border(top: BorderSide(color: AppColors.divider)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -367,7 +372,7 @@ class _DatabaseViewerScreenState extends State<DatabaseViewerScreen> {
 
   Widget _buildCellContent(String column, dynamic value) {
     if (value == null) {
-      return const Text('NULL', style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic));
+      return Text('NULL', style: TextStyle(color: AppColors.textSecondary, fontStyle: FontStyle.italic));
     }
 
     // Highlight GUID matches
@@ -377,14 +382,15 @@ class _DatabaseViewerScreenState extends State<DatabaseViewerScreen> {
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
           decoration: BoxDecoration(
-            color: Colors.yellow[200],
+            color: AppColors.iconBgAmber,
             borderRadius: BorderRadius.circular(4),
           ),
           child: Text(
             valueStr,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.bold,
+              color: AppColors.textPrimary,
             ),
           ),
         );
@@ -397,7 +403,7 @@ class _DatabaseViewerScreenState extends State<DatabaseViewerScreen> {
         final date = DateTime.fromMillisecondsSinceEpoch(value);
         return Text(
           '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}',
-          style: const TextStyle(fontSize: 12),
+          style: TextStyle(fontSize: 12, color: AppColors.textPrimary),
         );
       }
     }
@@ -406,7 +412,7 @@ class _DatabaseViewerScreenState extends State<DatabaseViewerScreen> {
     if (value is num && value.abs() > 1000) {
       return Text(
         value.toStringAsFixed(2),
-        style: const TextStyle(fontSize: 12),
+        style: TextStyle(fontSize: 12, color: AppColors.textPrimary),
       );
     }
 
@@ -418,7 +424,7 @@ class _DatabaseViewerScreenState extends State<DatabaseViewerScreen> {
 
     return Text(
       displayText,
-      style: const TextStyle(fontSize: 12),
+      style: TextStyle(fontSize: 12, color: AppColors.textPrimary),
       maxLines: 2,
       overflow: TextOverflow.ellipsis,
     );
@@ -431,18 +437,18 @@ class _DatabaseViewerScreenState extends State<DatabaseViewerScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: Row(
           children: [
-            Icon(icon, color: Colors.blue, size: 20),
+            Icon(icon, color: AppColors.blue, size: 20),
             const SizedBox(width: 8),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   label,
-                  style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+                  style: TextStyle(fontSize: 10, color: AppColors.textSecondary),
                 ),
                 Text(
                   value,
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                 ),
               ],
             ),

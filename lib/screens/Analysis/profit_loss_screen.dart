@@ -2163,6 +2163,7 @@ import 'package:flutter/material.dart';
 import '../../models/data_model.dart';
 import '../../database/database_helper.dart';
 import '../../utils/date_utils.dart';
+import '../theme/app_theme.dart';
 import 'group_detail_screen.dart';
 
 class ProfitLossScreen extends StatefulWidget {
@@ -4112,6 +4113,7 @@ final openingStockResult = await db.rawQuery('''
 
   @override
   Widget build(BuildContext context) {
+    syncBrightness(context);
     if (_loading) {
       return Scaffold(
         appBar: AppBar(title: Text('Profit & Loss A/c')),
@@ -4120,7 +4122,7 @@ final openingStockResult = await db.rawQuery('''
     }
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Text('Profit & Loss A/c'),
         actions: [
@@ -4151,7 +4153,7 @@ final openingStockResult = await db.rawQuery('''
                   SizedBox(height: 4),
                   Text(
                     '${_formatDate(dateToString(_fromDate))} to ${_formatDate(dateToString(_toDate))}',
-                    style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                    style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
                   ),
                 ],
               ),
@@ -4243,7 +4245,7 @@ final openingStockResult = await db.rawQuery('''
             // Footer - Total
             Container(
               width: double.infinity,
-              color: Colors.grey[200],
+              color: AppColors.pillBg,
               padding: EdgeInsets.all(16),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -4276,7 +4278,7 @@ final openingStockResult = await db.rawQuery('''
   Widget _buildSectionHeader(String title) {
     return Container(
       width: double.infinity,
-      color: Colors.grey[100],
+      color: AppColors.pillBg,
       padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Text(
         title,
@@ -4298,7 +4300,7 @@ final openingStockResult = await db.rawQuery('''
                 Text(label),
                 if (onTap != null) ...[
                   SizedBox(width: 8),
-                  Icon(Icons.chevron_right, size: 18, color: Colors.grey[600]),
+                  Icon(Icons.chevron_right, size: 18, color: AppColors.textSecondary),
                 ],
               ],
             ),
@@ -4322,7 +4324,7 @@ final openingStockResult = await db.rawQuery('''
                 Text(label),
                 if (onTap != null) ...[
                   SizedBox(width: 8),
-                  Icon(Icons.chevron_right, size: 18, color: Colors.grey[600]),
+                  Icon(Icons.chevron_right, size: 18, color: AppColors.textSecondary),
                 ],
               ],
             ),
@@ -4406,15 +4408,13 @@ final openingStockResult = await db.rawQuery('''
       lastDate: DateTime(2100),
       initialDateRange: DateTimeRange(start: _fromDate, end: _toDate),
       builder: (context, child) {
+        final dk = Theme.of(context).brightness == Brightness.dark;
         return Theme(
-          data: ThemeData.light().copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: Colors.blue,
-              onPrimary: Colors.white,
-              surface: Colors.white,
-              onSurface: Colors.black,
-            ),
-            dialogBackgroundColor: Colors.white,
+          data: (dk ? ThemeData.dark() : ThemeData.light()).copyWith(
+            colorScheme: dk
+                ? ColorScheme.dark(primary: Colors.blue, onPrimary: Colors.white, surface: AppColors.surface, onSurface: AppColors.textPrimary)
+                : const ColorScheme.light(primary: Colors.blue, onPrimary: Colors.white, surface: Colors.white, onSurface: Colors.black),
+            dialogBackgroundColor: dk ? AppColors.surface : Colors.white,
           ),
           child: child!,
         );

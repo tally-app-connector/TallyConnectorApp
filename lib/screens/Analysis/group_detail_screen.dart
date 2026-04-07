@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import '../../database/database_helper.dart';
 import '../../services/queries/query_service.dart';
+import '../theme/app_theme.dart';
 import 'ledger_detail_screen.dart';
 
 class GroupDetailScreen extends StatefulWidget {
@@ -51,8 +52,9 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    syncBrightness(context);
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -89,7 +91,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
 
                 // Table Header
                 Container(
-                  color: Colors.grey[200],
+                  color: AppColors.pillBg,
                   padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   child: Row(
                     children: [
@@ -138,7 +140,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                       ? Center(
                           child: Text(
                             'No ledgers found',
-                            style: TextStyle(color: Colors.grey[600]),
+                            style: TextStyle(color: AppColors.textSecondary),
                           ),
                         )
                       : ListView.separated(
@@ -181,7 +183,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                                           Icon(
                                             Icons.chevron_right,
                                             size: 20,
-                                            color: Colors.grey[600],
+                                            color: AppColors.textSecondary,
                                           ),
                                         ],
                                       ),
@@ -250,9 +252,9 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                 // Summary Footer
                 Container(
                   decoration: BoxDecoration(
-                    color: Colors.grey[100],
+                    color: AppColors.pillBg,
                     border: Border(
-                      top: BorderSide(color: Colors.grey[400]!, width: 2),
+                      top: BorderSide(color: AppColors.divider, width: 2),
                     ),
                   ),
                   padding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),

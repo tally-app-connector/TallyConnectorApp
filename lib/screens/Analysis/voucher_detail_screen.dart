@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import '../../services/queries/query_service.dart';
+import '../theme/app_theme.dart';
 
 class VoucherDetailScreen extends StatefulWidget {
   final String companyGuid;
@@ -56,8 +57,9 @@ class _VoucherDetailScreenState extends State<VoucherDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    syncBrightness(context);
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Text('Voucher Details'),
         actions: [
@@ -73,7 +75,7 @@ class _VoucherDetailScreenState extends State<VoucherDetailScreen> {
               ? Center(
                   child: Text(
                     'Voucher not found',
-                    style: TextStyle(color: Colors.grey[600]),
+                    style: TextStyle(color: AppColors.textSecondary),
                   ),
                 )
               : SingleChildScrollView(
@@ -241,7 +243,7 @@ class _VoucherDetailScreenState extends State<VoucherDetailScreen> {
                       // Table Header
                       Container(
                         margin: EdgeInsets.symmetric(horizontal: 16),
-                        color: Colors.grey[200],
+                        color: AppColors.pillBg,
                         padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                         child: Row(
                           children: [
@@ -276,7 +278,7 @@ class _VoucherDetailScreenState extends State<VoucherDetailScreen> {
                       Container(
                         margin: EdgeInsets.symmetric(horizontal: 16),
                         decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey[300]!),
+                          border: Border.all(color: AppColors.divider),
                           borderRadius: BorderRadius.only(
                             bottomLeft: Radius.circular(8),
                             bottomRight: Radius.circular(8),
@@ -293,10 +295,10 @@ class _VoucherDetailScreenState extends State<VoucherDetailScreen> {
                               return Container(
                                 padding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                                 decoration: BoxDecoration(
-                                  color: index.isEven ? Colors.white : Colors.grey[50],
+                                  color: index.isEven ? AppColors.surface : AppColors.pillBg,
                                   border: Border(
                                     bottom: index < _voucherEntries.length - 1
-                                        ? BorderSide(color: Colors.grey[200]!)
+                                        ? BorderSide(color: AppColors.divider)
                                         : BorderSide.none,
                                   ),
                                 ),
@@ -315,7 +317,7 @@ class _VoucherDetailScreenState extends State<VoucherDetailScreen> {
                                         debit > 0 ? _formatAmount(debit) : '-',
                                         style: TextStyle(
                                           fontSize: 14,
-                                          color: debit > 0 ? Colors.red[700] : Colors.grey,
+                                          color: debit > 0 ? Colors.red[700] : AppColors.textSecondary,
                                           fontWeight: debit > 0
                                               ? FontWeight.w600
                                               : FontWeight.normal,
@@ -329,7 +331,7 @@ class _VoucherDetailScreenState extends State<VoucherDetailScreen> {
                                         credit > 0 ? _formatAmount(credit) : '-',
                                         style: TextStyle(
                                           fontSize: 14,
-                                          color: credit > 0 ? Colors.green[700] : Colors.grey,
+                                          color: credit > 0 ? Colors.green[700] : AppColors.textSecondary,
                                           fontWeight: credit > 0
                                               ? FontWeight.w600
                                               : FontWeight.normal,
@@ -346,9 +348,9 @@ class _VoucherDetailScreenState extends State<VoucherDetailScreen> {
                             Container(
                               padding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                               decoration: BoxDecoration(
-                                color: Colors.grey[100],
+                                color: AppColors.pillBg,
                                 border: Border(
-                                  top: BorderSide(color: Colors.grey[400]!, width: 2),
+                                  top: BorderSide(color: AppColors.divider, width: 2),
                                 ),
                               ),
                               child: Row(
@@ -401,14 +403,14 @@ class _VoucherDetailScreenState extends State<VoucherDetailScreen> {
                         child: Container(
                           padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                           decoration: BoxDecoration(
-                            color: Colors.grey[100],
+                            color: AppColors.pillBg,
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
                             'GUID: ${widget.voucherGuid}',
                             style: TextStyle(
                               fontSize: 10,
-                              color: Colors.grey[600],
+                              color: AppColors.textSecondary,
                               fontFamily: 'monospace',
                             ),
                           ),
@@ -433,7 +435,7 @@ class _VoucherDetailScreenState extends State<VoucherDetailScreen> {
             child: Text(
               label,
               style: TextStyle(
-                color: Colors.grey[700],
+                color: AppColors.textSecondary,
                 fontWeight: FontWeight.w500,
               ),
             ),

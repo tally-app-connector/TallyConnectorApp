@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../database/database_helper.dart';
 import '../../services/queries/query_service.dart';
 import 'ledger_detail_screen.dart';
+import '../theme/app_theme.dart';
 
 // ── Mode enum ──────────────────────────────────────────────────────────────────
 
@@ -60,15 +61,10 @@ class _LedgerListScreenState extends State<LedgerListScreen>
   // ── Design tokens ────────────────────────────────────────────────────────────
   static const Color _primary    = Color(0xFF1A6FD8);
   static const Color _accent     = Color(0xFF00C9A7);
-  static const Color _bg         = Color(0xFFF4F6FB);
-  static const Color _cardBg     = Colors.white;
-  static const Color _textDark   = Color(0xFF1A2340);
-  static const Color _textMuted  = Color(0xFF8A94A6);
   static const Color _positiveC  = Color(0xFF1B8A5A);
   static const Color _negativeC  = Color(0xFFD32F2F);
   static const Color _positiveBg = Color(0xFFE8F5EE);
   static const Color _negativeBg = Color(0xFFFFEBEB);
-  static const Color _tableBg    = Color(0xFFF0F3FA);
 
   // ── Convenience getters ──────────────────────────────────────────────────────
 
@@ -200,8 +196,9 @@ class _LedgerListScreenState extends State<LedgerListScreen>
 
   @override
   Widget build(BuildContext context) {
+    syncBrightness(context);
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: AppColors.background,
       appBar: _buildAppBar(),
       body: _loading
           ? const Center(child: CircularProgressIndicator(color: _primary))
@@ -225,19 +222,19 @@ class _LedgerListScreenState extends State<LedgerListScreen>
 
   AppBar _buildAppBar() {
     return AppBar(
-      backgroundColor: _cardBg,
+      backgroundColor: AppColors.surface,
       elevation: 0,
       surfaceTintColor: Colors.transparent,
       leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: _textDark),
+        icon: Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: AppColors.textPrimary),
         onPressed: () => Navigator.pop(context),
       ),
       title: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(_screenTitle,
-              style: const TextStyle(
-                  fontSize: 17, fontWeight: FontWeight.w800, color: _textDark)),
+              style: TextStyle(
+                  fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
           if (_isPartyMode)
             Text(
               widget.isReceivable ? 'Receivables' : 'Payables',
@@ -250,7 +247,7 @@ class _LedgerListScreenState extends State<LedgerListScreen>
       ),
       actions: [
         IconButton(
-          icon: const Icon(Icons.refresh_rounded, color: _textMuted, size: 20),
+          icon: Icon(Icons.refresh_rounded, color: AppColors.textSecondary, size: 20),
           onPressed: _loadData,
           tooltip: 'Refresh',
         ),
@@ -334,7 +331,7 @@ class _LedgerListScreenState extends State<LedgerListScreen>
 
   Widget _buildFilters() {
     return Container(
-      color: _cardBg,
+      color: AppColors.surface,
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
       child: Row(
         children: [
@@ -346,10 +343,10 @@ class _LedgerListScreenState extends State<LedgerListScreen>
               child: TextField(
                 decoration: InputDecoration(
                   hintText: 'Search ledgers…',
-                  hintStyle: const TextStyle(fontSize: 13, color: _textMuted),
-                  prefixIcon: const Icon(Icons.search_rounded, size: 18, color: _textMuted),
+                  hintStyle: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                  prefixIcon: Icon(Icons.search_rounded, size: 18, color: AppColors.textSecondary),
                   filled: true,
-                  fillColor: _bg,
+                  fillColor: AppColors.background,
                   contentPadding: EdgeInsets.zero,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
@@ -381,19 +378,19 @@ class _LedgerListScreenState extends State<LedgerListScreen>
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10),
                 decoration: BoxDecoration(
-                  color: _bg,
+                  color: AppColors.background,
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: Colors.grey.shade200),
                 ),
                 child: DropdownButtonHideUnderline(
                   child: DropdownButton<String>(
                     isExpanded: true,
-                    hint: const Text('All Groups',
-                        style: TextStyle(fontSize: 12, color: _textMuted)),
+                    hint: Text('All Groups',
+                        style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                     value: _selectedGroup,
-                    icon: const Icon(Icons.unfold_more_rounded,
-                        size: 16, color: _textMuted),
-                    style: const TextStyle(fontSize: 12, color: _textDark),
+                    icon: Icon(Icons.unfold_more_rounded,
+                        size: 16, color: AppColors.textSecondary),
+                    style: TextStyle(fontSize: 12, color: AppColors.textPrimary),
                     items: [
                       const DropdownMenuItem(value: null, child: Text('All Groups')),
                       ..._groups.map((g) =>
@@ -418,7 +415,7 @@ class _LedgerListScreenState extends State<LedgerListScreen>
   Widget _buildResultsBar() {
     final hasFilters = _selectedGroup != null || _searchQuery.isNotEmpty;
     return Container(
-      color: _cardBg,
+      color: AppColors.surface,
       padding: const EdgeInsets.fromLTRB(16, 0, 12, 10),
       child: Row(
         children: [
@@ -441,7 +438,7 @@ class _LedgerListScreenState extends State<LedgerListScreen>
               icon: const Icon(Icons.close_rounded, size: 14),
               label: const Text('Clear', style: TextStyle(fontSize: 12)),
               style: TextButton.styleFrom(
-                foregroundColor: _textMuted,
+                foregroundColor: AppColors.textSecondary,
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               ),
             ),
@@ -454,7 +451,7 @@ class _LedgerListScreenState extends State<LedgerListScreen>
 
   Widget _buildTableHeader() {
     return Container(
-      color: _tableBg,
+      color: AppColors.pillBg,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       child: Row(
         children: [
@@ -479,10 +476,10 @@ class _LedgerListScreenState extends State<LedgerListScreen>
       {int flex = 0, TextAlign align = TextAlign.left}) {
     final text = Text(label,
         textAlign: align,
-        style: const TextStyle(
+        style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w800,
-            color: _textMuted,
+            color: AppColors.textSecondary,
             letterSpacing: 0.4));
     if (flex == 0) return text;
     return Expanded(flex: flex, child: text);
@@ -500,7 +497,7 @@ class _LedgerListScreenState extends State<LedgerListScreen>
             const SizedBox(height: 14),
             Text(
               _isPartyMode ? 'No parties found' : 'No ledgers found',
-              style: const TextStyle(fontSize: 15, color: _textMuted),
+              style: TextStyle(fontSize: 15, color: AppColors.textSecondary),
             ),
           ],
         ),
@@ -523,7 +520,7 @@ class _LedgerListScreenState extends State<LedgerListScreen>
       onTap: () => _openDetail(row),
       child: Container(
         decoration: BoxDecoration(
-          color: index.isEven ? _cardBg : _bg,
+          color: index.isEven ? AppColors.surface : AppColors.background,
           border: Border(
               bottom: BorderSide(color: Colors.grey.shade100, width: 0.8)),
         ),
@@ -538,10 +535,10 @@ class _LedgerListScreenState extends State<LedgerListScreen>
                 children: [
                   Text(
                     row['ledger_name'] as String,
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: _textDark),
+                        color: AppColors.textPrimary),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -549,7 +546,7 @@ class _LedgerListScreenState extends State<LedgerListScreen>
                       (row['group_name'] as String? ?? '').isNotEmpty)
                     Text(
                       row['group_name'] as String,
-                      style: const TextStyle(fontSize: 11, color: _textMuted),
+                      style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -623,7 +620,7 @@ class _LedgerListScreenState extends State<LedgerListScreen>
 
     return Container(
       decoration: BoxDecoration(
-        color: _cardBg,
+        color: AppColors.surface,
         border: Border(top: BorderSide(color: Colors.grey.shade200, width: 1)),
         boxShadow: [
           BoxShadow(
@@ -638,13 +635,13 @@ class _LedgerListScreenState extends State<LedgerListScreen>
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
-              color: _bg,
+              color: AppColors.background,
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
               '${_rows.length} ${_isPartyMode ? 'parties' : 'ledgers'}',
-              style: const TextStyle(
-                  fontSize: 12, fontWeight: FontWeight.w700, color: _textMuted),
+              style: TextStyle(
+                  fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textSecondary),
             ),
           ),
           const Spacer(),
@@ -654,7 +651,7 @@ class _LedgerListScreenState extends State<LedgerListScreen>
             children: [
               Text(
                 'Total $_balanceColumnLabel',
-                style: const TextStyle(fontSize: 11, color: _textMuted),
+                style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
               ),
               const SizedBox(height: 2),
               Text(

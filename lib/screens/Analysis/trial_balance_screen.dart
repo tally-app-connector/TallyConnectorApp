@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import '../../database/database_helper.dart';
 import '../../services/queries/query_service.dart';
+import '../theme/app_theme.dart';
 
 class TrialBalanceScreen extends StatefulWidget {
   @override
@@ -73,8 +74,9 @@ class _TrialBalanceScreenState extends State<TrialBalanceScreen> {
   
   @override
   Widget build(BuildContext context) {
+    syncBrightness(context);
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Text('Trial Balance'),
         actions: [
@@ -106,7 +108,7 @@ class _TrialBalanceScreenState extends State<TrialBalanceScreen> {
                       SizedBox(height: 4),
                       Text(
                         'As on ${_formatDate(_toDate)}',
-                        style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                        style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
                       ),
                     ],
                   ),
@@ -114,7 +116,7 @@ class _TrialBalanceScreenState extends State<TrialBalanceScreen> {
                 
                 // Table Header
                 Container(
-                  color: Colors.grey[200],
+                  color: AppColors.pillBg,
                   padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   child: Row(
                     children: [
@@ -158,7 +160,7 @@ class _TrialBalanceScreenState extends State<TrialBalanceScreen> {
                       ? Center(
                           child: Text(
                             'No ledgers found',
-                            style: TextStyle(color: Colors.grey[600]),
+                            style: TextStyle(color: AppColors.textSecondary),
                           ),
                         )
                       : ListView.separated(
@@ -172,7 +174,7 @@ class _TrialBalanceScreenState extends State<TrialBalanceScreen> {
                             
                             return Container(
                               padding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                              color: index.isEven ? Colors.white : Colors.grey[50],
+                              color: index.isEven ? AppColors.surface : AppColors.pillBg,
                               child: Row(
                                 children: [
                                   Expanded(
@@ -188,7 +190,7 @@ class _TrialBalanceScreenState extends State<TrialBalanceScreen> {
                                       ledger['group_name'] as String? ?? '-',
                                       style: TextStyle(
                                         fontSize: 12,
-                                        color: Colors.grey[600],
+                                        color: AppColors.textSecondary,
                                       ),
                                     ),
                                   ),
@@ -198,7 +200,7 @@ class _TrialBalanceScreenState extends State<TrialBalanceScreen> {
                                       debit > 0 ? _formatAmount(debit) : '-',
                                       style: TextStyle(
                                         fontSize: 13,
-                                        color: debit > 0 ? Colors.red[700] : Colors.grey,
+                                        color: debit > 0 ? Colors.red[700] : AppColors.textSecondary,
                                       ),
                                       textAlign: TextAlign.right,
                                     ),
@@ -209,7 +211,7 @@ class _TrialBalanceScreenState extends State<TrialBalanceScreen> {
                                       credit > 0 ? _formatAmount(credit) : '-',
                                       style: TextStyle(
                                         fontSize: 13,
-                                        color: credit > 0 ? Colors.green[700] : Colors.grey,
+                                        color: credit > 0 ? Colors.green[700] : AppColors.textSecondary,
                                       ),
                                       textAlign: TextAlign.right,
                                     ),
@@ -224,9 +226,9 @@ class _TrialBalanceScreenState extends State<TrialBalanceScreen> {
                 // Total Footer
                 Container(
                   decoration: BoxDecoration(
-                    color: Colors.grey[100],
+                    color: AppColors.pillBg,
                     border: Border(
-                      top: BorderSide(color: Colors.grey[400]!, width: 2),
+                      top: BorderSide(color: AppColors.divider, width: 2),
                     ),
                   ),
                   padding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),

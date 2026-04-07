@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../database/database_helper.dart';
 import '../../services/queries/query_service.dart';
+import '../theme/app_theme.dart';
 import 'bill_wise_detail_screen.dart';
 
 class BillWiseOutstandingScreen extends StatefulWidget {
@@ -139,6 +140,7 @@ class _BillWiseOutstandingScreenState extends State<BillWiseOutstandingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    syncBrightness(context);
     if (_loading) {
       return Scaffold(
         appBar: AppBar(title: Text('Loading...')),
@@ -152,7 +154,7 @@ class _BillWiseOutstandingScreenState extends State<BillWiseOutstandingScreen> {
     );
 
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -185,9 +187,9 @@ class _BillWiseOutstandingScreenState extends State<BillWiseOutstandingScreen> {
             margin: EdgeInsets.all(16),
             padding: EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.blue[50],
+              color: AppColors.iconBgBlue,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.blue[200]!),
+              border: Border.all(color: AppColors.divider),
             ),
             child: Row(
               children: [
@@ -199,7 +201,7 @@ class _BillWiseOutstandingScreenState extends State<BillWiseOutstandingScreen> {
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: Colors.blue[900],
+                      color: AppColors.textPrimary,
                     ),
                   ),
                 ),
@@ -215,7 +217,7 @@ class _BillWiseOutstandingScreenState extends State<BillWiseOutstandingScreen> {
           Container(
             margin: EdgeInsets.symmetric(horizontal: 16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppColors.surface,
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
@@ -247,7 +249,7 @@ class _BillWiseOutstandingScreenState extends State<BillWiseOutstandingScreen> {
                           style: TextStyle(
                             color: _selectedType == 'Receivables'
                                 ? Colors.white
-                                : Colors.grey[700],
+                                : AppColors.textSecondary,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -275,7 +277,7 @@ class _BillWiseOutstandingScreenState extends State<BillWiseOutstandingScreen> {
                           style: TextStyle(
                             color: _selectedType == 'Payables'
                                 ? Colors.white
-                                : Colors.grey[700],
+                                : AppColors.textSecondary,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -370,13 +372,13 @@ class _BillWiseOutstandingScreenState extends State<BillWiseOutstandingScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.inbox, size: 64, color: Colors.grey[400]),
+                        Icon(Icons.inbox, size: 64, color: AppColors.textSecondary),
                         SizedBox(height: 16),
                         Text(
                           'No outstanding found',
                           style: TextStyle(
                             fontSize: 16,
-                            color: Colors.grey[600],
+                            color: AppColors.textSecondary,
                           ),
                         ),
                       ],
@@ -415,7 +417,7 @@ class _BillWiseOutstandingScreenState extends State<BillWiseOutstandingScreen> {
                                             style: TextStyle(
                                               fontSize: 16,
                                               fontWeight: FontWeight.bold,
-                                              color: Colors.black87,
+                                              color: AppColors.textPrimary,
                                             ),
                                           ),
                                           SizedBox(height: 4),
@@ -423,7 +425,7 @@ class _BillWiseOutstandingScreenState extends State<BillWiseOutstandingScreen> {
                                             ledger['group_name'] as String,
                                             style: TextStyle(
                                               fontSize: 12,
-                                              color: Colors.grey[600],
+                                              color: AppColors.textSecondary,
                                             ),
                                           ),
                                         ],
@@ -449,7 +451,7 @@ class _BillWiseOutstandingScreenState extends State<BillWiseOutstandingScreen> {
                                             vertical: 4,
                                           ),
                                           decoration: BoxDecoration(
-                                            color: Colors.blue[50],
+                                            color: AppColors.iconBgBlue,
                                             borderRadius: BorderRadius.circular(12),
                                           ),
                                           child: Text(
@@ -464,7 +466,7 @@ class _BillWiseOutstandingScreenState extends State<BillWiseOutstandingScreen> {
                                       ],
                                     ),
                                     SizedBox(width: 8),
-                                    Icon(Icons.chevron_right, color: Colors.grey),
+                                    Icon(Icons.chevron_right, color: AppColors.textSecondary),
                                   ],
                                 ),
                               ],

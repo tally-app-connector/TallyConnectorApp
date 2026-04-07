@@ -9,6 +9,8 @@ import '../../services/ai/ai_qa_service.dart';
 import '../../models/ai/query_result.dart';
 import '../../services/ai/query_templates.dart';
 import '../../services/ai/query_builder.dart';
+import '../../utils/date_utils.dart' as date_utils;
+import '../theme/app_theme.dart';
 
 /// Result type categories for universal summary card
 enum _ResultType {
@@ -81,12 +83,17 @@ class _AIQueriesScreenState extends State<AIQueriesScreen> {
   // AI provider selection
   String _aiProvider = 'claude';  // 'claude', 'deepseek', 'both'
 
+  // Adaptive FY toggle: default to last FY in April-May when new FY has barely started
+  bool _useLastFy = date_utils.isEarlyInFy();
+
   // Metric categories with preset questions
   final metrics = MetricConfig.allMetrics;
 
   @override
   Widget build(BuildContext context) {
+    syncBrightness(context);
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('AI Queries'),
         backgroundColor: Colors.teal,
@@ -139,10 +146,10 @@ class _AIQueriesScreenState extends State<AIQueriesScreen> {
                     child: Container(
                       width: 90,
                       decoration: BoxDecoration(
-                        color: isSelected ? metric.color : Colors.grey[200],
+                        color: isSelected ? metric.color : AppColors.pillBg,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: isSelected ? metric.color : Colors.grey[300]!,
+                          color: isSelected ? metric.color : AppColors.divider,
                           width: 2,
                         ),
                       ),
@@ -160,7 +167,7 @@ class _AIQueriesScreenState extends State<AIQueriesScreen> {
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
-                              color: isSelected ? Colors.white : Colors.black87,
+                              color: isSelected ? Colors.white : AppColors.textPrimary,
                             ),
                             textAlign: TextAlign.center,
                             maxLines: 2,
@@ -180,9 +187,9 @@ class _AIQueriesScreenState extends State<AIQueriesScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.blue[50],
+                color: AppColors.surface,
                 border: Border(
-                  bottom: BorderSide(color: Colors.blue[200]!),
+                  bottom: BorderSide(color: AppColors.divider),
                 ),
               ),
               child: Column(
@@ -198,11 +205,14 @@ class _AIQueriesScreenState extends State<AIQueriesScreen> {
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: Colors.blue[900],
+                          color: AppColors.textPrimary,
                         ),
                       ),
                     ],
                   ),
+                  const SizedBox(height: 8),
+                  // — FY toggle row —
+                  _buildFyToggle(),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 6,
@@ -218,7 +228,7 @@ class _AIQueriesScreenState extends State<AIQueriesScreen> {
                               onPressed: _isLoading ? null : () {
                                 _runPresetQuery(question);
                               },
-                              backgroundColor: Colors.white,
+                              backgroundColor: AppColors.pillBg,
                               side: BorderSide(color: Colors.blue[300]!),
                             ))
                         .toList(),
@@ -235,18 +245,18 @@ class _AIQueriesScreenState extends State<AIQueriesScreen> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(Icons.chat_bubble_outline,
-                            size: 64, color: Colors.grey[300]),
+                            size: 64, color: AppColors.divider),
                         const SizedBox(height: 16),
                         Text(
                           'Select a metric above to get started',
                           style:
-                              TextStyle(fontSize: 16, color: Colors.grey[600]),
+                              TextStyle(fontSize: 16, color: AppColors.textSecondary),
                         ),
                         const SizedBox(height: 8),
                         Text(
                           'or type your question below',
                           style:
-                              TextStyle(fontSize: 14, color: Colors.grey[500]),
+                              TextStyle(fontSize: 14, color: AppColors.textSecondary),
                         ),
                       ],
                     ),
@@ -276,13 +286,13 @@ class _AIQueriesScreenState extends State<AIQueriesScreen> {
           // Input field
           Container(
             padding: const EdgeInsets.all(8),
-            decoration: const BoxDecoration(
-              color: Colors.white,
+            decoration: BoxDecoration(
+              color: AppColors.surface,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black12,
+                  color: Colors.black.withOpacity(0.12),
                   blurRadius: 4,
-                  offset: Offset(0, -2),
+                  offset: const Offset(0, -2),
                 ),
               ],
             ),
@@ -297,7 +307,7 @@ class _AIQueriesScreenState extends State<AIQueriesScreen> {
                         borderRadius: BorderRadius.circular(24),
                       ),
                       filled: true,
-                      fillColor: Colors.grey[100],
+                      fillColor: AppColors.pillBg,
                       contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 12),
                     ),
@@ -380,7 +390,7 @@ class _AIQueriesScreenState extends State<AIQueriesScreen> {
                 Flexible(
                   child: Text(
                     statusText,
-                    style: TextStyle(fontSize: 11, color: Colors.grey[700]),
+                    style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
@@ -396,12 +406,12 @@ class _AIQueriesScreenState extends State<AIQueriesScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.grey[50],
-        border: Border(top: BorderSide(color: Colors.grey.withOpacity(0.15))),
+        color: AppColors.surface,
+        border: Border(top: BorderSide(color: AppColors.divider)),
       ),
       child: Row(
         children: [
-          Text('AI:', style: TextStyle(fontSize: 10, color: Colors.grey[500], fontWeight: FontWeight.w600)),
+          Text('AI:', style: TextStyle(fontSize: 10, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
           const SizedBox(width: 6),
           // _providerChip('claude', '🟣 Claude', Colors.purple),
           // const SizedBox(width: 4),
@@ -446,7 +456,7 @@ class _AIQueriesScreenState extends State<AIQueriesScreen> {
           style: TextStyle(
             fontSize: 10,
             fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-            color: isActive ? color : Colors.grey[600],
+            color: isActive ? color : AppColors.textSecondary,
           ),
         ),
       ),
@@ -508,7 +518,7 @@ class _AIQueriesScreenState extends State<AIQueriesScreen> {
                     width: 90,
                     child: Text(
                       meta['label'] as String,
-                      style: TextStyle(fontSize: 10, color: Colors.grey[700], fontWeight: FontWeight.w500),
+                      style: TextStyle(fontSize: 10, color: AppColors.textSecondary, fontWeight: FontWeight.w500),
                     ),
                   ),
                   Expanded(
@@ -516,7 +526,7 @@ class _AIQueriesScreenState extends State<AIQueriesScreen> {
                       height: 32,
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: AppColors.surface,
                         borderRadius: BorderRadius.circular(6),
                         border: Border.all(color: Colors.teal.withOpacity(0.3)),
                       ),
@@ -525,7 +535,8 @@ class _AIQueriesScreenState extends State<AIQueriesScreen> {
                           value: selected,
                           isExpanded: true,
                           isDense: true,
-                          style: TextStyle(fontSize: 11, color: Colors.black87),
+                          dropdownColor: AppColors.surface,
+                          style: TextStyle(fontSize: 11, color: AppColors.textPrimary),
                           icon: Icon(Icons.arrow_drop_down, size: 18, color: Colors.teal[400]),
                           items: [
                             DropdownMenuItem<String>(
@@ -611,12 +622,12 @@ class _AIQueriesScreenState extends State<AIQueriesScreen> {
           margin: const EdgeInsets.symmetric(vertical: 4),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
-            color: Colors.grey[200],
+            color: AppColors.pillBg,
             borderRadius: BorderRadius.circular(12),
           ),
           child: Text(
             message['content'] ?? '',
-            style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+            style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
           ),
         ),
       );
@@ -639,7 +650,7 @@ class _AIQueriesScreenState extends State<AIQueriesScreen> {
               ? Colors.red[100]
               : isUser
                   ? Colors.teal[500]
-                  : Colors.grey[200],
+                  : AppColors.pillBg,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Column(
@@ -648,7 +659,7 @@ class _AIQueriesScreenState extends State<AIQueriesScreen> {
             Text(
               message['content'],
               style: TextStyle(
-                color: isUser ? Colors.white : Colors.black87,
+                color: isUser ? Colors.white : AppColors.textPrimary,
                 fontSize: 14,
               ),
             ),
@@ -954,7 +965,7 @@ class _AIQueriesScreenState extends State<AIQueriesScreen> {
             child: SingleChildScrollView(
               child: SelectableText(
                 sql,
-                style: TextStyle(fontSize: 8, fontFamily: 'monospace', color: Colors.grey[700]),
+                style: TextStyle(fontSize: 8, fontFamily: 'monospace', color: AppColors.textSecondary),
               ),
             ),
           ),
@@ -1285,6 +1296,84 @@ class _AIQueriesScreenState extends State<AIQueriesScreen> {
     }
   }
 
+  /// FY toggle shown above preset questions.
+  /// Auto-selects last FY in Apr-May; lets user switch to current FY.
+  Widget _buildFyToggle() {
+    final currentFyLabel = date_utils.getCurrentFyLabel();
+    final prevFyLabel = date_utils.getPrevFyLabel();
+    final isEarly = date_utils.isEarlyInFy();
+    // Current month name for the 13th-month hint
+    final now = DateTime.now();
+    final monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    final curMonth = monthNames[now.month - 1];
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.orange[200]!),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.calendar_today, size: 14, color: Colors.orange[700]),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _useLastFy
+                      ? 'Showing FY $prevFyLabel + $curMonth ${now.year}'
+                      : 'Showing FY $currentFyLabel',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.orange[900],
+                  ),
+                ),
+                if (isEarly && _useLastFy)
+                  Text(
+                    'Includes $curMonth as 13th month for comparison',
+                    style: TextStyle(fontSize: 10, color: Colors.orange[700]),
+                  )
+                else if (isEarly)
+                  Text(
+                    'New FY — only ${now.day} days of data so far',
+                    style: TextStyle(fontSize: 10, color: Colors.orange[700]),
+                  ),
+              ],
+            ),
+          ),
+          // Toggle: prev FY label / current FY label
+          Text(
+            prevFyLabel,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: _useLastFy ? FontWeight.bold : FontWeight.normal,
+              color: _useLastFy ? Colors.orange[800] : Colors.grey,
+            ),
+          ),
+          Switch(
+            value: !_useLastFy,
+            onChanged: (val) => setState(() => _useLastFy = !val),
+            activeThumbColor: Colors.teal,
+            inactiveThumbColor: Colors.orange,
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+          Text(
+            currentFyLabel,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: !_useLastFy ? FontWeight.bold : FontWeight.normal,
+              color: !_useLastFy ? Colors.teal[700] : Colors.grey,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildDateRangeFilter(Map<String, dynamic> message) {
     // Extract current dates from SQL
     final sql = message['generated_sql']?.toString() ?? '';
@@ -1341,7 +1430,7 @@ class _AIQueriesScreenState extends State<AIQueriesScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppColors.surface,
                 borderRadius: BorderRadius.circular(4),
                 border: Border.all(color: Colors.blue.withOpacity(0.3)),
               ),
@@ -1353,7 +1442,7 @@ class _AIQueriesScreenState extends State<AIQueriesScreen> {
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: Text('→', style: TextStyle(fontSize: 10, color: Colors.grey[500])),
+            child: Text('→', style: TextStyle(fontSize: 10, color: AppColors.textSecondary)),
           ),
           // To date chip
           GestureDetector(
@@ -1371,7 +1460,7 @@ class _AIQueriesScreenState extends State<AIQueriesScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppColors.surface,
                 borderRadius: BorderRadius.circular(4),
                 border: Border.all(color: Colors.blue.withOpacity(0.3)),
               ),
@@ -1576,7 +1665,7 @@ class _AIQueriesScreenState extends State<AIQueriesScreen> {
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: Colors.grey[100],
+                  color: AppColors.pillBg,
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: SelectableText(
@@ -1590,7 +1679,7 @@ class _AIQueriesScreenState extends State<AIQueriesScreen> {
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: Colors.grey[100],
+                  color: AppColors.pillBg,
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: SelectableText(
@@ -1666,9 +1755,9 @@ class _AIQueriesScreenState extends State<AIQueriesScreen> {
     if (queryResult.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)),
+        decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(8)),
         child: Text('No results found (${queryResult.formattedExecutionTime})',
-            style: const TextStyle(fontSize: 12, color: Colors.black54)),
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
       );
     }
     return _SortableTable(
@@ -1683,7 +1772,6 @@ class _AIQueriesScreenState extends State<AIQueriesScreen> {
   static const _cGreen = Color(0xFF16A34A);
   static const _cRed = Color(0xFFEF4444);
   static const _cAmber = Color(0xFFF59E0B);
-  static const _cTextSec = Color(0xFF9CA3AF);
   static const int _ckNone = 0, _ckHBar = 1, _ckVBar = 2, _ckPie = 3, _ckLine = 4;
 
   /// Determine what chart to show based on columns and question
@@ -1932,14 +2020,14 @@ class _AIQueriesScreenState extends State<AIQueriesScreen> {
       margin: const EdgeInsets.only(top: 10),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: AppColors.divider),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.black54)),
+          Text(title, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
           const SizedBox(height: 8),
           SizedBox(
             height: 200,
@@ -1989,10 +2077,10 @@ class _AIQueriesScreenState extends State<AIQueriesScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(labels[i],
-                                        style: const TextStyle(fontSize: 9, color: Colors.black87),
+                                        style: TextStyle(fontSize: 9, color: AppColors.textPrimary),
                                         overflow: TextOverflow.ellipsis),
                                     Text('₹${_chartFormatNum(values[i])} ($pct%)',
-                                        style: TextStyle(fontSize: 8, color: Colors.grey.shade600)),
+                                        style: TextStyle(fontSize: 8, color: AppColors.textSecondary)),
                                   ],
                                 ),
                               ),
@@ -2023,9 +2111,9 @@ class _AIQueriesScreenState extends State<AIQueriesScreen> {
       margin: const EdgeInsets.only(top: 10),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(14),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12, offset: const Offset(0, 2))],
+        boxShadow: AppShadows.card,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2033,7 +2121,7 @@ class _AIQueriesScreenState extends State<AIQueriesScreen> {
           // Title + legend
           Row(
             children: [
-              Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.5, color: Color(0xFF4A4A5A))),
+              Text(title, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.5, color: AppColors.textPrimary)),
               const Spacer(),
               if (isDual) ...[
                 Container(width: 10, height: 3, decoration: BoxDecoration(color: _cBlue, borderRadius: BorderRadius.circular(2))),
@@ -2079,7 +2167,7 @@ class _AIQueriesScreenState extends State<AIQueriesScreen> {
                       reservedSize: 50,
                       getTitlesWidget: (val, meta) => Text(
                         _chartFormatNum(val),
-                        style: const TextStyle(fontSize: 9, color: _cTextSec),
+                        style: TextStyle(fontSize: 9, color: AppColors.textSecondary),
                       ),
                     ),
                   ),
@@ -2097,7 +2185,7 @@ class _AIQueriesScreenState extends State<AIQueriesScreen> {
                             : _truncLabel(labels[idx], 7);
                         return Padding(
                           padding: const EdgeInsets.only(top: 4),
-                          child: Text(short, style: const TextStyle(fontSize: 8, color: Colors.black87)),
+                          child: Text(short, style: TextStyle(fontSize: 8, color: AppColors.textPrimary)),
                         );
                       },
                     ),
@@ -2106,13 +2194,13 @@ class _AIQueriesScreenState extends State<AIQueriesScreen> {
                 gridData: FlGridData(
                   show: true,
                   drawVerticalLine: false,
-                  getDrawingHorizontalLine: (_) => FlLine(color: Colors.grey.shade200, strokeWidth: 0.5, dashArray: [5, 3]),
+                  getDrawingHorizontalLine: (_) => FlLine(color: AppColors.divider, strokeWidth: 0.5, dashArray: [5, 3]),
                 ),
                 borderData: FlBorderData(
                   show: true,
                   border: Border(
-                    bottom: BorderSide(color: Colors.grey.shade300, width: 0.5),
-                    left: BorderSide(color: Colors.grey.shade300, width: 0.5),
+                    bottom: BorderSide(color: AppColors.divider, width: 0.5),
+                    left: BorderSide(color: AppColors.divider, width: 0.5),
                   ),
                 ),
                 lineBarsData: [
@@ -2200,14 +2288,14 @@ class _AIQueriesScreenState extends State<AIQueriesScreen> {
       margin: const EdgeInsets.only(top: 10),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: AppColors.divider),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Aging Analysis', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.black54)),
+          Text('Aging Analysis', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
           const SizedBox(height: 10),
           ...buckets.map((bucket) {
             final value = bucketTotals[bucket]!;
@@ -2227,8 +2315,8 @@ class _AIQueriesScreenState extends State<AIQueriesScreen> {
                           Container(width: 10, height: 10,
                               decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2))),
                           const SizedBox(width: 6),
-                          Text(bucket, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.black87)),
-                          Text('  ($count bills)', style: const TextStyle(fontSize: 9, color: Colors.black45)),
+                          Text(bucket, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                          Text('  ($count bills)', style: TextStyle(fontSize: 9, color: AppColors.textSecondary)),
                         ],
                       ),
                       Text('₹${_chartFormatNum(value)}',
@@ -2241,7 +2329,7 @@ class _AIQueriesScreenState extends State<AIQueriesScreen> {
                       Container(
                         height: 14,
                         decoration: BoxDecoration(
-                          color: Colors.grey.shade100,
+                          color: AppColors.pillBg,
                           borderRadius: BorderRadius.circular(7),
                         ),
                       ),
@@ -2286,13 +2374,13 @@ class _AIQueriesScreenState extends State<AIQueriesScreen> {
       margin: const EdgeInsets.only(top: 10),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white, borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey.shade200),
+        color: AppColors.surface, borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.divider),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Receipts vs Payments', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.black54)),
+          Text('Receipts vs Payments', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
           const SizedBox(height: 10),
           ...items.map((item) {
             final fraction = maxVal > 0 ? item.$2 / maxVal : 0.0;
@@ -2307,7 +2395,7 @@ class _AIQueriesScreenState extends State<AIQueriesScreen> {
                   Expanded(
                     child: Stack(children: [
                       Container(height: 14, decoration: BoxDecoration(
-                          color: Colors.grey.shade100, borderRadius: BorderRadius.circular(7))),
+                          color: AppColors.pillBg, borderRadius: BorderRadius.circular(7))),
                       FractionallySizedBox(
                         widthFactor: fraction.clamp(0.03, 1.0),
                         child: Container(height: 14, decoration: BoxDecoration(
@@ -2350,13 +2438,13 @@ class _AIQueriesScreenState extends State<AIQueriesScreen> {
       margin: const EdgeInsets.only(top: 10),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white, borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey.shade200),
+        color: AppColors.surface, borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.divider),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Profit & Loss', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.black54)),
+          Text('Profit & Loss', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
           const SizedBox(height: 10),
           ...items.map((item) {
             final fraction = item.$2 / maxVal;
@@ -2371,7 +2459,7 @@ class _AIQueriesScreenState extends State<AIQueriesScreen> {
                   Expanded(
                     child: Stack(children: [
                       Container(height: 16, decoration: BoxDecoration(
-                          color: Colors.grey.shade100, borderRadius: BorderRadius.circular(8))),
+                          color: AppColors.pillBg, borderRadius: BorderRadius.circular(8))),
                       FractionallySizedBox(
                         widthFactor: fraction.clamp(0.03, 1.0),
                         child: Container(height: 16, decoration: BoxDecoration(
@@ -2433,7 +2521,7 @@ class _AIQueriesScreenState extends State<AIQueriesScreen> {
                     spacing: 10,
                     children: extras.entries.map((e) => Text(
                       '${e.key}: ${e.value}',
-                      style: const TextStyle(fontSize: 10, color: _cTextSec),
+                      style: TextStyle(fontSize: 10, color: AppColors.textSecondary),
                     )).toList(),
                   ),
                 ],
@@ -3708,11 +3796,18 @@ class _AIQueriesScreenState extends State<AIQueriesScreen> {
           if (qLower == sq.toLowerCase() || qLower.contains(sq.toLowerCase()) || sq.toLowerCase().contains(qLower)) {
             debugPrint('[PRESET] Matched template: ${t.templateId} — ${t.description}');
 
-            // Build dates (current FY)
+            // Build dates — adaptive: use last FY when toggled (early in new FY)
+            // When using last FY, extend to today so current month appears
+            // as a 13th month in month-wise breakdowns.
             final now = DateTime.now();
-            final fyStart = now.month < 4 ? DateTime(now.year - 1, 4, 1) : DateTime(now.year, 4, 1);
-            final fromDate = '${fyStart.year}${fyStart.month.toString().padLeft(2, '0')}${fyStart.day.toString().padLeft(2, '0')}';
-            final toDate = '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
+            final DateTime fyStart;
+            if (_useLastFy) {
+              fyStart = date_utils.getPrevFyStartDate(now);
+            } else {
+              fyStart = date_utils.getFyStartDate(now);
+            }
+            final fromDate = date_utils.dateToString(fyStart);
+            final toDate = date_utils.dateToString(now); // always up to today
 
             // Collect entities with dates + defaults from schema
             final entities = <String, dynamic>{'from_date': fromDate, 'to_date': toDate};
@@ -4737,12 +4832,12 @@ Widget _sortChip(String label, bool active, VoidCallback onTap) {
     child: Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: active ? const Color(0xFF2D8BE0) : const Color(0xFFF3F4F6),
+        color: active ? const Color(0xFF2D8BE0) : AppColors.pillBg,
         borderRadius: BorderRadius.circular(10),
       ),
       child: Text(label, style: TextStyle(
           fontSize: 9, fontWeight: FontWeight.w600,
-          color: active ? Colors.white : const Color(0xFF9CA3AF))),
+          color: active ? Colors.white : AppColors.textSecondary)),
     ),
   );
 }
@@ -4794,9 +4889,9 @@ class _SortableBarChartState extends State<_SortableBarChart> {
       margin: const EdgeInsets.only(top: 10),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(14),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12, offset: const Offset(0, 2))],
+        boxShadow: AppShadows.card,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -4804,7 +4899,7 @@ class _SortableBarChartState extends State<_SortableBarChart> {
           // Header row
           Row(
             children: [
-              Expanded(child: Text(widget.title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.5, color: Color(0xFF4A4A5A)))),
+              Expanded(child: Text(widget.title, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.5, color: AppColors.textPrimary))),
               _sortChip('High→Low', _sortMode == 0, () => setState(() { _sortMode = 0; _showSearch = false; })),
               const SizedBox(width: 4),
               _sortChip('Low→High', _sortMode == 1, () => setState(() { _sortMode = 1; _showSearch = false; })),
@@ -4814,15 +4909,15 @@ class _SortableBarChartState extends State<_SortableBarChart> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: _sortMode == 2 ? const Color(0xFF2D8BE0) : const Color(0xFFF3F4F6),
+                    color: _sortMode == 2 ? const Color(0xFF2D8BE0) : AppColors.pillBg,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Row(mainAxisSize: MainAxisSize.min, children: [
                     Icon(_showSearch ? Icons.close : Icons.search, size: 10,
-                        color: _sortMode == 2 ? Colors.white : const Color(0xFF9CA3AF)),
+                        color: _sortMode == 2 ? Colors.white : AppColors.textSecondary),
                     const SizedBox(width: 2),
                     Text('Name', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600,
-                        color: _sortMode == 2 ? Colors.white : const Color(0xFF9CA3AF))),
+                        color: _sortMode == 2 ? Colors.white : AppColors.textSecondary)),
                   ]),
                 ),
               ),
@@ -4839,17 +4934,17 @@ class _SortableBarChartState extends State<_SortableBarChart> {
                 style: const TextStyle(fontSize: 11),
                 decoration: InputDecoration(
                   hintText: 'Search name...',
-                  hintStyle: const TextStyle(fontSize: 11, color: Color(0xFF9CA3AF)),
-                  prefixIcon: const Icon(Icons.search, size: 14, color: Color(0xFF9CA3AF)),
+                  hintStyle: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                  prefixIcon: Icon(Icons.search, size: 14, color: AppColors.textSecondary),
                   prefixIconConstraints: const BoxConstraints(minWidth: 30),
                   filled: true,
-                  fillColor: const Color(0xFFF3F4F6),
+                  fillColor: AppColors.pillBg,
                   contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
                   suffixIcon: _search.isNotEmpty
                       ? GestureDetector(
                           onTap: () => setState(() { _search = ''; _searchCtrl.clear(); }),
-                          child: const Icon(Icons.clear, size: 14, color: Color(0xFF9CA3AF)))
+                          child: Icon(Icons.clear, size: 14, color: AppColors.textSecondary))
                       : null,
                   suffixIconConstraints: const BoxConstraints(minWidth: 30),
                 ),
@@ -4861,7 +4956,7 @@ class _SortableBarChartState extends State<_SortableBarChart> {
           if (items.isEmpty)
             Padding(
               padding: const EdgeInsets.all(12),
-              child: Text('No match for "$_search"', style: const TextStyle(fontSize: 11, color: Color(0xFF9CA3AF))),
+              child: Text('No match for "$_search"', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
             )
           else
             ...items.map((item) {
@@ -4872,12 +4967,12 @@ class _SortableBarChartState extends State<_SortableBarChart> {
                 child: Row(
                   children: [
                     SizedBox(width: 80, child: Text(item.$2,
-                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w500, color: Color(0xFF1A1A2E)),
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w500, color: AppColors.textPrimary),
                         overflow: TextOverflow.ellipsis, textAlign: TextAlign.right)),
                     const SizedBox(width: 8),
                     Expanded(child: Stack(children: [
                       Container(height: barH, decoration: BoxDecoration(
-                          color: const Color(0xFFF3F4F6), borderRadius: BorderRadius.circular(barH / 2))),
+                          color: AppColors.pillBg, borderRadius: BorderRadius.circular(barH / 2))),
                       FractionallySizedBox(
                         widthFactor: fraction.clamp(0.02, 1.0),
                         child: Container(height: barH, decoration: BoxDecoration(
@@ -4960,7 +5055,7 @@ class _SortableTableState extends State<_SortableTable> {
     final tableH = isLarge ? 400.0 : (rows.length * 40.0 + 40.0).clamp(80.0, 400.0);
 
     return Container(
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)),
+      decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(8)),
       clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -4976,8 +5071,8 @@ class _SortableTableState extends State<_SortableTable> {
                   Container(
                     height: 36,
                     decoration: BoxDecoration(
-                      color: Colors.grey[100],
-                      border: Border(bottom: BorderSide(color: Colors.grey[300]!)),
+                      color: AppColors.pillBg,
+                      border: Border(bottom: BorderSide(color: AppColors.divider)),
                     ),
                     child: Row(
                       children: columns.map((col) {
@@ -4991,7 +5086,7 @@ class _SortableTableState extends State<_SortableTable> {
                                 children: [
                                   Expanded(child: Text(col,
                                       style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold,
-                                          color: isSorted ? const Color(0xFF2D8BE0) : Colors.black87),
+                                          color: isSorted ? const Color(0xFF2D8BE0) : AppColors.textPrimary),
                                       overflow: TextOverflow.ellipsis)),
                                   if (isSorted)
                                     Icon(_sortAsc ? Icons.arrow_upward : Icons.arrow_downward,
@@ -5014,15 +5109,15 @@ class _SortableTableState extends State<_SortableTable> {
                         final row = rows[index];
                         return Container(
                           decoration: BoxDecoration(
-                            color: index.isEven ? Colors.white : Colors.grey[50],
-                            border: Border(bottom: BorderSide(color: Colors.grey[200]!)),
+                            color: index.isEven ? AppColors.surface : AppColors.pillBg,
+                            border: Border(bottom: BorderSide(color: AppColors.divider)),
                           ),
                           child: Row(
                             children: columns.map((col) => Expanded(
                               child: Padding(
                                 padding: const EdgeInsets.symmetric(horizontal: 8),
                                 child: Text(_fmtCellValue(row[col]),
-                                    style: const TextStyle(fontSize: 12, color: Colors.black87),
+                                    style: TextStyle(fontSize: 12, color: AppColors.textPrimary),
                                     maxLines: 2, overflow: TextOverflow.ellipsis),
                               ),
                             )).toList(),
@@ -5038,7 +5133,7 @@ class _SortableTableState extends State<_SortableTable> {
           Padding(
             padding: const EdgeInsets.all(8),
             child: Text('${rows.length} result${rows.length == 1 ? '' : 's'} (${widget.executionTime})',
-                style: const TextStyle(fontSize: 11, color: Colors.black45)),
+                style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
           ),
         ],
       ),

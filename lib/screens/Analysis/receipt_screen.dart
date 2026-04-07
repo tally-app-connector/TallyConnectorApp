@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import '../../database/database_helper.dart';
 import '../../services/queries/query_service.dart';
+import '../theme/app_theme.dart';
 
 class ReceiptScreen extends StatefulWidget {
   @override
@@ -57,6 +58,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
   
   @override
   Widget build(BuildContext context) {
+    syncBrightness(context);
     return Scaffold(
       appBar: AppBar(
         title: Text('Receipt Vouchers'),
@@ -70,7 +72,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                 Container(
                   width: double.infinity,
                   padding: EdgeInsets.all(16),
-                  color: Colors.green[50],
+                  color: AppColors.iconBgGreen,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -79,7 +81,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: Colors.green[900],
+                          color: AppColors.textPrimary,
                         ),
                       ),
                       SizedBox(height: 8),
@@ -87,7 +89,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                         'Period: ${_formatDate(_fromDate ?? '')} to ${_formatDate(_toDate ?? '')}',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.grey[700],
+                          color: AppColors.textSecondary,
                         ),
                       ),
                       SizedBox(height: 12),
@@ -101,7 +103,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                                 'Total Receipts',
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: Colors.grey[700],
+                                  color: AppColors.textSecondary,
                                 ),
                               ),
                               SizedBox(height: 4),
@@ -118,7 +120,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                           Container(
                             padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                             decoration: BoxDecoration(
-                              color: Colors.white,
+                              color: AppColors.surface,
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Text(
@@ -142,13 +144,13 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.receipt_long, size: 64, color: Colors.grey[400]),
+                              Icon(Icons.receipt_long, size: 64, color: AppColors.textSecondary),
                               SizedBox(height: 16),
                               Text(
                                 'No Receipt Vouchers Found',
                                 style: TextStyle(
                                   fontSize: 16,
-                                  color: Colors.grey[600],
+                                  color: AppColors.textSecondary,
                                 ),
                               ),
                             ],
@@ -201,7 +203,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                             Container(
                               padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
-                                color: Colors.green[100],
+                                color: AppColors.iconBgGreen,
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: Text(
@@ -246,7 +248,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                         _formatDate(date),
                         style: TextStyle(
                           fontSize: 11,
-                          color: Colors.grey[600],
+                          color: AppColors.textSecondary,
                         ),
                       ),
                     ],
@@ -258,19 +260,19 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                 Container(
                   padding: EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.grey[100],
+                    color: AppColors.pillBg,
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.notes, size: 14, color: Colors.grey[600]),
+                      Icon(Icons.notes, size: 14, color: AppColors.textSecondary),
                       SizedBox(width: 4),
                       Expanded(
                         child: Text(
                           narration,
                           style: TextStyle(
                             fontSize: 12,
-                            color: Colors.grey[700],
+                            color: AppColors.textSecondary,
                             fontStyle: FontStyle.italic,
                           ),
                           maxLines: 2,
@@ -311,7 +313,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
             Container(
               padding: EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.green[50],
+                color: AppColors.iconBgGreen,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
               ),
               child: Column(
@@ -322,7 +324,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                       width: 40,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: Colors.grey[300],
+                        color: AppColors.divider,
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -333,17 +335,17 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
-                      color: Colors.green[900],
+                      color: AppColors.textPrimary,
                     ),
                   ),
                   SizedBox(height: 8),
                   Text(
                     'Voucher: ${receipt['voucher_number']}',
-                    style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                    style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
                   ),
                   Text(
                     'Date: ${_formatDate(receipt['date'])}',
-                    style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                    style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
                   ),
                 ],
               ),
@@ -362,7 +364,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                     margin: EdgeInsets.only(bottom: 8),
                     child: ListTile(
                       leading: CircleAvatar(
-                        backgroundColor: isCredit ? Colors.green[100] : Colors.red[100],
+                        backgroundColor: isCredit ? AppColors.iconBgGreen : AppColors.iconBgRed,
                         child: Icon(
                           isCredit ? Icons.arrow_downward : Icons.arrow_upward,
                           color: isCredit ? Colors.green[700] : Colors.red[700],

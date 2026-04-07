@@ -455,6 +455,7 @@ import 'package:flutter/material.dart';
 import '../../database/database_helper.dart';
 import '../../services/queries/query_service.dart';
 import 'voucher_detail_screen.dart';
+import '../theme/app_theme.dart';
 
 class LedgerDetailScreen extends StatefulWidget {
   final String companyGuid;
@@ -489,13 +490,8 @@ class _LedgerDetailScreenState extends State<LedgerDetailScreen>
 
   // ── Design tokens ──────────────────────────────────────────────────────────
   static const Color _primary   = Color(0xFF1A6FD8);
-  static const Color _bg        = Color(0xFFF4F6FB);
-  static const Color _cardBg    = Colors.white;
-  static const Color _textDark  = Color(0xFF1A2340);
-  static const Color _textMuted = Color(0xFF8A94A6);
   static const Color _positiveC = Color(0xFF1B8A5A);
   static const Color _negativeC = Color(0xFFD32F2F);
-  static const Color _tableBg   = Color(0xFFF0F3FA);
   static const Color _debitC    = Color(0xFFD32F2F);
   static const Color _creditC   = Color(0xFF1B8A5A);
 
@@ -566,8 +562,9 @@ class _LedgerDetailScreenState extends State<LedgerDetailScreen>
 
   @override
   Widget build(BuildContext context) {
+    syncBrightness(context);
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: AppColors.background,
       appBar: _buildAppBar(),
       body: _loading
           ? const Center(child: CircularProgressIndicator(color: _primary))
@@ -589,31 +586,31 @@ class _LedgerDetailScreenState extends State<LedgerDetailScreen>
 
   AppBar _buildAppBar() {
     return AppBar(
-      backgroundColor: _cardBg,
+      backgroundColor: AppColors.surface,
       elevation: 0,
       surfaceTintColor: Colors.transparent,
       leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios_new_rounded,
-            size: 18, color: _textDark),
+        icon: Icon(Icons.arrow_back_ios_new_rounded,
+            size: 18, color: AppColors.textPrimary),
         onPressed: () => Navigator.pop(context),
       ),
       title: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(widget.ledgerName,
-              style: const TextStyle(
-                  fontSize: 16, fontWeight: FontWeight.w800, color: _textDark),
+              style: TextStyle(
+                  fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
               maxLines: 1,
               overflow: TextOverflow.ellipsis),
           Text(
             '${_formatDate(widget.fromDate)} → ${_formatDate(widget.toDate)}',
-            style: const TextStyle(fontSize: 11, color: _textMuted),
+            style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
           ),
         ],
       ),
       actions: [
         IconButton(
-          icon: const Icon(Icons.refresh_rounded, color: _textMuted, size: 20),
+          icon: Icon(Icons.refresh_rounded, color: AppColors.textSecondary, size: 20),
           onPressed: _loadVouchers,
         ),
       ],
@@ -714,7 +711,7 @@ class _LedgerDetailScreenState extends State<LedgerDetailScreen>
 
   Widget _buildTableHeader() {
     return Container(
-      color: _tableBg,
+      color: AppColors.pillBg,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
       child: Row(
         children: [
@@ -735,10 +732,10 @@ class _LedgerDetailScreenState extends State<LedgerDetailScreen>
       flex: flex,
       child: Text(label,
           textAlign: align,
-          style: const TextStyle(
+          style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w800,
-              color: _textMuted,
+              color: AppColors.textSecondary,
               letterSpacing: 0.3)),
     );
   }
@@ -754,8 +751,8 @@ class _LedgerDetailScreenState extends State<LedgerDetailScreen>
             Icon(Icons.receipt_long_rounded,
                 size: 52, color: Colors.grey.shade300),
             const SizedBox(height: 14),
-            const Text('No transactions found',
-                style: TextStyle(color: _textMuted, fontSize: 15)),
+            Text('No transactions found',
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 15)),
           ],
         ),
       );
@@ -785,7 +782,7 @@ class _LedgerDetailScreenState extends State<LedgerDetailScreen>
       ),
       child: Container(
         decoration: BoxDecoration(
-          color: index.isEven ? _cardBg : _bg,
+          color: index.isEven ? AppColors.surface : AppColors.background,
           border: Border(
               bottom: BorderSide(color: Colors.grey.shade100, width: 0.8)),
         ),
@@ -796,7 +793,7 @@ class _LedgerDetailScreenState extends State<LedgerDetailScreen>
             Expanded(
               flex: 2,
               child: Text(_formatDate(v['date'] as String),
-                  style: const TextStyle(fontSize: 11, color: _textMuted)),
+                  style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
             ),
             // Particulars
             Expanded(
@@ -805,7 +802,7 @@ class _LedgerDetailScreenState extends State<LedgerDetailScreen>
                 (v['narration'] as String?)?.isNotEmpty == true
                     ? v['narration'] as String
                     : '-',
-                style: const TextStyle(fontSize: 11, color: _textDark),
+                style: TextStyle(fontSize: 11, color: AppColors.textPrimary),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -836,7 +833,7 @@ class _LedgerDetailScreenState extends State<LedgerDetailScreen>
               flex: 2,
               child: Text(
                 v['voucher_number']?.toString() ?? '-',
-                style: const TextStyle(fontSize: 11, color: _textMuted),
+                style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
                 textAlign: TextAlign.center,
               ),
             ),
@@ -893,7 +890,7 @@ class _LedgerDetailScreenState extends State<LedgerDetailScreen>
 
     return Container(
       decoration: BoxDecoration(
-        color: _cardBg,
+        color: AppColors.surface,
         border: Border(top: BorderSide(color: Colors.grey.shade200)),
         boxShadow: [
           BoxShadow(
@@ -908,13 +905,13 @@ class _LedgerDetailScreenState extends State<LedgerDetailScreen>
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
-              color: _bg,
+              color: AppColors.background,
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
               '${_vouchers.length} txns',
-              style: const TextStyle(
-                  fontSize: 12, fontWeight: FontWeight.w700, color: _textMuted),
+              style: TextStyle(
+                  fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textSecondary),
             ),
           ),
           const Spacer(),
@@ -937,7 +934,7 @@ class _LedgerDetailScreenState extends State<LedgerDetailScreen>
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(label,
-            style: const TextStyle(fontSize: 10, color: _textMuted)),
+            style: TextStyle(fontSize: 10, color: AppColors.textSecondary)),
         const SizedBox(height: 2),
         Text(
           _formatAmount(amount),

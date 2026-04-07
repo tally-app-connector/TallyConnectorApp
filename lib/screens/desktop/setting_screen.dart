@@ -446,6 +446,7 @@ import 'package:flutter/services.dart';
 import 'package:tally_connector/services/sync_service.dart';
 import '../../database/database_helper.dart';
 import '../../utils/secure_storage.dart';
+import '../theme/app_theme.dart';
 
 class DesktopSettingsScreen extends StatefulWidget {
   const DesktopSettingsScreen({super.key});
@@ -472,12 +473,7 @@ class _DesktopSettingsScreenState extends State<DesktopSettingsScreen>
   // ── Design Tokens ──────────────────────────────────────────────────────────
   static const Color _primary   = Color(0xFF1A6FD8);
   static const Color _accent    = Color(0xFF00C9A7);
-  static const Color _bg        = Color(0xFFF4F6FB);
-  static const Color _cardBg    = Colors.white;
-  static const Color _textDark  = Color(0xFF1A2340);
-  static const Color _textMuted = Color(0xFF8A94A6);
   static const Color _danger    = Color(0xFFE53935);
-  static const Color _dangerBg  = Color(0xFFFFF0F0);
 
   @override
   void initState() {
@@ -603,7 +599,7 @@ class _DesktopSettingsScreenState extends State<DesktopSettingsScreen>
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: _dangerBg,
+                color: AppColors.iconBgRed,
                 shape: BoxShape.circle,
               ),
               child: const Icon(Icons.warning_amber_rounded, color: _danger, size: 22),
@@ -611,19 +607,19 @@ class _DesktopSettingsScreenState extends State<DesktopSettingsScreen>
             const SizedBox(width: 12),
             Expanded(
               child: Text(title,
-                  style: const TextStyle(
-                      fontSize: 17, fontWeight: FontWeight.w800, color: _textDark)),
+                  style: TextStyle(
+                      fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
             ),
           ],
         ),
         content: Text(body,
-            style: const TextStyle(fontSize: 14, color: _textMuted, height: 1.5)),
+            style: TextStyle(fontSize: 14, color: AppColors.textSecondary, height: 1.5)),
         actions: [
           OutlinedButton(
             onPressed: () => Navigator.pop(context, false),
             style: OutlinedButton.styleFrom(
-              foregroundColor: _textMuted,
-              side: BorderSide(color: Colors.grey.shade300),
+              foregroundColor: AppColors.textSecondary,
+              side: BorderSide(color: AppColors.divider),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
             child: const Text('Cancel'),
@@ -657,8 +653,9 @@ class _DesktopSettingsScreenState extends State<DesktopSettingsScreen>
 
   @override
   Widget build(BuildContext context) {
+    syncBrightness(context);
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: AppColors.background,
       appBar: _buildAppBar(),
       body: _loading
           ? const Center(child: CircularProgressIndicator(color: _primary))
@@ -677,7 +674,7 @@ class _DesktopSettingsScreenState extends State<DesktopSettingsScreen>
                     const SizedBox(height: 12),
                     _buildDangerCard(),
                     const SizedBox(height: 28),
-                    _buildSectionLabel('About', Icons.info_outline_rounded, _textMuted),
+                    _buildSectionLabel('About', Icons.info_outline_rounded, AppColors.textSecondary),
                     const SizedBox(height: 12),
                     _buildAboutCard(),
                     const SizedBox(height: 16),
@@ -690,25 +687,22 @@ class _DesktopSettingsScreenState extends State<DesktopSettingsScreen>
 
   AppBar _buildAppBar() {
     return AppBar(
-      backgroundColor: _cardBg,
+      backgroundColor: AppColors.surface,
       elevation: 0,
       surfaceTintColor: Colors.transparent,
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: _textDark),
-        onPressed: () => Navigator.pop(context),
-      ),
-      title: const Text(
+      automaticallyImplyLeading: false,
+      title: Text(
         'Settings',
         style: TextStyle(
           fontWeight: FontWeight.w800,
           fontSize: 18,
-          color: _textDark,
+          color: AppColors.textPrimary,
           letterSpacing: -0.3,
         ),
       ),
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(1),
-        child: Container(height: 1, color: Colors.grey.shade100),
+        child: Container(height: 1, color: AppColors.divider),
       ),
     );
   }
@@ -745,14 +739,10 @@ class _DesktopSettingsScreenState extends State<DesktopSettingsScreen>
   Widget _buildCompanyCard() {
     return Container(
       decoration: BoxDecoration(
-        color: _cardBg,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 12,
-              offset: const Offset(0, 3))
-        ],
+        border: AppShadows.cardBorder,
+        boxShadow: AppShadows.card,
       ),
       child: Column(
         children: [
@@ -762,11 +752,11 @@ class _DesktopSettingsScreenState extends State<DesktopSettingsScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Active Company',
+                Text('Active Company',
                     style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
-                        color: _textDark)),
+                        color: AppColors.textPrimary)),
                 const SizedBox(height: 10),
                 _companies.isEmpty
                     ? _buildEmptyState()
@@ -781,7 +771,7 @@ class _DesktopSettingsScreenState extends State<DesktopSettingsScreen>
             _buildCompanyMeta(),
 
           // Divider
-          Divider(height: 1, color: Colors.grey.shade100),
+          Divider(height: 1, color: AppColors.divider),
 
           // Fetch action
           _buildActionTile(
@@ -801,18 +791,18 @@ class _DesktopSettingsScreenState extends State<DesktopSettingsScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: _bg,
+        color: AppColors.background,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: AppColors.divider),
       ),
-      child: const Row(
+      child: Row(
         children: [
-          Icon(Icons.info_outline_rounded, color: _textMuted, size: 18),
-          SizedBox(width: 10),
+          Icon(Icons.info_outline_rounded, color: AppColors.textSecondary, size: 18),
+          const SizedBox(width: 10),
           Expanded(
             child: Text(
               'No companies found. Sync from Tally to get started.',
-              style: TextStyle(fontSize: 13, color: _textMuted),
+              style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
             ),
           ),
         ],
@@ -824,14 +814,15 @@ class _DesktopSettingsScreenState extends State<DesktopSettingsScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
       decoration: BoxDecoration(
-        color: _bg,
+        color: AppColors.background,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: AppColors.divider),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           isExpanded: true,
-          icon: const Icon(Icons.unfold_more_rounded, color: _textMuted, size: 20),
+          dropdownColor: AppColors.surface,
+          icon: Icon(Icons.unfold_more_rounded, color: AppColors.textSecondary, size: 20),
           value: _selectedCompany?['company_guid'],
           items: _companies.map((company) {
             return DropdownMenuItem<String>(
@@ -841,13 +832,13 @@ class _DesktopSettingsScreenState extends State<DesktopSettingsScreen>
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(company['company_name'],
-                      style: const TextStyle(
+                      style: TextStyle(
                           fontWeight: FontWeight.w700,
                           fontSize: 14,
-                          color: _textDark)),
+                          color: AppColors.textPrimary)),
                   if ((company['company_address'] ?? '').toString().isNotEmpty)
                     Text(company['company_address'],
-                        style: const TextStyle(fontSize: 11, color: _textMuted),
+                        style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis),
                 ],
@@ -883,7 +874,7 @@ class _DesktopSettingsScreenState extends State<DesktopSettingsScreen>
                 Clipboard.setData(ClipboardData(text: guid));
                 _showSnack('GUID copied', isError: false);
               },
-              child: const Icon(Icons.copy_rounded, size: 14, color: _textMuted),
+              child: Icon(Icons.copy_rounded, size: 14, color: AppColors.textSecondary),
             ),
           ),
           const SizedBox(height: 8),
@@ -912,19 +903,19 @@ class _DesktopSettingsScreenState extends State<DesktopSettingsScreen>
         SizedBox(
           width: 76,
           child: Text(label,
-              style: const TextStyle(
+              style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
-                  color: _textMuted,
+                  color: AppColors.textSecondary,
                   letterSpacing: 0.2)),
         ),
         const SizedBox(width: 8),
         Expanded(
           child: Text(value,
-              style: const TextStyle(
+              style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: _textDark)),
+                  color: AppColors.textPrimary)),
         ),
         if (trailingWidget != null) ...[
           const SizedBox(width: 8),
@@ -939,7 +930,7 @@ class _DesktopSettingsScreenState extends State<DesktopSettingsScreen>
   Widget _buildDangerCard() {
     return Container(
       decoration: BoxDecoration(
-        color: _cardBg,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: _danger.withOpacity(0.18)),
         boxShadow: [
@@ -979,14 +970,10 @@ class _DesktopSettingsScreenState extends State<DesktopSettingsScreen>
   Widget _buildAboutCard() {
     return Container(
       decoration: BoxDecoration(
-        color: _cardBg,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 12,
-              offset: const Offset(0, 3))
-        ],
+        border: AppShadows.cardBorder,
+        boxShadow: AppShadows.card,
       ),
       child: Column(
         children: [
@@ -994,14 +981,14 @@ class _DesktopSettingsScreenState extends State<DesktopSettingsScreen>
             icon: Icons.tag_rounded,
             label: 'Version',
             value: '1.0.0',
-            color: _textMuted,
+            color: AppColors.textSecondary,
           ),
-          Divider(height: 1, color: Colors.grey.shade100),
+          Divider(height: 1, color: AppColors.divider),
           _buildInfoTile(
             icon: Icons.code_rounded,
             label: 'Built with',
             value: 'Flutter ${const String.fromEnvironment('FLUTTER_VERSION', defaultValue: '3.x')}',
-            color: _textMuted,
+            color: AppColors.textSecondary,
           ),
         ],
       ),
@@ -1055,11 +1042,11 @@ class _DesktopSettingsScreenState extends State<DesktopSettingsScreen>
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
                           color: disabled
-                              ? _textMuted.withOpacity(0.5)
+                              ? AppColors.textSecondary.withOpacity(0.5)
                               : color)),
                   const SizedBox(height: 2),
                   Text(sublabel,
-                      style: const TextStyle(fontSize: 12, color: _textMuted)),
+                      style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                 ],
               ),
             ),
@@ -1067,18 +1054,18 @@ class _DesktopSettingsScreenState extends State<DesktopSettingsScreen>
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
+                  color: AppColors.pillBg,
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: const Text('Soon',
+                child: Text('Soon',
                     style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
-                        color: _textMuted)),
+                        color: AppColors.textSecondary)),
               )
             else
               Icon(Icons.chevron_right_rounded,
-                  color: _textMuted.withOpacity(0.5), size: 20),
+                  color: AppColors.textSecondary.withOpacity(0.5), size: 20),
           ],
         ),
       ),
@@ -1107,13 +1094,13 @@ class _DesktopSettingsScreenState extends State<DesktopSettingsScreen>
           const SizedBox(width: 14),
           Expanded(
             child: Text(label,
-                style: const TextStyle(
+                style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: _textDark)),
+                    color: AppColors.textPrimary)),
           ),
           Text(value,
-              style: const TextStyle(fontSize: 13, color: _textMuted,
+              style: TextStyle(fontSize: 13, color: AppColors.textSecondary,
                   fontWeight: FontWeight.w500)),
         ],
       ),

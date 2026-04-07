@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../database/database_helper.dart';
+import '../theme/app_theme.dart';
 
 // ============================================================================
 // MAIN BALANCE SHEET SCREEN
@@ -84,12 +85,12 @@ class _BalanceSheetScreenState extends State<BalanceSheetScreen> {
         end: _selectedToDate ?? DateTime.now(),
       ),
       builder: (context, child) {
+        final dk = Theme.of(context).brightness == Brightness.dark;
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(
-              primary: Colors.blue,
-              onPrimary: Colors.white,
-            ),
+            colorScheme: dk
+                ? ColorScheme.dark(primary: Colors.blue, onPrimary: Colors.white, surface: AppColors.surface, onSurface: AppColors.textPrimary)
+                : ColorScheme.light(primary: Colors.blue, onPrimary: Colors.white),
           ),
           child: child!,
         );
@@ -789,6 +790,7 @@ class _BalanceSheetScreenState extends State<BalanceSheetScreen> {
 
   @override
   Widget build(BuildContext context) {
+    syncBrightness(context);
     if (_loading) {
       return Scaffold(
         appBar: AppBar(title: Text('Balance Sheet')),
@@ -806,7 +808,7 @@ class _BalanceSheetScreenState extends State<BalanceSheetScreen> {
         (_bsData?['current_assets'] ?? 0.0);
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -974,13 +976,14 @@ class _BalanceSheetScreenState extends State<BalanceSheetScreen> {
   Widget _buildSectionHeader(String title) {
     return Container(
       width: double.infinity,
-      color: Colors.grey[300],
+      color: AppColors.divider,
       padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Text(
         title,
         style: TextStyle(
           fontWeight: FontWeight.bold,
           fontSize: 16,
+          color: AppColors.textPrimary,
         ),
       ),
     );
@@ -1015,7 +1018,7 @@ class _BalanceSheetScreenState extends State<BalanceSheetScreen> {
               ),
             ),
             if (onTap != null)
-              Icon(Icons.chevron_right, size: 20, color: Colors.grey[600]),
+              Icon(Icons.chevron_right, size: 20, color: AppColors.textSecondary),
           ],
         ),
       ),
@@ -1024,7 +1027,7 @@ class _BalanceSheetScreenState extends State<BalanceSheetScreen> {
 
   Widget _buildTotalItem(String label, double amount) {
     return Container(
-      color: Colors.grey[200],
+      color: AppColors.pillBg,
       padding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1103,13 +1106,13 @@ class _BalanceSheetDetailScreenState extends State<BalanceSheetDetailScreen> {
     setState(() => _loading = true);
     
     final db = await _db.database;
-    
+
     print('=== BALANCE SHEET DETAIL DEBUG ===');
     print('Group Name: ${widget.groupName}');
     print('Company GUID: ${widget.companyGuid}');
     print('From Date: ${widget.fromDate}');
     print('To Date: ${widget.toDate}');
-    
+
     // First, get the parent group's guid
     final parentGroup = await db.rawQuery('''
       SELECT group_guid, name
@@ -1119,7 +1122,7 @@ class _BalanceSheetDetailScreenState extends State<BalanceSheetDetailScreen> {
         AND is_deleted = 0
       LIMIT 1
     ''', [widget.companyGuid, widget.groupName, widget.groupName]);
-    
+
     if (parentGroup.isEmpty) {
       print('ERROR: Parent group not found!');
       setState(() {
@@ -1420,7 +1423,7 @@ final balanceResult = await db.rawQuery('''
       final balanceB = ((b['balance'] as num?)?.toDouble() ?? 0.0).abs();
       return balanceB.compareTo(balanceA);
     });
-    
+
     setState(() {
       _items = items;
       _total = total;
@@ -1475,6 +1478,7 @@ final balanceResult = await db.rawQuery('''
 
   @override
   Widget build(BuildContext context) {
+    syncBrightness(context);
     if (_loading) {
       return Scaffold(
         appBar: AppBar(title: Text('Loading...')),
@@ -1483,7 +1487,7 @@ final balanceResult = await db.rawQuery('''
     }
 
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1568,13 +1572,13 @@ final balanceResult = await db.rawQuery('''
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.inbox, size: 64, color: Colors.grey[400]),
+                        Icon(Icons.inbox, size: 64, color: AppColors.textSecondary),
                         SizedBox(height: 16),
                         Text(
                           'No items found',
                           style: TextStyle(
                             fontSize: 16,
-                            color: Colors.grey[600],
+                            color: AppColors.textSecondary,
                           ),
                         ),
                       ],
@@ -1623,7 +1627,7 @@ final balanceResult = await db.rawQuery('''
                                         style: TextStyle(
                                           fontSize: 16,
                                           fontWeight: FontWeight.bold,
-                                          color: Colors.black87,
+                                          color: AppColors.textPrimary,
                                         ),
                                       ),
                                       SizedBox(height: 4),
@@ -1631,7 +1635,7 @@ final balanceResult = await db.rawQuery('''
                                         isGroup ? 'Group' : 'Ledger',
                                         style: TextStyle(
                                           fontSize: 12,
-                                          color: Colors.grey[600],
+                                          color: AppColors.textSecondary,
                                         ),
                                       ),
                                     ],
@@ -1651,7 +1655,7 @@ final balanceResult = await db.rawQuery('''
                                   ],
                                 ),
                                 SizedBox(width: 8),
-                                Icon(Icons.chevron_right, color: Colors.grey),
+                                Icon(Icons.chevron_right, color: AppColors.textSecondary),
                               ],
                             ),
                           ),
@@ -1709,9 +1713,9 @@ class _LedgerTransactionsScreenState extends State<LedgerTransactionsScreen> {
 
   Future<void> _loadData() async {
     setState(() => _loading = true);
-    
+
     final db = await _db.database;
-    
+
     print('\n=== LEDGER TRANSACTIONS DEBUG ===');
     print('Ledger Name: ${widget.ledgerName}');
     print('From Date: ${widget.fromDate}');
@@ -1743,7 +1747,7 @@ class _LedgerTransactionsScreenState extends State<LedgerTransactionsScreen> {
           AND l.is_deleted = 0
         GROUP BY l.ledger_guid, l.name, l.opening_balance
       ''', [widget.toDate, widget.companyGuid, widget.ledgerName]);
-      
+
       if (balanceResult.isEmpty) {
         print('ERROR: Ledger not found!');
         setState(() {
@@ -1794,7 +1798,7 @@ class _LedgerTransactionsScreenState extends State<LedgerTransactionsScreen> {
           'running_balance': runningBalance,
         };
       }).toList();
-      
+
       setState(() {
         _transactions = transactionsWithBalance;
         _loading = false;
@@ -1859,14 +1863,14 @@ class _LedgerTransactionsScreenState extends State<LedgerTransactionsScreen> {
           'running_balance': runningBalance,
         };
       }).toList();
-      
+
       setState(() {
         _transactions = transactionsWithBalance;
         _closingBalance = runningBalance;
         _loading = false;
       });
     }
-    
+
     print('=================================\n');
   }
 
@@ -1889,6 +1893,7 @@ class _LedgerTransactionsScreenState extends State<LedgerTransactionsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    syncBrightness(context);
     if (_loading) {
       return Scaffold(
         appBar: AppBar(title: Text('Loading...')),
@@ -1897,7 +1902,7 @@ class _LedgerTransactionsScreenState extends State<LedgerTransactionsScreen> {
     }
 
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1919,15 +1924,10 @@ class _LedgerTransactionsScreenState extends State<LedgerTransactionsScreen> {
             margin: EdgeInsets.all(16),
             padding: EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppColors.surface,
               borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 4,
-                  offset: Offset(0, 2),
-                ),
-              ],
+              border: AppShadows.cardBorder,
+              boxShadow: AppShadows.card,
             ),
             child: Row(
               children: [
@@ -1938,7 +1938,7 @@ class _LedgerTransactionsScreenState extends State<LedgerTransactionsScreen> {
                         'Opening',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.grey[600],
+                          color: AppColors.textSecondary,
                         ),
                       ),
                       SizedBox(height: 4),
@@ -1947,7 +1947,7 @@ class _LedgerTransactionsScreenState extends State<LedgerTransactionsScreen> {
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: Colors.black87,
+                          color: AppColors.textPrimary,
                         ),
                       ),
                     ],
@@ -1956,7 +1956,7 @@ class _LedgerTransactionsScreenState extends State<LedgerTransactionsScreen> {
                 Container(
                   width: 1,
                   height: 40,
-                  color: Colors.grey[300],
+                  color: AppColors.divider,
                 ),
                 Expanded(
                   child: Column(
@@ -1965,7 +1965,7 @@ class _LedgerTransactionsScreenState extends State<LedgerTransactionsScreen> {
                         'Closing',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.grey[600],
+                          color: AppColors.textSecondary,
                         ),
                       ),
                       SizedBox(height: 4),
@@ -1983,7 +1983,7 @@ class _LedgerTransactionsScreenState extends State<LedgerTransactionsScreen> {
                 Container(
                   width: 1,
                   height: 40,
-                  color: Colors.grey[300],
+                  color: AppColors.divider,
                 ),
                 Expanded(
                   child: Column(
@@ -1992,7 +1992,7 @@ class _LedgerTransactionsScreenState extends State<LedgerTransactionsScreen> {
                         'Transactions',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.grey[600],
+                          color: AppColors.textSecondary,
                         ),
                       ),
                       SizedBox(height: 4),
@@ -2001,7 +2001,7 @@ class _LedgerTransactionsScreenState extends State<LedgerTransactionsScreen> {
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: Colors.black87,
+                          color: AppColors.textPrimary,
                         ),
                       ),
                     ],
@@ -2018,13 +2018,13 @@ class _LedgerTransactionsScreenState extends State<LedgerTransactionsScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.receipt_long, size: 64, color: Colors.grey[400]),
+                        Icon(Icons.receipt_long, size: 64, color: AppColors.textSecondary),
                         SizedBox(height: 16),
                         Text(
                           'No transactions found',
                           style: TextStyle(
                             fontSize: 16,
-                            color: Colors.grey[600],
+                            color: AppColors.textSecondary,
                           ),
                         ),
                       ],
@@ -2061,7 +2061,7 @@ class _LedgerTransactionsScreenState extends State<LedgerTransactionsScreen> {
                                           style: TextStyle(
                                             fontSize: 14,
                                             fontWeight: FontWeight.bold,
-                                            color: Colors.black87,
+                                            color: AppColors.textPrimary,
                                           ),
                                         ),
                                         SizedBox(height: 4),
@@ -2069,7 +2069,7 @@ class _LedgerTransactionsScreenState extends State<LedgerTransactionsScreen> {
                                           '${txn['voucher_number']} • ${_parseTallyDate(txn['date'] as String)}',
                                           style: TextStyle(
                                             fontSize: 12,
-                                            color: Colors.grey[600],
+                                            color: AppColors.textSecondary,
                                           ),
                                         ),
                                       ],
@@ -2082,7 +2082,7 @@ class _LedgerTransactionsScreenState extends State<LedgerTransactionsScreen> {
                                         amount >= 0 ? 'Cr' : 'Dr',
                                         style: TextStyle(
                                           fontSize: 12,
-                                          color: Colors.grey[600],
+                                          color: AppColors.textSecondary,
                                         ),
                                       ),
                                       Text(
@@ -2104,7 +2104,7 @@ class _LedgerTransactionsScreenState extends State<LedgerTransactionsScreen> {
                                     txn['narration'] as String,
                                     style: TextStyle(
                                       fontSize: 12,
-                                      color: Colors.grey[700],
+                                      color: AppColors.textSecondary,
                                       fontStyle: FontStyle.italic,
                                     ),
                                   ),
@@ -2117,7 +2117,7 @@ class _LedgerTransactionsScreenState extends State<LedgerTransactionsScreen> {
                                     'Balance: ',
                                     style: TextStyle(
                                       fontSize: 12,
-                                      color: Colors.grey[600],
+                                      color: AppColors.textSecondary,
                                     ),
                                   ),
                                   Text(

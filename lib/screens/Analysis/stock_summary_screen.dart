@@ -3,6 +3,7 @@ import '../../models/data_model.dart';
 import '../../database/database_helper.dart';
 import '../../services/queries/query_service.dart';
 import '../../utils/date_utils.dart';
+import '../theme/app_theme.dart';
 
 class StockSummaryScreen extends StatefulWidget {
   @override
@@ -130,7 +131,7 @@ class _StockSummaryScreenState extends State<StockSummaryScreen> {
   void _showMonthPicker() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -153,22 +154,22 @@ class _StockSummaryScreenState extends State<StockSummaryScreen> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.grey[300],
+                    color: AppColors.divider,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-                const Padding(
-                  padding: EdgeInsets.all(16),
+                Padding(
+                  padding: const EdgeInsets.all(16),
                   child: Text(
                     'Select Month',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
-                      color: Colors.black87,
+                      color: AppColors.textPrimary,
                     ),
                   ),
                 ),
-                const Divider(height: 1),
+                Divider(height: 1, color: AppColors.divider),
                 Flexible(
                   child: ListView(
                     shrinkWrap: true,
@@ -209,12 +210,12 @@ class _StockSummaryScreenState extends State<StockSummaryScreen> {
                                     decoration: BoxDecoration(
                                       color: isSelected
                                           ? Colors.blue[700]
-                                          : Colors.grey[100],
+                                          : AppColors.pillBg,
                                       borderRadius: BorderRadius.circular(20),
                                       border: Border.all(
                                         color: isSelected
                                             ? Colors.blue[700]!
-                                            : Colors.grey[300]!,
+                                            : AppColors.divider,
                                       ),
                                     ),
                                     child: Text(
@@ -224,7 +225,7 @@ class _StockSummaryScreenState extends State<StockSummaryScreen> {
                                         fontWeight: FontWeight.w500,
                                         color: isSelected
                                             ? Colors.white
-                                            : Colors.black87,
+                                            : AppColors.textPrimary,
                                       ),
                                     ),
                                   ),
@@ -283,6 +284,7 @@ class _StockSummaryScreenState extends State<StockSummaryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    syncBrightness(context);
     if (_loading) {
       return Scaffold(
         appBar: AppBar(title: const Text('Stock Summary')),
@@ -291,19 +293,19 @@ class _StockSummaryScreenState extends State<StockSummaryScreen> {
     }
 
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.surface,
         elevation: 0,
-        title: const Text(
+        title: Text(
           'Stock Summary',
           style: TextStyle(
-            color: Colors.black87,
+            color: AppColors.textPrimary,
             fontWeight: FontWeight.w600,
             fontSize: 18,
           ),
         ),
-        iconTheme: const IconThemeData(color: Colors.black87),
+        iconTheme: IconThemeData(color: AppColors.textPrimary),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh_outlined, size: 20),
@@ -317,17 +319,17 @@ class _StockSummaryScreenState extends State<StockSummaryScreen> {
           // ── Company + Month Selector Header ──────────────────
           Container(
             width: double.infinity,
-            color: Colors.white,
+            color: AppColors.surface,
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   _companyName ?? '',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
-                    color: Colors.black87,
+                    color: AppColors.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -436,12 +438,12 @@ class _StockSummaryScreenState extends State<StockSummaryScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(Icons.inventory_2_outlined,
-                            size: 48, color: Colors.grey[400]),
+                            size: 48, color: AppColors.textSecondary),
                         const SizedBox(height: 12),
                         Text(
                           'No stock items found',
                           style: TextStyle(
-                            color: Colors.grey[500],
+                            color: AppColors.textSecondary,
                             fontSize: 15,
                           ),
                         ),
@@ -451,12 +453,12 @@ class _StockSummaryScreenState extends State<StockSummaryScreen> {
                 : ListView.separated(
                     itemCount: _stockItems.length,
                     separatorBuilder: (_, __) =>
-                        Divider(height: 1, color: Colors.grey[200]),
+                        Divider(height: 1, color: AppColors.divider),
                     itemBuilder: (context, index) {
                       final item = _stockItems[index];
                       final isEven = index % 2 == 0;
                       return Container(
-                        color: isEven ? Colors.white : Colors.grey[50],
+                        color: isEven ? AppColors.surface : AppColors.pillBg,
                         padding: const EdgeInsets.symmetric(
                             horizontal: 16, vertical: 10),
                         child: Row(
@@ -468,10 +470,10 @@ class _StockSummaryScreenState extends State<StockSummaryScreen> {
                                 children: [
                                   Text(
                                     item.itemName,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.w500,
-                                      color: Colors.black87,
+                                      color: AppColors.textPrimary,
                                     ),
                                     maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
@@ -481,7 +483,7 @@ class _StockSummaryScreenState extends State<StockSummaryScreen> {
                                       item.unit,
                                       style: TextStyle(
                                         fontSize: 11,
-                                        color: Colors.grey[500],
+                                        color: AppColors.textSecondary,
                                       ),
                                     ),
                                 ],
@@ -496,7 +498,7 @@ class _StockSummaryScreenState extends State<StockSummaryScreen> {
                                   fontSize: 13,
                                   color: item.closingQty < 0
                                       ? Colors.red[700]
-                                      : Colors.black87,
+                                      : AppColors.textPrimary,
                                 ),
                               ),
                             ),
@@ -505,9 +507,9 @@ class _StockSummaryScreenState extends State<StockSummaryScreen> {
                               child: Text(
                                 _formatAmount(item.closingRate),
                                 textAlign: TextAlign.right,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 13,
-                                  color: Colors.black54,
+                                  color: AppColors.textSecondary,
                                 ),
                               ),
                             ),
