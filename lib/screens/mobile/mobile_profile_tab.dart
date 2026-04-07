@@ -1130,9 +1130,9 @@ class _MobileProfileTabState extends State<MobileProfileTab>
         _divider(),
 
         _actionRow(
-          icon: Icons.dark_mode_rounded,
-          label: 'Theme  ·  ${_themeLabel()}',
-          color: const Color(0xFF6366F1),
+          icon: Icons.brightness_6_rounded,
+          label: 'Theme  ·  ${_themeLabel(themeModeNotifier.value)}',
+          color: AppColors.blue,
           onTap: _showThemePicker,
         ),
         _divider(),
@@ -1279,8 +1279,8 @@ class _MobileProfileTabState extends State<MobileProfileTab>
 
   // ── Theme picker ─────────────────────────────────────────────────────────
 
-  String _themeLabel() {
-    switch (themeModeNotifier.value) {
+  String _themeLabel(ThemeMode mode) {
+    switch (mode) {
       case ThemeMode.light: return 'Light';
       case ThemeMode.dark: return 'Dark';
       case ThemeMode.system: return 'System';
@@ -1289,15 +1289,16 @@ class _MobileProfileTabState extends State<MobileProfileTab>
 
   void _showThemePicker() {
     final options = {
+      'System': ThemeMode.system,
       'Light': ThemeMode.light,
       'Dark': ThemeMode.dark,
-      'System': ThemeMode.system,
     };
     final icons = {
+      'System': Icons.brightness_auto_rounded,
       'Light': Icons.light_mode_rounded,
       'Dark': Icons.dark_mode_rounded,
-      'System': Icons.settings_suggest_rounded,
     };
+
     showModalBottomSheet(
       context: context,
       backgroundColor: AppColors.surface,
@@ -1314,11 +1315,7 @@ class _MobileProfileTabState extends State<MobileProfileTab>
               children: [
                 Text(
                   'Theme',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
-                  ),
+                  style: AppTypography.pageTitle,
                 ),
                 const SizedBox(height: 16),
                 ...options.entries.map((entry) {
@@ -1337,12 +1334,12 @@ class _MobileProfileTabState extends State<MobileProfileTab>
                       margin: const EdgeInsets.only(bottom: 8),
                       decoration: BoxDecoration(
                         color: isSelected
-                            ? const Color(0xFF6366F1).withValues(alpha: 0.08)
+                            ? AppColors.blue.withValues(alpha: 0.08)
                             : AppColors.pillBg,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: isSelected
-                              ? const Color(0xFF6366F1)
+                              ? AppColors.blue
                               : AppColors.divider,
                           width: isSelected ? 1.5 : 1,
                         ),
@@ -1351,9 +1348,9 @@ class _MobileProfileTabState extends State<MobileProfileTab>
                         children: [
                           Icon(
                             icons[entry.key],
-                            size: 22,
+                            size: 20,
                             color: isSelected
-                                ? const Color(0xFF6366F1)
+                                ? AppColors.blue
                                 : AppColors.textSecondary,
                           ),
                           const SizedBox(width: 12),
@@ -1365,14 +1362,14 @@ class _MobileProfileTabState extends State<MobileProfileTab>
                                 fontWeight:
                                     isSelected ? FontWeight.w700 : FontWeight.w500,
                                 color: isSelected
-                                    ? const Color(0xFF6366F1)
+                                    ? AppColors.blue
                                     : AppColors.textPrimary,
                               ),
                             ),
                           ),
                           if (isSelected)
-                            const Icon(Icons.check_circle,
-                                color: Color(0xFF6366F1), size: 22),
+                            Icon(Icons.check_circle,
+                                size: 20, color: AppColors.blue),
                         ],
                       ),
                     ),

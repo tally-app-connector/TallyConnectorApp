@@ -57,7 +57,11 @@ class ReportMetricCard extends StatelessWidget {
               textBaseline: TextBaseline.alphabetic,
               children: [
                 Flexible(
-                  child: Text(value, style: AppTypography.cardValue, overflow: TextOverflow.ellipsis),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.bottomLeft,
+                    child: Text(value, style: AppTypography.cardValue),
+                  ),
                 ),
                 if (unit.isNotEmpty) ...[
                   const SizedBox(width: 4),

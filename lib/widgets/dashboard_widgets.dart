@@ -64,13 +64,26 @@ class MetricCard extends StatelessWidget {
               textBaseline: TextBaseline.alphabetic,
               children: [
                 Flexible(
-                  child: Text(value, style: AppTypography.cardValue, overflow: TextOverflow.ellipsis),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.bottomLeft,
+                    child: Text(value, style: AppTypography.cardValue),
+                  ),
                 ),
                 if (unit.isNotEmpty) ...[
                   const SizedBox(width: 4),
                   Text(unit, style: AppTypography.cardUnit),
                 ],
               ],
+            ),
+            // Arrow indicator
+            Align(
+              alignment: Alignment.centerRight,
+              child: Icon(
+                Icons.chevron_right,
+                size: 18,
+                color: AppColors.textSecondary,
+              ),
             ),
           ],
         ),
@@ -154,26 +167,30 @@ class RevenueBreakdown extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Revenue Breakdown', style: AppTypography.cardLabel),
+          Text('Revenue Breakdown', style: AppTypography.chartSectionTitle),
           const SizedBox(height: 16),
-          _row('Revenue', revenue, AppColors.green),
+          _row('Revenue', revenue, AppColors.green, false),
           const SizedBox(height: 10),
-          _row('Expenses', expenses, AppColors.red),
+          _row('Expenses', expenses, AppColors.red, false),
           const Divider(height: 24),
-          _row('Net Profit', net, AppColors.green),
+          _row('Net Profit', net, AppColors.green, true),
         ],
       ),
     );
   }
 
-  Widget _row(String label, String value, Color color) {
+  Widget _row(String label, String value, Color color, bool isBold) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
+        Text(label, style: TextStyle(
+          fontSize: 13,
+          color: AppColors.textSecondary,
+          fontWeight: isBold ? FontWeight.w700 : FontWeight.normal,
+        )),
         Text(
           value,
-          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: color),
+          style: TextStyle(fontSize: 14, fontWeight: isBold ? FontWeight.w700 : FontWeight.w600, color: color),
         ),
       ],
     );
@@ -299,7 +316,7 @@ class KpiSection extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(20, 16, 12, 0),
             child: Row(
               children: [
-                Text('Key Metrics', style: AppTypography.cardLabel),
+                Text('Key Metrics', style: AppTypography.chartSectionTitle),
                 const Spacer(),
                 if (onEditTap != null)
                   IconButton(

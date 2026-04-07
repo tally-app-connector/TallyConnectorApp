@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
 import '../home/home_screen.dart';
+import '../theme/app_theme.dart';
 import '../../utils/message_helper.dart';
 
 class EmailVerificationScreen extends StatefulWidget {
@@ -32,7 +33,10 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
+        backgroundColor: AppColors.background,
+        foregroundColor: AppColors.textPrimary,
         title: const Text('Verify Email'),
       ),
       body: SafeArea(
@@ -46,7 +50,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                 Icon(
                   Icons.mark_email_unread,
                   size: 100,
-                  color: Colors.blue.shade700,
+                  color: AppColors.blue, // old: Colors.blue.shade700
                 ),
                 const SizedBox(height: 32),
 
@@ -56,7 +60,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                   style: TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.bold,
-                    color: Colors.blue.shade700,
+                    color: AppColors.blue, // old: Colors.blue.shade700
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -67,7 +71,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                   'We\'ve sent a verification link to:',
                   style: TextStyle(
                     fontSize: 16,
-                    color: Colors.grey.shade700,
+                    color: AppColors.textSecondary, // old: Colors.grey.shade700
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -79,7 +83,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: Colors.blue.shade700,
+                    color: AppColors.blue, // old: Colors.blue.shade700
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -116,7 +120,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                           'Tip: Check your spam folder if you don\'t see the email',
                           style: TextStyle(
                             fontSize: 12,
-                            color: Colors.grey.shade600,
+                            color: AppColors.textSecondary, // old: Colors.grey.shade600
                             fontStyle: FontStyle.italic,
                           ),
                         ),

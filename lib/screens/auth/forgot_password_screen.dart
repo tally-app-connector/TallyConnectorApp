@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
 import '../../utils/validators.dart';
 import '../../widgets/custom_text_field.dart';
+import '../theme/app_theme.dart';
 import 'reset_password_screen.dart';
 import '../../utils/message_helper.dart';
 
@@ -56,7 +57,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
+        backgroundColor: AppColors.background,
+        foregroundColor: AppColors.textPrimary,
         title: const Text('Forgot Password'),
       ),
       body: SafeArea(
@@ -73,7 +77,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   Icon(
                     Icons.lock_reset,
                     size: 80,
-                    color: Colors.blue.shade700,
+                    color: AppColors.blue, // old: Colors.blue.shade700
                   ),
                   const SizedBox(height: 16),
 
@@ -84,7 +88,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     style: TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.bold,
-                      color: Colors.blue.shade700,
+                      color: AppColors.blue, // old: Colors.blue.shade700
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -93,7 +97,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 14,
-                      color: Colors.grey.shade600,
+                      color: AppColors.textSecondary, // old: Colors.grey.shade600
                     ),
                   ),
                   const SizedBox(height: 32),

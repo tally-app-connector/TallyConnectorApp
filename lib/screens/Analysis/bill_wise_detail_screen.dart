@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../database/database_helper.dart';
 import '../../services/queries/query_service.dart';
+import '../theme/app_theme.dart';
 
 class BillWiseDetailScreen extends StatefulWidget {
   final String companyGuid;
@@ -65,10 +66,25 @@ class _BillWiseDetailScreenState extends State<BillWiseDetailScreen> {
 }
 
   String _formatCurrency(double amount) {
-    return '₹${amount.abs().toStringAsFixed(2).replaceAllMapped(
-      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-      (Match m) => '${m[1]},',
-    )}';
+    final parts = amount.abs().toStringAsFixed(2).split('.');
+    final intPart = parts[0];
+    final decPart = parts[1];
+    // Indian numbering: last 3 digits, then groups of 2
+    String formatted;
+    if (intPart.length <= 3) {
+      formatted = intPart;
+    } else {
+      final last3 = intPart.substring(intPart.length - 3);
+      String rest = intPart.substring(0, intPart.length - 3);
+      final buffer = StringBuffer();
+      while (rest.length > 2) {
+        buffer.write('${rest.substring(0, rest.length - 2)},');
+        rest = rest.substring(rest.length - 2);
+      }
+      if (rest.isNotEmpty) buffer.write('$rest,');
+      formatted = '$buffer$last3';
+    }
+    return '₹$formatted.$decPart';
   }
 
   String _parseTallyDate(String tallyDate) {
@@ -89,15 +105,17 @@ class _BillWiseDetailScreenState extends State<BillWiseDetailScreen> {
     }
 
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: AppColors.background, // old: Colors.grey[100]
       appBar: AppBar(
+        backgroundColor: AppColors.surface, // old: default
+        foregroundColor: AppColors.textPrimary, // old: default
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(widget.ledgerName, style: TextStyle(fontSize: 18)),
+            Text(widget.ledgerName, style: TextStyle(fontSize: 18, color: AppColors.textPrimary)),
             Text(
               'Bill-Wise Outstanding',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.normal),
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.normal, color: AppColors.textSecondary),
             ),
           ],
         ),
@@ -109,20 +127,20 @@ class _BillWiseDetailScreenState extends State<BillWiseDetailScreen> {
             margin: EdgeInsets.all(16),
             padding: EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.blue[50],
+              color: AppColors.iconBgBlue, // old: Colors.blue[50]
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.blue[200]!),
+              border: Border.all(color: AppColors.blue.withOpacity(0.3)), // old: Colors.blue[200]
             ),
             child: Row(
               children: [
-                Icon(Icons.calendar_today, color: Colors.blue[700], size: 20),
+                Icon(Icons.calendar_today, color: AppColors.blue, size: 20), // old: Colors.blue[700]
                 SizedBox(width: 12),
                 Text(
                   '${DateFormat('dd MMM yyyy').format(widget.selectedFromDate)} - ${DateFormat('dd MMM yyyy').format(widget.selectedToDate)}',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: Colors.blue[900],
+                    color: AppColors.textPrimary, // old: Colors.blue[900]
                   ),
                 ),
               ],
@@ -132,7 +150,7 @@ class _BillWiseDetailScreenState extends State<BillWiseDetailScreen> {
           // Total Outstanding Card
           Container(
             margin: EdgeInsets.symmetric(horizontal: 16),
-            padding: EdgeInsets.all(20),
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: widget.ledgerType == 'Receivables'
@@ -149,47 +167,58 @@ class _BillWiseDetailScreenState extends State<BillWiseDetailScreen> {
                 ),
               ],
             ),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.receipt_long, color: Colors.white, size: 32),
-                SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Total Outstanding',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.white.withOpacity(0.9),
-                          fontWeight: FontWeight.w500,
-                        ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Total Outstanding',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.white.withOpacity(0.9),
+                        fontWeight: FontWeight.w500,
                       ),
-                      SizedBox(height: 4),
-                      Text(
-                        _formatCurrency(_totalOutstanding),
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    '${_bills.length} Bills',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
                     ),
-                  ),
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Text(
+                        '${_bills.length} Bills',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 6),
+                Row(
+                  children: [
+                    Icon(Icons.receipt_long, color: Colors.white, size: 24),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          _formatCurrency(_totalOutstanding),
+                          maxLines: 1,
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -204,13 +233,13 @@ class _BillWiseDetailScreenState extends State<BillWiseDetailScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.receipt, size: 64, color: Colors.grey[400]),
+                        Icon(Icons.receipt, size: 64, color: AppColors.textSecondary), // old: Colors.grey[400]
                         SizedBox(height: 16),
                         Text(
                           'No pending bills',
                           style: TextStyle(
                             fontSize: 16,
-                            color: Colors.grey[600],
+                            color: AppColors.textSecondary, // old: Colors.grey[600]
                           ),
                         ),
                       ],
@@ -237,6 +266,7 @@ class _BillWiseDetailScreenState extends State<BillWiseDetailScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
                                   Expanded(
@@ -248,7 +278,7 @@ class _BillWiseDetailScreenState extends State<BillWiseDetailScreen> {
                                           style: TextStyle(
                                             fontSize: 16,
                                             fontWeight: FontWeight.bold,
-                                            color: Colors.black87,
+                                            color: AppColors.textPrimary, // old: Colors.black87
                                           ),
                                         ),
                                         SizedBox(height: 4),
@@ -256,20 +286,27 @@ class _BillWiseDetailScreenState extends State<BillWiseDetailScreen> {
                                           _parseTallyDate(bill['bill_date'] as String),
                                           style: TextStyle(
                                             fontSize: 12,
-                                            color: Colors.grey[600],
+                                            color: AppColors.textSecondary, // old: Colors.grey[600]
                                           ),
                                         ),
                                       ],
                                     ),
                                   ),
-                                  Text(
-                                    _formatCurrency(outstanding),
-                                    style: TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.bold,
-                                      color: outstanding >= 0
-                                          ? Colors.green[700]
-                                          : Colors.red[700],
+                                  Flexible(
+                                    child: FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      alignment: Alignment.centerRight,
+                                      child: Text(
+                                        _formatCurrency(outstanding),
+                                        maxLines: 1,
+                                        style: TextStyle(
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.bold,
+                                          color: outstanding >= 0
+                                              ? AppColors.green // old: Colors.green[700]
+                                              : AppColors.red,  // old: Colors.red[700]
+                                        ),
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -287,16 +324,21 @@ class _BillWiseDetailScreenState extends State<BillWiseDetailScreen> {
                                           'Bill Amount',
                                           style: TextStyle(
                                             fontSize: 12,
-                                            color: Colors.grey[600],
+                                            color: AppColors.textSecondary, // old: Colors.grey[600]
                                           ),
                                         ),
-                                        SizedBox(height: 4),
-                                        Text(
-                                          _formatCurrency(billAmount),
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w600,
-                                            color: Colors.black87,
+                                        const SizedBox(height: 4),
+                                        FittedBox(
+                                          fit: BoxFit.scaleDown,
+                                          alignment: Alignment.centerLeft,
+                                          child: Text(
+                                            _formatCurrency(billAmount),
+                                            maxLines: 1,
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w600,
+                                              color: AppColors.textPrimary, // old: Colors.black87
+                                            ),
                                           ),
                                         ),
                                       ],
@@ -310,16 +352,21 @@ class _BillWiseDetailScreenState extends State<BillWiseDetailScreen> {
                                           'Paid',
                                           style: TextStyle(
                                             fontSize: 12,
-                                            color: Colors.grey[600],
+                                            color: AppColors.textSecondary, // old: Colors.grey[600]
                                           ),
                                         ),
-                                        SizedBox(height: 4),
-                                        Text(
-                                          _formatCurrency(paymentAmount),
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w600,
-                                            color: Colors.black87,
+                                        const SizedBox(height: 4),
+                                        FittedBox(
+                                          fit: BoxFit.scaleDown,
+                                          alignment: Alignment.centerLeft,
+                                          child: Text(
+                                            _formatCurrency(paymentAmount),
+                                            maxLines: 1,
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w600,
+                                              color: AppColors.textPrimary, // old: Colors.black87
+                                            ),
                                           ),
                                         ),
                                       ],
@@ -331,14 +378,14 @@ class _BillWiseDetailScreenState extends State<BillWiseDetailScreen> {
                                       vertical: 6,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: Colors.blue[50],
+                                      color: AppColors.iconBgBlue, // old: Colors.blue[50]
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                     child: Text(
                                       '${bill['payment_count']} payments',
                                       style: TextStyle(
                                         fontSize: 11,
-                                        color: Colors.blue[700],
+                                        color: AppColors.blue, // old: Colors.blue[700]
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),

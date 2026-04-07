@@ -3,6 +3,7 @@ import '../../services/auth_service.dart';
 import '../../utils/validators.dart';
 import '../../utils/message_helper.dart';
 import '../../widgets/custom_text_field.dart';
+import '../theme/app_theme.dart';
 import 'email_verification_screen.dart';
 import 'otp_verification_screen.dart';
 import '../home/home_screen.dart';
@@ -78,7 +79,7 @@ class _SignupScreenState extends State<SignupScreen> {
       builder: (dialogContext) => AlertDialog(
         title: Row(
           children: [
-            Icon(Icons.verified_user, color: Colors.blue.shade700),
+            Icon(Icons.verified_user, color: AppColors.blue), // old: Colors.blue.shade700
             const SizedBox(width: 8),
             const Text('Verify Your Email'),
           ],
@@ -194,7 +195,7 @@ class _SignupScreenState extends State<SignupScreen> {
   }) {
     return Row(
       children: [
-        Icon(icon, color: Colors.blue.shade700),
+        Icon(icon, color: AppColors.blue), // old: Colors.blue.shade700
         const SizedBox(width: 12),
         Expanded(
           child: Column(
@@ -211,7 +212,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 description,
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.grey.shade600,
+                  color: AppColors.textSecondary, // old: Colors.grey.shade600
                 ),
               ),
             ],
@@ -224,7 +225,10 @@ class _SignupScreenState extends State<SignupScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.background, // old: default
       appBar: AppBar(
+        backgroundColor: AppColors.background, // old: default
+        foregroundColor: AppColors.textPrimary, // old: default
         title: const Text('Create Account'),
       ),
       body: SafeArea(
@@ -239,7 +243,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 Icon(
                   Icons.person_add_alt_1,
                   size: 80,
-                  color: Colors.blue.shade700,
+                  color: AppColors.blue, // old: Colors.blue.shade700
                 ),
                 const SizedBox(height: 16),
 
@@ -250,7 +254,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   style: TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.bold,
-                    color: Colors.blue.shade700,
+                    color: AppColors.blue, // old: Colors.blue.shade700
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -259,7 +263,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 14,
-                    color: Colors.grey.shade600,
+                    color: AppColors.textSecondary, // old: Colors.grey.shade600
                   ),
                 ),
                 const SizedBox(height: 32),

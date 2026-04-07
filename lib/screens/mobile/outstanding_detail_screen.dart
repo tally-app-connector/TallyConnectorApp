@@ -2455,7 +2455,7 @@ class _OutstandingDetailScreenState extends State<OutstandingDetailScreen> {
   void _showShareOptions() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.surface, // old: Colors.white
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -2472,7 +2472,7 @@ class _OutstandingDetailScreenState extends State<OutstandingDetailScreen> {
                   height: 4,
                   margin: const EdgeInsets.only(bottom: 16),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFD1D5DB),
+                    color: AppColors.divider, // old: Color(0xFFD1D5DB)
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -2498,7 +2498,7 @@ class _OutstandingDetailScreenState extends State<OutstandingDetailScreen> {
                 thickness: 0.5,
                 indent: 20,
                 endIndent: 20,
-                color: Colors.grey.shade300,
+                color: AppColors.divider, // old: Colors.grey.shade300
               ),
               ListTile(
                 leading:
@@ -2977,6 +2977,18 @@ class _OutstandingDetailScreenState extends State<OutstandingDetailScreen> {
         return 'Pie';
       case ReportChartType.horizontalBar:
         return 'H-Bar';
+      case ReportChartType.scatter:
+        return 'Scatter';
+      case ReportChartType.stepLine:
+        return 'Step';
+      case ReportChartType.rangeLine:
+        return 'Range';
+      case ReportChartType.gradientBar:
+        return 'Gradient';
+      case ReportChartType.lollipop:
+        return 'Lollipop';
+      case ReportChartType.candlestick:
+        return 'Candle';
     }
   }
 

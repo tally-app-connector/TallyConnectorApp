@@ -234,19 +234,58 @@ class SalesPurchaseProfitBarChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final maxVal = [data.revenue, data.expense, data.profit.abs()].reduce((a, b) => a > b ? a : b);
-    if (maxVal == 0) return const SizedBox(height: 120);
-
-    return SizedBox(
-      height: 160,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        crossAxisAlignment: CrossAxisAlignment.end,
+    if (maxVal == 0) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _bar('Revenue', data.revenue, maxVal, AppColors.blue),
-          _bar('Expense', data.expense, maxVal, AppColors.red),
-          _bar('Profit', data.profit, maxVal, data.profit >= 0 ? AppColors.green : AppColors.amber),
+          Text('Revenue vs Expense vs Profit', style: AppTypography.chartSectionTitle),
+          const SizedBox(height: 40),
+          Center(child: Text('No data for selected period', style: TextStyle(fontSize: 13, color: AppColors.textSecondary))),
+          const SizedBox(height: 40),
         ],
-      ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Revenue vs Expense vs Profit', style: AppTypography.chartSectionTitle),
+        const SizedBox(height: 14),
+        SizedBox(
+          height: 160,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              _bar('Revenue', data.revenue, maxVal, AppColors.blue),
+              _bar('Expense', data.expense, maxVal, AppColors.red),
+              _bar('Profit', data.profit, maxVal, data.profit >= 0 ? AppColors.green : AppColors.amber),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _legendDot(AppColors.blue, 'Revenue'),
+            const SizedBox(width: 16),
+            _legendDot(AppColors.red, 'Expense'),
+            const SizedBox(width: 16),
+            _legendDot(data.profit >= 0 ? AppColors.green : AppColors.amber, 'Profit'),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _legendDot(Color color, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+        const SizedBox(width: 4),
+        Text(label, style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+      ],
     );
   }
 
@@ -368,33 +407,96 @@ class SalesPurchaseProfitGauges extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final total = data.revenue + data.expense;
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+    final revenue = data.revenue.abs();
+    final expense = data.expense.abs();
+    final profit = data.profit;
+    final maxVal = [revenue, expense, profit.abs()].reduce((a, b) => a > b ? a : b);
+    final marginPct = revenue > 0 ? (profit / revenue * 100) : 0.0;
+
+    if (maxVal == 0) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Profit Margin Overview', style: AppTypography.chartSectionTitle),
+          const SizedBox(height: 40),
+          Center(child: Text('No data for selected period', style: TextStyle(fontSize: 13, color: AppColors.textSecondary))),
+          const SizedBox(height: 40),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _gauge('Revenue', data.revenue, total, AppColors.green),
-        _gauge('Expense', data.expense, total, AppColors.red),
-        _gauge('Margin', total > 0 ? (data.profit / data.revenue * 100) : 0, 100, AppColors.blue),
+        Text('Profit Margin Overview', style: AppTypography.chartSectionTitle),
+        const SizedBox(height: 14),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            _gauge('Revenue', revenue, maxVal, AppColors.green,
+                AmountFormatter.shortSpaced(revenue)),
+            _gauge('Expense', expense, maxVal, AppColors.red,
+                AmountFormatter.shortSpaced(expense)),
+            _gauge('Margin', marginPct.abs(), 100, AppColors.blue,
+                '${marginPct.toStringAsFixed(1)}%'),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _legendDot(AppColors.green, 'Revenue'),
+            const SizedBox(width: 16),
+            _legendDot(AppColors.red, 'Expense'),
+            const SizedBox(width: 16),
+            _legendDot(AppColors.blue, 'Margin'),
+          ],
+        ),
       ],
     );
   }
 
-  Widget _gauge(String label, double value, double max, Color color) {
+  Widget _legendDot(Color color, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+        const SizedBox(width: 4),
+        Text(label, style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+      ],
+    );
+  }
+
+  Widget _gauge(String label, double value, double max, Color color, String displayText) {
     final pct = max > 0 ? (value / max).clamp(0.0, 1.0) : 0.0;
     return Column(
       children: [
         SizedBox(
-          width: 60,
-          height: 60,
-          child: CircularProgressIndicator(
-            value: pct,
-            strokeWidth: 6,
-            backgroundColor: AppColors.divider,
-            valueColor: AlwaysStoppedAnimation(color),
+          width: 64,
+          height: 64,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              SizedBox(
+                width: 64,
+                height: 64,
+                child: CircularProgressIndicator(
+                  value: pct,
+                  strokeWidth: 6,
+                  backgroundColor: AppColors.divider,
+                  valueColor: AlwaysStoppedAnimation(color),
+                  strokeCap: StrokeCap.round,
+                ),
+              ),
+              Text(
+                '${(pct * 100).toStringAsFixed(0)}%',
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 8),
-        Text(AmountFormatter.shortSpaced(value),
+        Text(displayText,
             style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color)),
         Text(label, style: TextStyle(fontSize: 10, color: AppColors.textSecondary)),
       ],

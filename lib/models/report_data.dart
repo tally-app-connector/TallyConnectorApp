@@ -112,7 +112,7 @@ class ReportValue {
 // ─────────────────────────────────────────────
 //  CHART TYPES
 // ─────────────────────────────────────────────
-enum ReportChartType { bar, line, area, pie, horizontalBar }
+enum ReportChartType { bar, line, area, pie, horizontalBar, scatter, stepLine, rangeLine, gradientBar, lollipop, candlestick }
 
 // ─────────────────────────────────────────────
 //  CHART DATA

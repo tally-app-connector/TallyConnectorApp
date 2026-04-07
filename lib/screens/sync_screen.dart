@@ -1332,32 +1332,35 @@ import '../database/database_helper.dart';
 import '../services/cloud_to_local_sync_service.dart';
 import '../utils/secure_storage.dart';
 import '../models/user_model.dart';
+import '../models/company_model.dart';
+import 'main.dart';
+import 'theme/app_theme.dart';
 
 // ============================================
 // LIGHT MODE COLOR PALETTE
 // ============================================
 class _Colors {
-  static const background      = Color(0xFFF5F7FA);
-  static const surface         = Color(0xFFFFFFFF);
-  static const surfaceElevated = Color(0xFFF0F4FF);
-  static const border          = Color(0xFFE2E8F0);
-  static const borderAccent    = Color(0xFFBFD0F0);
-  static const primary         = Color(0xFF2563EB);
-  static const primaryLight    = Color(0xFFEFF6FF);
-  static const primaryMid      = Color(0xFFBFDBFE);
-  static const accent          = Color(0xFF7C3AED);
-  static const accentLight     = Color(0xFFF5F3FF);
-  static const success         = Color(0xFF16A34A);
-  static const successLight    = Color(0xFFF0FDF4);
-  static const successMid      = Color(0xFFBBF7D0);
-  static const warning         = Color(0xFFD97706);
-  static const warningLight    = Color(0xFFFFFBEB);
-  static const error           = Color(0xFFDC2626);
-  static const errorLight      = Color(0xFFFEF2F2);
-  static const textPrimary     = Color(0xFF0F172A);
-  static const textSecondary   = Color(0xFF475569);
-  static const textMuted       = Color(0xFF94A3B8);
-  static const textDisabled    = Color(0xFFCBD5E1);
+  static Color get background      => AppColors.background;
+  static Color get surface         => AppColors.surface;
+  static Color get surfaceElevated => AppColors.iconBgBlue;
+  static Color get border          => AppColors.divider;
+  static const borderAccent = Color(0xFFBFD0F0);
+  static const primary = Color(0xFF2563EB);
+  static Color get primaryLight    => AppColors.iconBgBlue;
+  static const primaryMid = Color(0xFFBFDBFE);
+  static const accent = Color(0xFF7C3AED);
+  static Color get accentLight     => AppColors.iconBgPurple;
+  static const success = Color(0xFF16A34A);
+  static Color get successLight    => AppColors.iconBgGreen;
+  static const successMid = Color(0xFFBBF7D0);
+  static const warning = Color(0xFFD97706);
+  static Color get warningLight    => AppColors.iconBgAmber;
+  static const error = Color(0xFFDC2626);
+  static Color get errorLight      => AppColors.iconBgRed;
+  static Color get textPrimary     => AppColors.textPrimary;
+  static Color get textSecondary   => AppColors.textSecondary;
+  static Color get textMuted       => AppColors.textSecondary;
+  static Color get textDisabled    => AppColors.divider;
 }
 
 class SyncScreen extends StatefulWidget {
@@ -1418,7 +1421,10 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
   // LOAD CLOUD COMPANIES (for full/incremental sync)
   // ============================================
   Future<void> _loadCompanies() async {
-    setState(() { _loadingCompanies = true; _loadError = null; });
+    setState(() {
+      _loadingCompanies = true;
+      _loadError = null;
+    });
     try {
       String? userId;
       final userData = await SecureStorage.getUser();
@@ -1429,17 +1435,22 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
       final companies = await CloudToLocalSyncService.instance
           .fetchCompaniesFromCloud(userId: userId);
       setState(() {
-        _companies = companies.map((c) => CompanyItem(
-          guid:  c['company_guid']  ?? '',
-          name:  c['company_name']  ?? '',
-          gstin: c['gsttin']        ?? '',
-          state: c['state']         ?? '',
-          city:  c['city']          ?? '',
-        )).toList();
+        _companies = companies
+            .map((c) => CompanyItem(
+                  guid: c['company_guid'] ?? '',
+                  name: c['company_name'] ?? '',
+                  gstin: c['gsttin'] ?? '',
+                  state: c['state'] ?? '',
+                  city: c['city'] ?? '',
+                ))
+            .toList();
         _loadingCompanies = false;
       });
     } catch (e) {
-      setState(() { _loadError = e.toString(); _loadingCompanies = false; });
+      setState(() {
+        _loadError = e.toString();
+        _loadingCompanies = false;
+      });
     }
   }
 
@@ -1447,7 +1458,9 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
   // LOAD LOCAL COMPANIES (already saved in SQLite)
   // ============================================
   Future<void> _loadLocalCompanies() async {
-    setState(() { _loadingLocalCompanies = true; });
+    setState(() {
+      _loadingLocalCompanies = true;
+    });
     try {
       _currentActiveGuid = await SecureStorage.getSelectedCompanyGuid();
       final db = await DatabaseHelper.instance.database;
@@ -1459,17 +1472,21 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
         orderBy: 'company_name ASC',
       );
       setState(() {
-        _localCompanies = rows.map((r) => CompanyItem(
-          guid:  r['company_guid']  as String? ?? '',
-          name:  r['company_name']  as String? ?? '',
-          gstin: r['gsttin']        as String? ?? '',
-          state: r['state']         as String? ?? '',
-          city:  r['city']          as String? ?? '',
-        )).toList();
+        _localCompanies = rows
+            .map((r) => CompanyItem(
+                  guid: r['company_guid'] as String? ?? '',
+                  name: r['company_name'] as String? ?? '',
+                  gstin: r['gsttin'] as String? ?? '',
+                  state: r['state'] as String? ?? '',
+                  city: r['city'] as String? ?? '',
+                ))
+            .toList();
         _loadingLocalCompanies = false;
       });
     } catch (e) {
-      setState(() { _loadingLocalCompanies = false; });
+      setState(() {
+        _loadingLocalCompanies = false;
+      });
     }
   }
 
@@ -1481,8 +1498,8 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
   // ============================================
   Future<void> _quickSyncCompanies() async {
     setState(() {
-      _quickSyncing    = true;
-      _quickSyncError  = null;
+      _quickSyncing = true;
+      _quickSyncError = null;
     });
     try {
       String? userId;
@@ -1500,7 +1517,7 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
 
       if (cloudCompanies.isEmpty) {
         setState(() {
-          _quickSyncing   = false;
+          _quickSyncing = false;
           _quickSyncError = 'No companies found for your account in cloud.';
         });
         return;
@@ -1508,14 +1525,15 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
 
       // Save each company locally using the same safe upsert logic
       for (final c in cloudCompanies) {
-        await CloudToLocalSyncService.instance
-            .upsertCompanyLocal(db, c);
+        await CloudToLocalSyncService.instance.upsertCompanyLocal(db, c);
       }
 
       // Reload local list to reflect new data
       await _loadLocalCompanies();
 
-      setState(() { _quickSyncing = false; });
+      setState(() {
+        _quickSyncing = false;
+      });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1525,13 +1543,14 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
             ),
             backgroundColor: _Colors.success,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
         );
       }
     } catch (e) {
       setState(() {
-        _quickSyncing   = false;
+        _quickSyncing = false;
         _quickSyncError = e.toString();
       });
     }
@@ -1542,7 +1561,9 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
   // ============================================
   Future<void> _setActiveCompany(String guid) async {
     await SecureStorage.saveCompanyGuid(guid);
-    setState(() { _currentActiveGuid = guid; });
+    setState(() {
+      _currentActiveGuid = guid;
+    });
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -1550,7 +1571,8 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
           backgroundColor: _Colors.primary,
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 2),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
       );
     }
@@ -1563,10 +1585,10 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
     final selected = _companies.where((c) => c.selected).toList();
     if (selected.isEmpty) return;
     setState(() {
-      _phase        = 'syncing';
+      _phase = 'syncing';
       _syncProgress = 0;
-      _currentStep  = -1;
-      _syncSteps    = _buildSyncSteps();
+      _currentStep = -1;
+      _syncSteps = _buildSyncSteps();
     });
     final stopwatch = Stopwatch()..start();
     final localDb = await DatabaseHelper.instance.database;
@@ -1574,7 +1596,8 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
       try {
         final result = _syncType == 'full'
             ? await CloudToLocalSyncService.instance.fullSync(
-                localDb, company.guid,
+                localDb,
+                company.guid,
                 onProgress: (status, progress) {
                   setState(() {
                     print('$status $progress');
@@ -1585,7 +1608,8 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
                 },
               )
             : await CloudToLocalSyncService.instance.incrementalSync(
-                localDb, company.guid,
+                localDb,
+                company.guid,
                 onProgress: (status, progress) {
                   setState(() {
                     _syncStatus = status;
@@ -1596,7 +1620,10 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
               );
         _syncResult = result;
       } catch (e) {
-        setState(() { _phase = 'error'; _syncStatus = 'Error: $e'; });
+        setState(() {
+          _phase = 'error';
+          _syncStatus = 'Error: $e';
+        });
         return;
       }
     }
@@ -1605,9 +1632,31 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
     if ((currentGuid == null || currentGuid.isEmpty) && selected.isNotEmpty) {
       await SecureStorage.saveCompanyGuid(selected.first.guid);
     }
+
+    // Update in-memory AppState so screens don't show "Select Company"
+    try {
+      final db = await DatabaseHelper.instance.database;
+      final companyMaps = await db.query('companies');
+      final companies = companyMaps.map((m) => Company.fromMap(m)).toList();
+      AppState.companies = companies;
+
+      final savedGuid = await SecureStorage.getSelectedCompanyGuid();
+      if (savedGuid != null && savedGuid.isNotEmpty) {
+        final match = companies.where((c) => c.guid == savedGuid);
+        AppState.selectedCompany = match.isNotEmpty
+            ? match.first
+            : (companies.isNotEmpty ? companies.first : null);
+      } else if (companies.isNotEmpty) {
+        AppState.selectedCompany = companies.first;
+      }
+    } catch (e) {
+      debugPrint('Error updating AppState after sync: $e');
+    }
+
     setState(() {
-      _syncTime = '${(stopwatch.elapsedMilliseconds / 1000).toStringAsFixed(1)}s';
-      _phase    = 'complete';
+      _syncTime =
+          '${(stopwatch.elapsedMilliseconds / 1000).toStringAsFixed(1)}s';
+      _phase = 'complete';
     });
   }
 
@@ -1627,26 +1676,54 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
   }
 
   List<SyncStep> _buildSyncSteps() => [
-    SyncStep(name: 'Company Info',      icon: Icons.business_outlined,               table: 'companies'),
-    SyncStep(name: 'Account Groups',    icon: Icons.folder_outlined,                 table: 'groups'),
-    SyncStep(name: 'Voucher Types',     icon: Icons.receipt_long_outlined,           table: 'voucher_types'),
-    SyncStep(name: 'Ledgers',           icon: Icons.menu_book_outlined,              table: 'ledgers'),
-    SyncStep(name: 'Stock Items',       icon: Icons.inventory_2_outlined,            table: 'stock_items'),
-    SyncStep(name: 'Vouchers',          icon: Icons.description_outlined,            table: 'vouchers'),
-    SyncStep(name: 'Ledger Entries',    icon: Icons.account_balance_wallet_outlined, table: 'ledger_entries'),
-    SyncStep(name: 'Inventory Entries', icon: Icons.bar_chart_outlined,              table: 'inventory_entries'),
-    SyncStep(name: 'Batch Allocations', icon: Icons.label_outlined,                  table: 'batch_allocs'),
-    SyncStep(name: 'Closing Balances',  icon: Icons.trending_up_outlined,            table: 'closing_balances'),
-  ];
+        SyncStep(
+            name: 'Company Info',
+            icon: Icons.business_outlined,
+            table: 'companies'),
+        SyncStep(
+            name: 'Account Groups',
+            icon: Icons.folder_outlined,
+            table: 'groups'),
+        SyncStep(
+            name: 'Voucher Types',
+            icon: Icons.receipt_long_outlined,
+            table: 'voucher_types'),
+        SyncStep(
+            name: 'Ledgers', icon: Icons.menu_book_outlined, table: 'ledgers'),
+        SyncStep(
+            name: 'Stock Items',
+            icon: Icons.inventory_2_outlined,
+            table: 'stock_items'),
+        SyncStep(
+            name: 'Vouchers',
+            icon: Icons.description_outlined,
+            table: 'vouchers'),
+        SyncStep(
+            name: 'Ledger Entries',
+            icon: Icons.account_balance_wallet_outlined,
+            table: 'ledger_entries'),
+        SyncStep(
+            name: 'Inventory Entries',
+            icon: Icons.bar_chart_outlined,
+            table: 'inventory_entries'),
+        SyncStep(
+            name: 'Batch Allocations',
+            icon: Icons.label_outlined,
+            table: 'batch_allocs'),
+        SyncStep(
+            name: 'Closing Balances',
+            icon: Icons.trending_up_outlined,
+            table: 'closing_balances'),
+      ];
 
   void _resetSync() {
     setState(() {
-      _phase        = 'select';
+      _phase = 'select';
       _syncProgress = 0;
-      _syncStatus   = '';
-      _syncSteps    = [];
-      _currentStep  = -1;
-      _syncResult   = null;
+      _syncStatus = '';
+      _syncSteps = [];
+      _currentStep = -1;
+      _syncResult = null;
     });
   }
 
@@ -1655,7 +1732,11 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
       setState(() => _companies[index].selected = !_companies[index].selected);
   void _selectAll() {
     final allSelected = _companies.every((c) => c.selected);
-    setState(() { for (var c in _companies) { c.selected = !allSelected; } });
+    setState(() {
+      for (var c in _companies) {
+        c.selected = !allSelected;
+      }
+    });
   }
 
   // ============================================
@@ -1689,10 +1770,22 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
     String title;
     Color titleColor;
     switch (_phase) {
-      case 'syncing':  title = 'Syncing Data'; titleColor = _Colors.primary;     break;
-      case 'complete': title = 'All Done!';    titleColor = _Colors.success;     break;
-      case 'error':    title = 'Sync Failed';  titleColor = _Colors.error;       break;
-      default:         title = 'Sync Data';    titleColor = _Colors.textPrimary; break;
+      case 'syncing':
+        title = 'Syncing Data';
+        titleColor = _Colors.primary;
+        break;
+      case 'complete':
+        title = 'All Done!';
+        titleColor = _Colors.success;
+        break;
+      case 'error':
+        title = 'Sync Failed';
+        titleColor = _Colors.error;
+        break;
+      default:
+        title = 'Sync Data';
+        titleColor = _Colors.textPrimary;
+        break;
     }
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
@@ -1700,7 +1793,10 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
         color: _Colors.surface,
         border: Border(bottom: BorderSide(color: _Colors.border, width: 1)),
         boxShadow: [
-          BoxShadow(color: _Colors.primary.withOpacity(0.04), blurRadius: 12, offset: const Offset(0, 2)),
+          BoxShadow(
+              color: _Colors.primary.withOpacity(0.04),
+              blurRadius: 12,
+              offset: const Offset(0, 2)),
         ],
       ),
       child: Row(
@@ -1708,13 +1804,15 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
           GestureDetector(
             onTap: () => Navigator.pop(context),
             child: Container(
-              width: 40, height: 40,
+              width: 40,
+              height: 40,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(10),
                 color: _Colors.background,
                 border: Border.all(color: _Colors.border),
               ),
-              child: const Icon(Icons.arrow_back_ios_new, size: 16, color: _Colors.textSecondary),
+              child: Icon(Icons.arrow_back_ios_new,
+                  size: 16, color: _Colors.textSecondary),
             ),
           ),
           const SizedBox(width: 12),
@@ -1724,18 +1822,27 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
               children: [
                 const Text(
                   'TALLY CLOUD SYNC',
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 2, color: _Colors.primary),
+                  style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 2,
+                      color: _Colors.primary),
                 ),
                 const SizedBox(height: 3),
                 Text(
                   title,
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: titleColor, letterSpacing: -0.3),
+                  style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      color: titleColor,
+                      letterSpacing: -0.3),
                 ),
               ],
             ),
           ),
           Container(
-            width: 44, height: 44,
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
               gradient: const LinearGradient(
@@ -1744,10 +1851,15 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
                 end: Alignment.bottomRight,
               ),
               boxShadow: [
-                BoxShadow(color: _Colors.primary.withOpacity(0.3), blurRadius: 12, offset: const Offset(0, 4)),
+                BoxShadow(
+                    color: _Colors.primary.withOpacity(0.3),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4)),
               ],
             ),
-            child: const Center(child: Icon(Icons.cloud_sync_outlined, size: 22, color: Colors.white)),
+            child: const Center(
+                child: Icon(Icons.cloud_sync_outlined,
+                    size: 22, color: Colors.white)),
           ),
         ],
       ),
@@ -1759,10 +1871,14 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
   // ============================================
   Widget _buildPhaseContent() {
     switch (_phase) {
-      case 'syncing':  return _buildSyncingPhase();
-      case 'complete': return _buildCompletePhase();
-      case 'error':    return _buildErrorPhase();
-      default:         return _buildSelectPhase();
+      case 'syncing':
+        return _buildSyncingPhase();
+      case 'complete':
+        return _buildCompletePhase();
+      case 'error':
+        return _buildErrorPhase();
+      default:
+        return _buildSelectPhase();
     }
   }
 
@@ -1781,16 +1897,19 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
 
         // ── Divider ───────────────────────────────────────────
         Row(children: [
-          const Expanded(child: Divider(color: _Colors.border)),
+          Expanded(child: Divider(color: _Colors.border)),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Text(
               'FULL / INCREMENTAL SYNC',
-              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700,
-                  letterSpacing: 1.2, color: _Colors.textMuted),
+              style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.2,
+                  color: _Colors.textMuted),
             ),
           ),
-          const Expanded(child: Divider(color: _Colors.border)),
+          Expanded(child: Divider(color: _Colors.border)),
         ]),
         const SizedBox(height: 16),
 
@@ -1805,12 +1924,12 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
         else ...[
           _buildCompanyListHeader(),
           const SizedBox(height: 10),
-          ..._companies.asMap().entries.map((e) =>
-            Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: _buildCompanyCard(e.key, e.value),
-            ),
-          ),
+          ..._companies.asMap().entries.map(
+                (e) => Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: _buildCompanyCard(e.key, e.value),
+                ),
+              ),
         ],
         const SizedBox(height: 24),
         _buildSyncButton(),
@@ -1829,7 +1948,10 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
         border: Border.all(color: _Colors.border),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 2)),
+          BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 2)),
         ],
       ),
       child: Column(
@@ -1839,32 +1961,39 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
             decoration: BoxDecoration(
               color: _Colors.primaryLight,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(16)),
               border: Border(bottom: BorderSide(color: _Colors.primaryMid)),
             ),
             child: Row(
               children: [
                 Container(
-                  width: 36, height: 36,
+                  width: 36,
+                  height: 36,
                   decoration: BoxDecoration(
                     color: _Colors.primary.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(Icons.business_center_outlined, size: 18, color: _Colors.primary),
+                  child: const Icon(Icons.business_center_outlined,
+                      size: 18, color: _Colors.primary),
                 ),
                 const SizedBox(width: 12),
-                const Expanded(
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         'Quick Company Sync',
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _Colors.textPrimary),
+                        style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: _Colors.textPrimary),
                       ),
                       SizedBox(height: 2),
                       Text(
                         'Sync only company list — then select active company',
-                        style: TextStyle(fontSize: 11, color: _Colors.textSecondary),
+                        style: TextStyle(
+                            fontSize: 11, color: _Colors.textSecondary),
                       ),
                     ],
                   ),
@@ -1874,7 +2003,8 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
                   onTap: _quickSyncing ? null : _quickSyncCompanies,
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                     decoration: BoxDecoration(
                       gradient: _quickSyncing
                           ? null
@@ -1887,23 +2017,34 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
                       borderRadius: BorderRadius.circular(10),
                       boxShadow: _quickSyncing
                           ? null
-                          : [BoxShadow(color: _Colors.primary.withOpacity(0.25), blurRadius: 8, offset: const Offset(0, 3))],
+                          : [
+                              BoxShadow(
+                                  color: _Colors.primary.withOpacity(0.25),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 3))
+                            ],
                     ),
                     child: _quickSyncing
-                        ? const SizedBox(
-                            width: 16, height: 16,
+                        ? SizedBox(
+                            width: 16,
+                            height: 16,
                             child: CircularProgressIndicator(
-                              strokeWidth: 2, color: _Colors.textMuted,
+                              strokeWidth: 2,
+                              color: _Colors.textMuted,
                             ),
                           )
                         : const Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.cloud_download_outlined, size: 14, color: Colors.white),
+                              Icon(Icons.cloud_download_outlined,
+                                  size: 14, color: Colors.white),
                               SizedBox(width: 5),
                               Text(
                                 'Sync',
-                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white),
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white),
                               ),
                             ],
                           ),
@@ -1926,12 +2067,14 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.error_outline_rounded, size: 14, color: _Colors.error),
+                  const Icon(Icons.error_outline_rounded,
+                      size: 14, color: _Colors.error),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       _quickSyncError!,
-                      style: const TextStyle(fontSize: 11, color: _Colors.error),
+                      style:
+                          const TextStyle(fontSize: 11, color: _Colors.error),
                     ),
                   ),
                 ],
@@ -1944,8 +2087,10 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
               padding: EdgeInsets.all(20),
               child: Center(
                 child: SizedBox(
-                  width: 20, height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: _Colors.primary),
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: _Colors.primary),
                 ),
               ),
             )
@@ -1954,14 +2099,15 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
               padding: const EdgeInsets.all(20),
               child: Column(
                 children: [
-                  Icon(Icons.inbox_outlined, size: 32, color: _Colors.textDisabled),
+                  Icon(Icons.inbox_outlined,
+                      size: 32, color: _Colors.textDisabled),
                   const SizedBox(height: 8),
-                  const Text(
+                  Text(
                     'No companies saved locally yet',
                     style: TextStyle(fontSize: 12, color: _Colors.textMuted),
                   ),
                   const SizedBox(height: 4),
-                  const Text(
+                  Text(
                     'Tap Sync to download your companies',
                     style: TextStyle(fontSize: 11, color: _Colors.textDisabled),
                   ),
@@ -1978,28 +2124,35 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
                     padding: const EdgeInsets.only(bottom: 8, left: 2),
                     child: Row(
                       children: [
-                        const Text(
+                        Text(
                           'SELECT ACTIVE COMPANY',
-                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700,
-                              color: _Colors.textMuted, letterSpacing: 1),
+                          style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: _Colors.textMuted,
+                              letterSpacing: 1),
                         ),
                         const SizedBox(width: 8),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 7, vertical: 2),
                           decoration: BoxDecoration(
                             color: _Colors.primary.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
                             '${_localCompanies.length}',
-                            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: _Colors.primary),
+                            style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: _Colors.primary),
                           ),
                         ),
                       ],
                     ),
                   ),
-                  ..._localCompanies.map((company) =>
-                      _buildLocalCompanyRow(company)),
+                  ..._localCompanies
+                      .map((company) => _buildLocalCompanyRow(company)),
                 ],
               ),
             ),
@@ -2022,14 +2175,17 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
         decoration: BoxDecoration(
           color: isActive ? _Colors.successLight : _Colors.background,
           border: Border.all(
-            color: isActive
-                ? _Colors.success.withOpacity(0.4)
-                : _Colors.border,
+            color: isActive ? _Colors.success.withOpacity(0.4) : _Colors.border,
             width: isActive ? 1.5 : 1,
           ),
           borderRadius: BorderRadius.circular(10),
           boxShadow: isActive
-              ? [BoxShadow(color: _Colors.success.withOpacity(0.1), blurRadius: 6, offset: const Offset(0, 2))]
+              ? [
+                  BoxShadow(
+                      color: _Colors.success.withOpacity(0.1),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2))
+                ]
               : null,
         ),
         child: Row(
@@ -2037,7 +2193,8 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
             // Active indicator
             AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              width: 20, height: 20,
+              width: 20,
+              height: 20,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: isActive ? _Colors.success : Colors.transparent,
@@ -2047,7 +2204,8 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
                 ),
               ),
               child: isActive
-                  ? const Icon(Icons.check_rounded, size: 12, color: Colors.white)
+                  ? const Icon(Icons.check_rounded,
+                      size: 12, color: Colors.white)
                   : null,
             ),
             const SizedBox(width: 10),
@@ -2074,14 +2232,17 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
                             company.gstin,
                             style: TextStyle(
                               fontSize: 10,
-                              color: isActive ? _Colors.success.withOpacity(0.7) : _Colors.textMuted,
+                              color: isActive
+                                  ? _Colors.success.withOpacity(0.7)
+                                  : _Colors.textMuted,
                               fontFamily: 'monospace',
                             ),
                           ),
                           if (company.city.isNotEmpty)
                             Text(
                               '  •  ',
-                              style: TextStyle(color: _Colors.textDisabled, fontSize: 10),
+                              style: TextStyle(
+                                  color: _Colors.textDisabled, fontSize: 10),
                             ),
                         ],
                         if (company.city.isNotEmpty)
@@ -2089,7 +2250,9 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
                             '${company.city}, ${company.state}',
                             style: TextStyle(
                               fontSize: 10,
-                              color: isActive ? _Colors.success.withOpacity(0.7) : _Colors.textMuted,
+                              color: isActive
+                                  ? _Colors.success.withOpacity(0.7)
+                                  : _Colors.textMuted,
                             ),
                           ),
                       ],
@@ -2109,8 +2272,11 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
                 ),
                 child: const Text(
                   'ACTIVE',
-                  style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800,
-                      color: Colors.white, letterSpacing: 0.8),
+                  style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                      letterSpacing: 0.8),
                 ),
               )
             else
@@ -2121,10 +2287,13 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
                   border: Border.all(color: _Colors.border),
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: const Text(
+                child: Text(
                   'SET ACTIVE',
-                  style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700,
-                      color: _Colors.textMuted, letterSpacing: 0.8),
+                  style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      color: _Colors.textMuted,
+                      letterSpacing: 0.8),
                 ),
               ),
           ],
@@ -2146,7 +2315,7 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
       ),
       child: Row(
         children: [
-          _buildToggleOption('full',        Icons.sync_rounded, 'Full Sync'),
+          _buildToggleOption('full', Icons.sync_rounded, 'Full Sync'),
           _buildToggleOption('incremental', Icons.bolt_rounded, 'Incremental'),
         ],
       ),
@@ -2165,13 +2334,20 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
             color: isActive ? _Colors.surface : Colors.transparent,
             borderRadius: BorderRadius.circular(9),
             boxShadow: isActive
-                ? [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 8, offset: const Offset(0, 2))]
+                ? [
+                    BoxShadow(
+                        color: Colors.black.withOpacity(0.06),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2))
+                  ]
                 : null,
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 15, color: isActive ? _Colors.primary : _Colors.textMuted),
+              Icon(icon,
+                  size: 15,
+                  color: isActive ? _Colors.primary : _Colors.textMuted),
               const SizedBox(width: 6),
               Text(
                 label,
@@ -2195,7 +2371,9 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
       decoration: BoxDecoration(
         color: isFull ? _Colors.warningLight : _Colors.successLight,
         border: Border.all(
-          color: isFull ? _Colors.warning.withOpacity(0.25) : _Colors.success.withOpacity(0.25),
+          color: isFull
+              ? _Colors.warning.withOpacity(0.25)
+              : _Colors.success.withOpacity(0.25),
         ),
         borderRadius: BorderRadius.circular(10),
       ),
@@ -2214,7 +2392,8 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
                   ? 'Downloads all data fresh. Use for first sync or to fix data issues.'
                   : 'Only downloads changes since last sync. Much faster for regular updates.',
               style: TextStyle(
-                fontSize: 12, height: 1.5,
+                fontSize: 12,
+                height: 1.5,
                 color: isFull ? _Colors.warning : _Colors.success,
                 fontWeight: FontWeight.w500,
               ),
@@ -2226,14 +2405,15 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildLoadingState() {
-    return const Padding(
-      padding: EdgeInsets.symmetric(vertical: 60),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 60),
       child: Center(
         child: Column(
           children: [
             CircularProgressIndicator(color: _Colors.primary, strokeWidth: 2.5),
-            SizedBox(height: 16),
-            Text('Loading companies from cloud...', style: TextStyle(color: _Colors.textMuted, fontSize: 13)),
+            const SizedBox(height: 16),
+            Text('Loading companies from cloud...',
+                style: TextStyle(color: _Colors.textMuted, fontSize: 13)),
           ],
         ),
       ),
@@ -2247,20 +2427,26 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
         child: Column(
           children: [
             Container(
-              width: 64, height: 64,
+              width: 64,
+              height: 64,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: _Colors.errorLight,
                 border: Border.all(color: _Colors.error.withOpacity(0.2)),
               ),
-              child: const Icon(Icons.cloud_off_outlined, size: 28, color: _Colors.error),
+              child: const Icon(Icons.cloud_off_outlined,
+                  size: 28, color: _Colors.error),
             ),
             const SizedBox(height: 16),
-            const Text('Failed to load companies',
-                style: TextStyle(color: _Colors.textPrimary, fontSize: 15, fontWeight: FontWeight.w600)),
+            Text('Failed to load companies',
+                style: TextStyle(
+                    color: _Colors.textPrimary,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600)),
             const SizedBox(height: 6),
             Text(_loadError ?? '',
-                style: const TextStyle(color: _Colors.textMuted, fontSize: 12), textAlign: TextAlign.center),
+                style: TextStyle(color: _Colors.textMuted, fontSize: 12),
+                textAlign: TextAlign.center),
             const SizedBox(height: 20),
             TextButton.icon(
               onPressed: _loadCompanies,
@@ -2269,8 +2455,10 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
               style: TextButton.styleFrom(
                 foregroundColor: _Colors.primary,
                 backgroundColor: _Colors.primaryLight,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
               ),
             ),
           ],
@@ -2285,9 +2473,12 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
       children: [
         Row(
           children: [
-            const Text('COMPANIES',
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
-                    color: _Colors.textMuted, letterSpacing: 1)),
+            Text('COMPANIES',
+                style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: _Colors.textMuted,
+                    letterSpacing: 1)),
             const SizedBox(width: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -2296,7 +2487,10 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text('$_selectedCount/${_companies.length}',
-                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _Colors.primary)),
+                  style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: _Colors.primary)),
             ),
           ],
         ),
@@ -2304,7 +2498,10 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
           onTap: _selectAll,
           child: Text(
             _companies.every((c) => c.selected) ? 'Deselect All' : 'Select All',
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _Colors.primary),
+            style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: _Colors.primary),
           ),
         ),
       ],
@@ -2320,7 +2517,9 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
         decoration: BoxDecoration(
           color: company.selected ? _Colors.primaryLight : _Colors.surface,
           border: Border.all(
-            color: company.selected ? _Colors.primary.withOpacity(0.4) : _Colors.border,
+            color: company.selected
+                ? _Colors.primary.withOpacity(0.4)
+                : _Colors.border,
             width: company.selected ? 1.5 : 1,
           ),
           borderRadius: BorderRadius.circular(14),
@@ -2329,7 +2528,8 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
               color: company.selected
                   ? _Colors.primary.withOpacity(0.08)
                   : Colors.black.withOpacity(0.03),
-              blurRadius: 8, offset: const Offset(0, 2),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
             ),
           ],
         ),
@@ -2338,21 +2538,30 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
           children: [
             AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              width: 22, height: 22,
+              width: 22,
+              height: 22,
               margin: const EdgeInsets.only(top: 2),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(6),
                 gradient: company.selected
-                    ? const LinearGradient(colors: [_Colors.primary, _Colors.accent])
+                    ? const LinearGradient(
+                        colors: [_Colors.primary, _Colors.accent])
                     : null,
                 color: company.selected ? null : _Colors.background,
-                border: company.selected ? null : Border.all(color: _Colors.border, width: 1.5),
+                border: company.selected
+                    ? null
+                    : Border.all(color: _Colors.border, width: 1.5),
                 boxShadow: company.selected
-                    ? [BoxShadow(color: _Colors.primary.withOpacity(0.3), blurRadius: 6)]
+                    ? [
+                        BoxShadow(
+                            color: _Colors.primary.withOpacity(0.3),
+                            blurRadius: 6)
+                      ]
                     : null,
               ),
               child: company.selected
-                  ? const Icon(Icons.check_rounded, size: 14, color: Colors.white)
+                  ? const Icon(Icons.check_rounded,
+                      size: 14, color: Colors.white)
                   : null,
             ),
             const SizedBox(width: 12),
@@ -2363,36 +2572,47 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
                   Text(
                     company.name,
                     style: TextStyle(
-                      fontSize: 14, fontWeight: FontWeight.w600,
-                      color: company.selected ? _Colors.primary : _Colors.textPrimary,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: company.selected
+                          ? _Colors.primary
+                          : _Colors.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 6),
                   Wrap(
-                    spacing: 6, runSpacing: 4,
+                    spacing: 6,
+                    runSpacing: 4,
                     children: [
                       if (company.gstin.isNotEmpty)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 7, vertical: 2),
                           decoration: BoxDecoration(
                             color: _Colors.accentLight,
                             borderRadius: BorderRadius.circular(5),
-                            border: Border.all(color: _Colors.accent.withOpacity(0.2)),
+                            border: Border.all(
+                                color: _Colors.accent.withOpacity(0.2)),
                           ),
                           child: Text(
                             company.gstin,
-                            style: const TextStyle(fontSize: 10, color: _Colors.accent,
-                                fontFamily: 'monospace', fontWeight: FontWeight.w600),
+                            style: const TextStyle(
+                                fontSize: 10,
+                                color: _Colors.accent,
+                                fontFamily: 'monospace',
+                                fontWeight: FontWeight.w600),
                           ),
                         ),
                       if (company.city.isNotEmpty)
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.location_on_outlined, size: 11, color: _Colors.textMuted),
+                            Icon(Icons.location_on_outlined,
+                                size: 11, color: _Colors.textMuted),
                             const SizedBox(width: 2),
                             Text('${company.city}, ${company.state}',
-                                style: const TextStyle(fontSize: 11, color: _Colors.textMuted)),
+                                style: TextStyle(
+                                    fontSize: 11, color: _Colors.textMuted)),
                           ],
                         ),
                     ],
@@ -2425,20 +2645,27 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
               : null,
           color: enabled ? null : _Colors.border,
           boxShadow: enabled
-              ? [BoxShadow(color: _Colors.primary.withOpacity(0.3), blurRadius: 16, offset: const Offset(0, 4))]
+              ? [
+                  BoxShadow(
+                      color: _Colors.primary.withOpacity(0.3),
+                      blurRadius: 16,
+                      offset: const Offset(0, 4))
+                ]
               : null,
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.cloud_sync_rounded, size: 18, color: enabled ? Colors.white : _Colors.textMuted),
+            Icon(Icons.cloud_sync_rounded,
+                size: 18, color: enabled ? Colors.white : _Colors.textMuted),
             const SizedBox(width: 8),
             Text(
               enabled
                   ? 'Sync $_selectedCount ${_selectedCount == 1 ? "Company" : "Companies"}'
                   : 'Select companies to sync',
               style: TextStyle(
-                fontSize: 15, fontWeight: FontWeight.w700,
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
                 color: enabled ? Colors.white : _Colors.textMuted,
                 letterSpacing: 0.2,
               ),
@@ -2465,7 +2692,10 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
             borderRadius: BorderRadius.circular(20),
           ),
           child: Text(_syncStatus,
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: _Colors.primary)),
+              style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: _Colors.primary)),
         ),
         const SizedBox(height: 24),
         _buildSyncStepsList(),
@@ -2476,7 +2706,8 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
 
   Widget _buildCircularProgress() {
     return SizedBox(
-      width: 160, height: 160,
+      width: 160,
+      height: 160,
       child: Stack(
         alignment: Alignment.center,
         children: [
@@ -2494,12 +2725,18 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
             children: [
               Text(
                 '${(_syncProgress * 100).round()}',
-                style: const TextStyle(fontSize: 40, fontWeight: FontWeight.w800,
-                    color: _Colors.textPrimary, fontFamily: 'monospace'),
+                style: TextStyle(
+                    fontSize: 40,
+                    fontWeight: FontWeight.w800,
+                    color: _Colors.textPrimary,
+                    fontFamily: 'monospace'),
               ),
-              const Text('PERCENT',
-                  style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700,
-                      color: _Colors.textMuted, letterSpacing: 1.5)),
+              Text('PERCENT',
+                  style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      color: _Colors.textMuted,
+                      letterSpacing: 1.5)),
             ],
           ),
         ],
@@ -2513,7 +2750,12 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
         color: _Colors.surface,
         border: Border.all(color: _Colors.border),
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 12, offset: const Offset(0, 2))],
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 12,
+              offset: const Offset(0, 2))
+        ],
       ),
       child: Column(
         children: _syncSteps.asMap().entries.map((e) {
@@ -2522,21 +2764,28 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
           return Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: step.status == StepStatus.syncing ? _Colors.primaryLight : Colors.transparent,
+              color: step.status == StepStatus.syncing
+                  ? _Colors.primaryLight
+                  : Colors.transparent,
               border: i < _syncSteps.length - 1
                   ? Border(bottom: BorderSide(color: _Colors.border))
                   : null,
               borderRadius: BorderRadius.only(
-                topLeft:     i == 0                      ? const Radius.circular(16) : Radius.zero,
-                topRight:    i == 0                      ? const Radius.circular(16) : Radius.zero,
-                bottomLeft:  i == _syncSteps.length - 1 ? const Radius.circular(16) : Radius.zero,
-                bottomRight: i == _syncSteps.length - 1 ? const Radius.circular(16) : Radius.zero,
+                topLeft: i == 0 ? const Radius.circular(16) : Radius.zero,
+                topRight: i == 0 ? const Radius.circular(16) : Radius.zero,
+                bottomLeft: i == _syncSteps.length - 1
+                    ? const Radius.circular(16)
+                    : Radius.zero,
+                bottomRight: i == _syncSteps.length - 1
+                    ? const Radius.circular(16)
+                    : Radius.zero,
               ),
             ),
             child: Row(
               children: [
                 Container(
-                  width: 32, height: 32,
+                  width: 32,
+                  height: 32,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(8),
                     color: step.status == StepStatus.done
@@ -2554,11 +2803,16 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
                   ),
                   child: Center(
                     child: step.status == StepStatus.done
-                        ? const Icon(Icons.check_rounded, size: 16, color: _Colors.success)
+                        ? const Icon(Icons.check_rounded,
+                            size: 16, color: _Colors.success)
                         : step.status == StepStatus.syncing
-                            ? const SizedBox(width: 14, height: 14,
-                                child: CircularProgressIndicator(strokeWidth: 2, color: _Colors.primary))
-                            : Icon(step.icon, size: 15, color: _Colors.textDisabled),
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: _Colors.primary))
+                            : Icon(step.icon,
+                                size: 15, color: _Colors.textDisabled),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -2567,7 +2821,9 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
                     step.name,
                     style: TextStyle(
                       fontSize: 13,
-                      fontWeight: step.status == StepStatus.syncing ? FontWeight.w600 : FontWeight.w500,
+                      fontWeight: step.status == StepStatus.syncing
+                          ? FontWeight.w600
+                          : FontWeight.w500,
                       color: step.status == StepStatus.done
                           ? _Colors.success
                           : step.status == StepStatus.syncing
@@ -2578,15 +2834,20 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
                 ),
                 if (step.status == StepStatus.done && step.count > 0)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
                       color: _Colors.successLight,
                       borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: _Colors.success.withOpacity(0.2)),
+                      border:
+                          Border.all(color: _Colors.success.withOpacity(0.2)),
                     ),
                     child: Text(_formatNumber(step.count),
-                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
-                            color: _Colors.success, fontFamily: 'monospace')),
+                        style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: _Colors.success,
+                            fontFamily: 'monospace')),
                   ),
               ],
             ),
@@ -2600,26 +2861,37 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
   // PHASE 3: COMPLETE (unchanged)
   // ============================================
   Widget _buildCompletePhase() {
-    final total        = _syncResult?.totalRecords ?? 0;
+    final total = _syncResult?.totalRecords ?? 0;
     final companyCount = _companies.where((c) => c.selected).length;
     return Column(
       children: [
         const SizedBox(height: 32),
         Container(
-          width: 96, height: 96,
+          width: 96,
+          height: 96,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: _Colors.successLight,
-            border: Border.all(color: _Colors.success.withOpacity(0.3), width: 2),
-            boxShadow: [BoxShadow(color: _Colors.success.withOpacity(0.15), blurRadius: 24, offset: const Offset(0, 4))],
+            border:
+                Border.all(color: _Colors.success.withOpacity(0.3), width: 2),
+            boxShadow: [
+              BoxShadow(
+                  color: _Colors.success.withOpacity(0.15),
+                  blurRadius: 24,
+                  offset: const Offset(0, 4))
+            ],
           ),
-          child: const Icon(Icons.cloud_done_rounded, size: 42, color: _Colors.success),
+          child: const Icon(Icons.cloud_done_rounded,
+              size: 42, color: _Colors.success),
         ),
         const SizedBox(height: 20),
-        const Text('Sync Complete!',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: _Colors.textPrimary)),
+        Text('Sync Complete!',
+            style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.w800,
+                color: _Colors.textPrimary)),
         const SizedBox(height: 6),
-        const Text('All data has been downloaded to your device',
+        Text('All data has been downloaded to your device',
             style: TextStyle(fontSize: 13, color: _Colors.textMuted)),
         const SizedBox(height: 28),
         _buildStatsGrid(total, companyCount),
@@ -2634,44 +2906,64 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
 
   Widget _buildStatsGrid(int total, int companyCount) {
     final stats = [
-      _StatItem(Icons.dataset_outlined,     _formatNumber(total), 'Total Records', _Colors.primary),
-      _StatItem(Icons.business_outlined,    '$companyCount',       'Companies',     _Colors.accent),
-      _StatItem(Icons.timer_outlined,       _syncTime,             'Sync Time',     _Colors.warning),
-      _StatItem(Icons.check_circle_outline, 'Success',             'Status',        _Colors.success),
+      _StatItem(Icons.dataset_outlined, _formatNumber(total), 'Total Records',
+          _Colors.primary),
+      _StatItem(Icons.business_outlined, '$companyCount', 'Companies',
+          _Colors.accent),
+      _StatItem(Icons.timer_outlined, _syncTime, 'Sync Time', _Colors.warning),
+      _StatItem(
+          Icons.check_circle_outline, 'Success', 'Status', _Colors.success),
     ];
     return GridView.count(
-      crossAxisCount: 2, shrinkWrap: true,
+      crossAxisCount: 2,
+      shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 10, crossAxisSpacing: 10, childAspectRatio: 1.7,
-      children: stats.map((stat) => Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: _Colors.surface,
-          border: Border.all(color: _Colors.border),
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2))],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 32, height: 32,
-              decoration: BoxDecoration(
-                color: stat.color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(stat.icon, size: 17, color: stat.color),
-            ),
-            const SizedBox(height: 8),
-            Text(stat.value,
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800,
-                    color: stat.color, fontFamily: 'monospace')),
-            Text(stat.label,
-                style: const TextStyle(fontSize: 11, color: _Colors.textMuted, fontWeight: FontWeight.w500)),
-          ],
-        ),
-      )).toList(),
+      mainAxisSpacing: 10,
+      crossAxisSpacing: 10,
+      childAspectRatio: 1.3,
+      children: stats
+          .map((stat) => Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: _Colors.surface,
+                  border: Border.all(color: _Colors.border),
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: [
+                    BoxShadow(
+                        color: Colors.black.withOpacity(0.04),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2))
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: stat.color.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(stat.icon, size: 17, color: stat.color),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(stat.value,
+                        style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                            color: stat.color,
+                            fontFamily: 'monospace')),
+                    Text(stat.label,
+                        style: TextStyle(
+                            fontSize: 11,
+                            color: _Colors.textMuted,
+                            fontWeight: FontWeight.w500)),
+                  ],
+                ),
+              ))
+          .toList(),
     );
   }
 
@@ -2683,43 +2975,62 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
         color: _Colors.surface,
         border: Border.all(color: _Colors.border),
         borderRadius: BorderRadius.circular(14),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2))],
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2))
+        ],
       ),
       child: Column(
         children: [
           Container(
             width: double.infinity,
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
-            decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: _Colors.border))),
-            child: const Text('SYNC BREAKDOWN',
-                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700,
-                    color: _Colors.textMuted, letterSpacing: 1.2)),
+            decoration: BoxDecoration(
+                border: Border(bottom: BorderSide(color: _Colors.border))),
+            child: Text('SYNC BREAKDOWN',
+                style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: _Colors.textMuted,
+                    letterSpacing: 1.2)),
           ),
           ...doneSteps.map((step) => Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-                border: Border(bottom: BorderSide(color: _Colors.border.withOpacity(0.5)))),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                    border: Border(
+                        bottom: BorderSide(
+                            color: _Colors.border.withOpacity(0.5)))),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Icon(step.icon, size: 14, color: _Colors.textMuted),
-                    const SizedBox(width: 8),
-                    Text(step.name, style: const TextStyle(fontSize: 13, color: _Colors.textSecondary)),
+                    Row(
+                      children: [
+                        Icon(step.icon, size: 14, color: _Colors.textMuted),
+                        const SizedBox(width: 8),
+                        Text(step.name,
+                            style: TextStyle(
+                                fontSize: 13, color: _Colors.textSecondary)),
+                      ],
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                          color: _Colors.successLight,
+                          borderRadius: BorderRadius.circular(6)),
+                      child: Text(_formatNumber(step.count),
+                          style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: _Colors.success,
+                              fontFamily: 'monospace')),
+                    ),
                   ],
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                      color: _Colors.successLight, borderRadius: BorderRadius.circular(6)),
-                  child: Text(_formatNumber(step.count),
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
-                          color: _Colors.success, fontFamily: 'monospace')),
-                ),
-              ],
-            ),
-          )),
+              )),
         ],
       ),
     );
@@ -2738,8 +3049,12 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
                 border: Border.all(color: _Colors.border, width: 1.5),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Text('Sync Again', textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _Colors.textSecondary)),
+              child: Text('Sync Again',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: _Colors.textSecondary)),
             ),
           ),
         ),
@@ -2747,21 +3062,31 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
         Expanded(
           flex: 2,
           child: GestureDetector(
-            onTap: () {},
+            onTap: () => Navigator.pop(context),
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 14),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
-                gradient: const LinearGradient(colors: [_Colors.primary, _Colors.accent]),
-                boxShadow: [BoxShadow(color: _Colors.primary.withOpacity(0.3), blurRadius: 16, offset: const Offset(0, 4))],
+                gradient: const LinearGradient(
+                    colors: [_Colors.primary, _Colors.accent]),
+                boxShadow: [
+                  BoxShadow(
+                      color: _Colors.primary.withOpacity(0.3),
+                      blurRadius: 16,
+                      offset: const Offset(0, 4))
+                ],
               ),
               child: const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text('Open Dashboard',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white)),
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white)),
                   SizedBox(width: 4),
-                  Icon(Icons.arrow_forward_rounded, size: 16, color: Colors.white),
+                  Icon(Icons.arrow_forward_rounded,
+                      size: 16, color: Colors.white),
                 ],
               ),
             ),
@@ -2780,22 +3105,35 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
       child: Column(
         children: [
           Container(
-            width: 88, height: 88,
+            width: 88,
+            height: 88,
             decoration: BoxDecoration(
-              shape: BoxShape.circle, color: _Colors.errorLight,
-              border: Border.all(color: _Colors.error.withOpacity(0.3), width: 2),
-              boxShadow: [BoxShadow(color: _Colors.error.withOpacity(0.1), blurRadius: 20, offset: const Offset(0, 4))],
+              shape: BoxShape.circle,
+              color: _Colors.errorLight,
+              border:
+                  Border.all(color: _Colors.error.withOpacity(0.3), width: 2),
+              boxShadow: [
+                BoxShadow(
+                    color: _Colors.error.withOpacity(0.1),
+                    blurRadius: 20,
+                    offset: const Offset(0, 4))
+              ],
             ),
-            child: const Icon(Icons.cloud_off_rounded, size: 38, color: _Colors.error),
+            child: const Icon(Icons.cloud_off_rounded,
+                size: 38, color: _Colors.error),
           ),
           const SizedBox(height: 20),
-          const Text('Sync Failed',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: _Colors.textPrimary)),
+          Text('Sync Failed',
+              style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: _Colors.textPrimary)),
           const SizedBox(height: 8),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Text(_syncStatus,
-                style: const TextStyle(fontSize: 13, color: _Colors.textMuted, height: 1.5),
+                style: TextStyle(
+                    fontSize: 13, color: _Colors.textMuted, height: 1.5),
                 textAlign: TextAlign.center),
           ),
           const SizedBox(height: 28),
@@ -2805,8 +3143,14 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
               padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
-                gradient: const LinearGradient(colors: [_Colors.primary, _Colors.accent]),
-                boxShadow: [BoxShadow(color: _Colors.primary.withOpacity(0.3), blurRadius: 12, offset: const Offset(0, 3))],
+                gradient: const LinearGradient(
+                    colors: [_Colors.primary, _Colors.accent]),
+                boxShadow: [
+                  BoxShadow(
+                      color: _Colors.primary.withOpacity(0.3),
+                      blurRadius: 12,
+                      offset: const Offset(0, 3))
+                ],
               ),
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
@@ -2814,7 +3158,10 @@ class _SyncScreenState extends State<SyncScreen> with TickerProviderStateMixin {
                   Icon(Icons.refresh_rounded, size: 16, color: Colors.white),
                   SizedBox(width: 6),
                   Text('Try Again',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white)),
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white)),
                 ],
               ),
             ),
@@ -2850,18 +3197,27 @@ class _CircleProgressPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = (size.width - strokeWidth) / 2;
-    canvas.drawCircle(center, radius,
-        Paint()..style = PaintingStyle.stroke..strokeWidth = strokeWidth..color = bgColor);
+    canvas.drawCircle(
+        center,
+        radius,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = strokeWidth
+          ..color = bgColor);
     if (progress > 0) {
       final rect = Rect.fromCircle(center: center, radius: radius);
       canvas.drawArc(
-        rect, -pi / 2, 2 * pi * progress, false,
+        rect,
+        -pi / 2,
+        2 * pi * progress,
+        false,
         Paint()
           ..style = PaintingStyle.stroke
           ..strokeWidth = strokeWidth
           ..strokeCap = StrokeCap.round
           ..shader = SweepGradient(
-            startAngle: -pi / 2, endAngle: 3 * pi / 2,
+            startAngle: -pi / 2,
+            endAngle: 3 * pi / 2,
             colors: gradientColors,
           ).createShader(rect),
       );
@@ -2869,7 +3225,8 @@ class _CircleProgressPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _CircleProgressPainter old) => old.progress != progress;
+  bool shouldRepaint(covariant _CircleProgressPainter old) =>
+      old.progress != progress;
 }
 
 // ============================================

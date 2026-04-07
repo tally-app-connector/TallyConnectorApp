@@ -2,30 +2,32 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:math' as math;
 import '../../database/database_helper.dart';
+import '../theme/app_theme.dart';
 
-// ── App-consistent design tokens ──────────────────────────────────────────────
+// ── App-consistent design tokens (now using AppColors for dark mode support) ──
+// old: all values were hardcoded light-only colors
 class _T {
-  // Surfaces
-  static const bg       = Color(0xFFF4F6FB);
-  static const cardBg   = Colors.white;
-  static const surface  = Color(0xFFF0F3FA);
-  static const border   = Color(0xFFE2E8F4);
+  // Surfaces — now theme-aware
+  static Color get bg       => AppColors.background;   // old: Color(0xFFF4F6FB)
+  static Color get cardBg   => AppColors.surface;      // old: Colors.white
+  static Color get surface  => AppColors.pillBg;       // old: Color(0xFFF0F3FA)
+  static Color get border   => AppColors.divider;      // old: Color(0xFFE2E8F4)
 
   // Brand
-  static const primary  = Color(0xFF1A6FD8);
-  static const accent   = Color(0xFF00C9A7);
+  static Color get primary  => AppColors.blue;         // old: Color(0xFF1A6FD8)
+  static const accent   = Color(0xFF00C9A7);           // teal — no AppColors equivalent
 
   // Semantics
-  static const positive = Color(0xFF1B8A5A);
-  static const negative = Color(0xFFD32F2F);
-  static const amber    = Color(0xFFB45309);
-  static const purple   = Color(0xFF7B2FBE);
-  static const teal     = Color(0xFF0891B2);
+  static Color get positive => AppColors.green;        // old: Color(0xFF1B8A5A)
+  static Color get negative => AppColors.red;          // old: Color(0xFFD32F2F)
+  static Color get amber    => AppColors.amber;        // old: Color(0xFFB45309)
+  static Color get purple   => AppColors.purple;       // old: Color(0xFF7B2FBE)
+  static const teal     = Color(0xFF0891B2);           // no AppColors equivalent
 
-  // Text
-  static const textDark  = Color(0xFF1A2340);
-  static const textMuted = Color(0xFF8A94A6);
-  static const textLight = Color(0xFFB0BBCC);
+  // Text — now theme-aware
+  static Color get textDark  => AppColors.textPrimary;  // old: Color(0xFF1A2340)
+  static Color get textMuted => AppColors.textSecondary; // old: Color(0xFF8A94A6)
+  static Color get textLight => AppColors.divider;       // old: Color(0xFFB0BBCC)
 
   // Table accent colors (same palette, softer)
   static const List<Color> tableColors = [
@@ -289,7 +291,7 @@ class _DatabaseOverviewScreenState extends State<DatabaseOverviewScreen>
                         : _view == 'table'
                             ? _selectedTable?.name ?? ''
                             : 'Query Result',
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w800,
                         color: _T.textDark,
@@ -303,7 +305,7 @@ class _DatabaseOverviewScreenState extends State<DatabaseOverviewScreen>
                       : _view == 'table'
                           ? '${_selectedTable?.columnCount ?? 0} columns · ${_selectedTable?.rowCount ?? 0} rows'
                           : '${_tableRows.length} results',
-                  style: const TextStyle(fontSize: 11, color: _T.textMuted),
+                  style: TextStyle(fontSize: 11, color: _T.textMuted),
                 ),
               ]),
         ),
@@ -409,7 +411,7 @@ class _DatabaseOverviewScreenState extends State<DatabaseOverviewScreen>
                 color: s.color)),
         const SizedBox(height: 2),
         Text(s.label,
-            style: const TextStyle(fontSize: 11, color: _T.textMuted)),
+            style: TextStyle(fontSize: 11, color: _T.textMuted)),
       ]),
     );
   }
@@ -444,7 +446,7 @@ class _DatabaseOverviewScreenState extends State<DatabaseOverviewScreen>
                 width: 100,
                 child: Text(
                   t.name.length > 13 ? '${t.name.substring(0, 12)}…' : t.name,
-                  style: const TextStyle(
+                  style: TextStyle(
                       fontSize: 11,
                       color: _T.textMuted,
                       fontWeight: FontWeight.w500),
@@ -491,7 +493,7 @@ class _DatabaseOverviewScreenState extends State<DatabaseOverviewScreen>
           Padding(
             padding: const EdgeInsets.only(top: 4),
             child: Text('+ ${_tables.length - 8} more tables',
-                style: const TextStyle(fontSize: 11, color: _T.textMuted)),
+                style: TextStyle(fontSize: 11, color: _T.textMuted)),
           ),
       ]),
     );
@@ -506,12 +508,12 @@ class _DatabaseOverviewScreenState extends State<DatabaseOverviewScreen>
       ),
       child: TextField(
         controller: _searchCtrl,
-        style: const TextStyle(fontSize: 13, color: _T.textDark),
+        style: TextStyle(fontSize: 13, color: _T.textDark),
         decoration: InputDecoration(
           hintText: 'Search tables…',
           hintStyle:
-              const TextStyle(color: _T.textMuted, fontSize: 13),
-          prefixIcon: const Icon(Icons.search_rounded,
+              TextStyle(color: _T.textMuted, fontSize: 13),
+          prefixIcon: Icon(Icons.search_rounded,
               size: 18, color: _T.textMuted),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(
@@ -522,7 +524,7 @@ class _DatabaseOverviewScreenState extends State<DatabaseOverviewScreen>
                     _searchCtrl.clear();
                     setState(() => _searchQuery = '');
                   },
-                  child: const Icon(Icons.close_rounded,
+                  child: Icon(Icons.close_rounded,
                       size: 16, color: _T.textMuted),
                 )
               : null,
@@ -586,7 +588,7 @@ class _DatabaseOverviewScreenState extends State<DatabaseOverviewScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(table.name,
-                      style: const TextStyle(
+                      style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
                           color: _T.textDark),
@@ -594,7 +596,7 @@ class _DatabaseOverviewScreenState extends State<DatabaseOverviewScreen>
                       overflow: TextOverflow.ellipsis),
                   const SizedBox(height: 3),
                   Text('${table.columnCount} columns',
-                      style: const TextStyle(
+                      style: TextStyle(
                           fontSize: 11, color: _T.textMuted)),
                 ]),
           ),
@@ -644,11 +646,11 @@ class _DatabaseOverviewScreenState extends State<DatabaseOverviewScreen>
               decoration: BoxDecoration(
                   color: _T.purple.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8)),
-              child: const Icon(Icons.terminal_rounded,
+              child: Icon(Icons.terminal_rounded,
                   size: 15, color: _T.purple),
             ),
             const SizedBox(width: 10),
-            const Text('SQL Query',
+            Text('SQL Query',
                 style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
@@ -669,19 +671,19 @@ class _DatabaseOverviewScreenState extends State<DatabaseOverviewScreen>
               child: TextField(
                 controller: _queryCtrl,
                 maxLines: 4,
-                style: const TextStyle(
+                style: TextStyle(
                     fontSize: 12,
                     color: _T.primary,
                     fontFamily: 'monospace',
                     height: 1.6),
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   hintText: 'SELECT * FROM companies LIMIT 10',
                   hintStyle: TextStyle(
                       color: _T.textMuted,
                       fontSize: 12,
                       fontFamily: 'monospace'),
                   border: InputBorder.none,
-                  contentPadding: EdgeInsets.all(12),
+                  contentPadding: const EdgeInsets.all(12),
                 ),
               ),
             ),
@@ -729,8 +731,8 @@ class _DatabaseOverviewScreenState extends State<DatabaseOverviewScreen>
                   padding: const EdgeInsets.symmetric(
                       horizontal: 18, vertical: 9),
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [_T.primary, Color(0xFF4898F0)],
+                    gradient: LinearGradient(
+                      colors: [_T.primary, const Color(0xFF4898F0)],
                       begin: Alignment.centerLeft,
                       end: Alignment.centerRight,
                     ),
@@ -805,7 +807,7 @@ class _DatabaseOverviewScreenState extends State<DatabaseOverviewScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(table.name,
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w800,
                             color: _T.textDark),
@@ -904,7 +906,7 @@ class _DatabaseOverviewScreenState extends State<DatabaseOverviewScreen>
                   Expanded(
                     flex: 3,
                     child: Text(col.name,
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontSize: 13,
                             color: _T.textDark,
                             fontWeight: FontWeight.w500)),
@@ -923,7 +925,7 @@ class _DatabaseOverviewScreenState extends State<DatabaseOverviewScreen>
                         border: Border.all(
                             color: _T.negative.withOpacity(0.2)),
                       ),
-                      child: const Text('NN',
+                      child: Text('NN',
                           style: TextStyle(
                               fontSize: 9,
                               color: _T.negative,
@@ -984,7 +986,7 @@ class _DatabaseOverviewScreenState extends State<DatabaseOverviewScreen>
 
   Widget _buildDataView() {
     if (_loadingRows) {
-      return const Center(
+      return Center(
           child: CircularProgressIndicator(color: _T.primary, strokeWidth: 2));
     }
     if (_tableRows.isEmpty) {
@@ -992,7 +994,7 @@ class _DatabaseOverviewScreenState extends State<DatabaseOverviewScreen>
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Icon(Icons.inbox_outlined, size: 48, color: Colors.grey.shade300),
           const SizedBox(height: 14),
-          const Text('No rows found',
+          Text('No rows found',
               style: TextStyle(color: _T.textMuted, fontSize: 15)),
         ]),
       );
@@ -1011,7 +1013,7 @@ class _DatabaseOverviewScreenState extends State<DatabaseOverviewScreen>
                 bottom: BorderSide(color: _T.border))),
         child: Text(
           '${_tableRows.length} rows · ${columns.length} columns · scroll →',
-          style: const TextStyle(
+          style: TextStyle(
               fontSize: 11, color: _T.textMuted),
         ),
       ),
@@ -1134,12 +1136,12 @@ class _DatabaseOverviewScreenState extends State<DatabaseOverviewScreen>
                 width: 2,
               ),
             ),
-            child: const Icon(Icons.storage_rounded,
+            child: Icon(Icons.storage_rounded,
                 color: _T.primary, size: 26),
           ),
         ),
         const SizedBox(height: 16),
-        const Text('Loading database…',
+        Text('Loading database…',
             style: TextStyle(color: _T.textMuted, fontSize: 13)),
       ]),
     );
@@ -1150,11 +1152,11 @@ class _DatabaseOverviewScreenState extends State<DatabaseOverviewScreen>
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          const Icon(Icons.error_outline_rounded,
+          Icon(Icons.error_outline_rounded,
               color: _T.negative, size: 44),
           const SizedBox(height: 16),
           Text(_error ?? 'Unknown error',
-              style: const TextStyle(
+              style: TextStyle(
                   color: _T.textMuted, fontSize: 13),
               textAlign: TextAlign.center),
           const SizedBox(height: 20),
@@ -1185,7 +1187,7 @@ class _DatabaseOverviewScreenState extends State<DatabaseOverviewScreen>
       Container(
         width: 4, height: 16,
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
+          gradient: LinearGradient(
               colors: [_T.primary, _T.accent],
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter),
@@ -1194,7 +1196,7 @@ class _DatabaseOverviewScreenState extends State<DatabaseOverviewScreen>
       ),
       const SizedBox(width: 8),
       Text(title,
-          style: const TextStyle(
+          style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w800,
               color: _T.textDark)),
@@ -1210,7 +1212,7 @@ class _DatabaseOverviewScreenState extends State<DatabaseOverviewScreen>
                 Border.all(color: _T.primary.withOpacity(0.2)),
           ),
           child: Text(badge,
-              style: const TextStyle(
+              style: TextStyle(
                   fontSize: 11,
                   color: _T.primary,
                   fontWeight: FontWeight.w700)),

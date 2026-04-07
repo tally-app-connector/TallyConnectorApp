@@ -42,7 +42,6 @@
 //   );
 // }
 
-
 // // ─────────────────────────────────────────────
 // //  HEADER ICON BUTTON (Bell, Settings)
 // // ─────────────────────────────────────────────
@@ -963,7 +962,6 @@
 //   }
 // }
 
-
 import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -1086,10 +1084,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool _kpiLoading = true;
 
   List<_MetricData> _dashboardMetrics = [];
-  String _revenue  = '';
+  String _revenue = '';
   String _expenses = '';
-  String _net      = '';
-  double _rawSales    = 0;
+  String _net = '';
+  double _rawSales = 0;
   double _rawPurchase = 0;
 
   // Helper: get current text scale factor for responsive sizing
@@ -1161,9 +1159,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   (DateTime, DateTime) _dateRangeForPeriod(String period) {
-    final now     = DateTime.now();
+    final now = DateTime.now();
     final fyStart = _companyFYStart();
-    final fyEnd   = _companyFYEnd();
+    final fyEnd = _companyFYEnd();
     final fyMonth = fyStart.month;
 
     switch (period) {
@@ -1180,7 +1178,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final fiscalMonth = now.month >= fyMonth ? now.month : now.month + 12;
         final qStart = ((fiscalMonth - fyMonth) ~/ 3) * 3 + fyMonth;
         final qStartMonth = qStart > 12 ? qStart - 12 : qStart;
-        final qStartYear  = qStart > 12
+        final qStartYear = qStart > 12
             ? now.year
             : (now.month >= fyMonth ? now.year : now.year - 1);
         return (DateTime(qStartYear, qStartMonth, 1), now);
@@ -1189,7 +1187,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       case 'Last Year':
         return (
           DateTime(fyStart.year - 1, fyStart.month, fyStart.day),
-          DateTime(fyEnd.year   - 1, fyEnd.month,   fyEnd.day),
+          DateTime(fyEnd.year - 1, fyEnd.month, fyEnd.day),
         );
       case 'Custom':
         if (_customStart != null && _customEnd != null) {
@@ -1206,7 +1204,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _loadMetricData() async {
     if (_companyGuid == null) return;
 
-    final guid        = _companyGuid!;
+    final guid = _companyGuid!;
     final (start, end) = _dateRangeForPeriod(_selectedPeriod);
 
     // Convert to Tally YYYYMMDD format
@@ -1224,14 +1222,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     try {
       final dashResults = await Future.wait([
-        _salesService.getTotalSales(companyGuid: guid, fromDate: fromDate, toDate: toDate),
-        _salesService.getTotalPurchase(companyGuid: guid, fromDate: fromDate, toDate: toDate),
-        _salesService.getTotalProfit(companyGuid: guid, fromDate: fromDate, toDate: toDate),
-        _salesService.getTotalReceivable(companyGuid: guid, fromDate: fromDate, toDate: toDate),
+        _salesService.getTotalSales(
+            companyGuid: guid, fromDate: fromDate, toDate: toDate),
+        _salesService.getTotalPurchase(
+            companyGuid: guid, fromDate: fromDate, toDate: toDate),
+        _salesService.getTotalProfit(
+            companyGuid: guid, fromDate: fromDate, toDate: toDate),
+        _salesService.getTotalReceivable(
+            companyGuid: guid, fromDate: fromDate, toDate: toDate),
       ]);
-      final salesVal      = dashResults[0];
-      final purchaseVal   = dashResults[1];
-      final profitVal     = dashResults[2];
+      final salesVal = dashResults[0];
+      final purchaseVal = dashResults[1];
+      final profitVal = dashResults[2];
       final receivableVal = dashResults[3];
 
       // Guard against widget being disposed while awaiting
@@ -1240,42 +1242,63 @@ class _DashboardScreenState extends State<DashboardScreen> {
       setState(() {
         _dashboardMetrics = [
           _MetricData(
-            AppIcons.barChart, AppColors.iconBgBlue, 'Net Sales',
-            salesVal.primaryValue, salesVal.primaryUnit,
-            salesVal.changePercent, salesVal.isPositiveChange,
+            AppIcons.barChart,
+            AppColors.iconBgBlue,
+            'Net Sales',
+            salesVal.primaryValue,
+            salesVal.primaryUnit,
+            salesVal.changePercent,
+            salesVal.isPositiveChange,
           ),
           _MetricData(
-            AppIcons.receipt, AppColors.iconBgAmber, 'Net Purchase',
-            purchaseVal.primaryValue, purchaseVal.primaryUnit,
-            purchaseVal.changePercent, purchaseVal.isPositiveChange,
+            AppIcons.receipt,
+            AppColors.iconBgAmber,
+            'Net Purchase',
+            purchaseVal.primaryValue,
+            purchaseVal.primaryUnit,
+            purchaseVal.changePercent,
+            purchaseVal.isPositiveChange,
           ),
           _MetricData(
-            AppIcons.arrowUpCircle, AppColors.iconBgGreen, 'Gross Profit',
-            profitVal.primaryValue, profitVal.primaryUnit,
-            profitVal.changePercent, profitVal.isPositiveChange,
+            AppIcons.arrowUpCircle,
+            AppColors.iconBgGreen,
+            'Gross Profit',
+            profitVal.primaryValue,
+            profitVal.primaryUnit,
+            profitVal.changePercent,
+            profitVal.isPositiveChange,
           ),
           _MetricData(
-            AppIcons.users, AppColors.iconBgPurple, 'Receivables',
-            receivableVal.primaryValue, receivableVal.primaryUnit,
-            receivableVal.changePercent, receivableVal.isPositiveChange,
+            AppIcons.users,
+            AppColors.iconBgPurple,
+            'Receivables',
+            receivableVal.primaryValue,
+            receivableVal.primaryUnit,
+            receivableVal.changePercent,
+            receivableVal.isPositiveChange,
           ),
         ];
 
-        _revenue  = '${salesVal.primaryValue} ${salesVal.primaryUnit}';
+        _revenue = '${salesVal.primaryValue} ${salesVal.primaryUnit}';
         _expenses = '${purchaseVal.primaryValue} ${purchaseVal.primaryUnit}';
-        _net      = '${profitVal.primaryValue} ${profitVal.primaryUnit}';
+        _net = '${profitVal.primaryValue} ${profitVal.primaryUnit}';
 
-        _rawSales    = double.tryParse(salesVal.primaryValue.replaceAll(',', '')) ?? 0;
-        _rawPurchase = double.tryParse(purchaseVal.primaryValue.replaceAll(',', '')) ?? 0;
+        _rawSales =
+            double.tryParse(salesVal.primaryValue.replaceAll(',', '')) ?? 0;
+        _rawPurchase =
+            double.tryParse(purchaseVal.primaryValue.replaceAll(',', '')) ?? 0;
       });
 
       _refreshKpiValues(_kpiConfigs, fromDate: fromDate, toDate: toDate);
 
       // Load monthly trend data for line/bar charts
       final trendResults = await Future.wait([
-        _salesService.getSalesTrend(companyGuid: guid, fromDate: fromDate, toDate: toDate),
-        _salesService.getPurchaseTrend(companyGuid: guid, fromDate: fromDate, toDate: toDate),
-        _salesService.getProfitTrend(companyGuid: guid, fromDate: fromDate, toDate: toDate),
+        _salesService.getSalesTrend(
+            companyGuid: guid, fromDate: fromDate, toDate: toDate),
+        _salesService.getPurchaseTrend(
+            companyGuid: guid, fromDate: fromDate, toDate: toDate),
+        _salesService.getProfitTrend(
+            companyGuid: guid, fromDate: fromDate, toDate: toDate),
       ]);
       if (mounted) {
         setState(() {
@@ -1287,7 +1310,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       // Load purchase category breakdown
       final categories = await _salesService.getPurchaseByCategory(
-        companyGuid: guid, fromDate: fromDate, toDate: toDate,
+        companyGuid: guid,
+        fromDate: fromDate,
+        toDate: toDate,
       );
       if (mounted) {
         setState(() {
@@ -1312,23 +1337,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   ReportMetric? _metricFromId(String id) {
     switch (id) {
-      case 'sales':      return ReportMetric.sales;
-      case 'purchase':   return ReportMetric.purchase;
-      case 'profit':     return ReportMetric.profit;
-      case 'receivable': return ReportMetric.receivable;
-      case 'payable':    return ReportMetric.payable;
-      case 'receipts':   return ReportMetric.receipts;
-      case 'payments':   return ReportMetric.payments;
-      case 'stock':      return ReportMetric.stock;
-      default:           return null;
+      case 'sales':
+        return ReportMetric.sales;
+      case 'purchase':
+        return ReportMetric.purchase;
+      case 'profit':
+        return ReportMetric.profit;
+      case 'receivable':
+        return ReportMetric.receivable;
+      case 'payable':
+        return ReportMetric.payable;
+      case 'receipts':
+        return ReportMetric.receipts;
+      case 'payments':
+        return ReportMetric.payments;
+      case 'stock':
+        return ReportMetric.stock;
+      default:
+        return null;
     }
   }
 
-  Future<void> _refreshKpiValues(List<KpiConfig> configs, {String? fromDate, String? toDate}) async {
+  Future<void> _refreshKpiValues(List<KpiConfig> configs,
+      {String? fromDate, String? toDate}) async {
     if (_companyGuid == null || configs.isEmpty) return;
 
-    final guid           = _companyGuid!;
-    final updated        = <KpiConfig>[];
+    final guid = _companyGuid!;
+    final updated = <KpiConfig>[];
 
     // If no dates passed, compute from current period
     if (fromDate == null || toDate == null) {
@@ -1346,12 +1381,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
         continue;
       }
       try {
-        final rv = await _salesService.getReportValueForMetric(
-            metric, companyGuid: guid, fromDate: fromDate, toDate: toDate);
+        final rv = await _salesService.getReportValueForMetric(metric,
+            companyGuid: guid, fromDate: fromDate, toDate: toDate);
         updated.add(config.copyWith(
-          value:      '${rv.primaryValue} ${rv.primaryUnit}',
-          sub:        _selectedPeriod,
-          badge:      rv.changePercent.isNotEmpty ? rv.changePercent : null,
+          value: '${rv.primaryValue} ${rv.primaryUnit}',
+          sub: _selectedPeriod,
+          badge: rv.changePercent.isNotEmpty ? rv.changePercent : null,
           isPositive: rv.isPositiveChange,
         ));
       } catch (_) {
@@ -1392,7 +1427,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _showLocalDataInfo() async {
     if (_companyGuid == null) return;
-    final counts   = await DataSyncService.instance.getLocalRowCounts(_companyGuid!);
+    final counts =
+        await DataSyncService.instance.getLocalRowCounts(_companyGuid!);
     final lastSync = DataSyncService.instance.lastSyncTime;
     if (!mounted) return;
     showDialog(
@@ -1418,8 +1454,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     'Last synced: ${lastSync.hour.toString().padLeft(2, '0')}:'
                     '${lastSync.minute.toString().padLeft(2, '0')} on '
                     '${lastSync.day}/${lastSync.month}/${lastSync.year}',
-                    style:
-                        const TextStyle(fontSize: 12, color: Colors.grey),
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
                   ),
                 ),
               const Divider(),
@@ -1428,16 +1463,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(e.key,
-                            style: const TextStyle(fontSize: 13)),
+                        Text(e.key, style: const TextStyle(fontSize: 13)),
                         Text(
                           e.value == -1 ? 'N/A' : '${e.value} rows',
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
-                            color: e.value > 0
-                                ? Colors.green
-                                : Colors.red,
+                            color: e.value > 0 ? Colors.green : Colors.red,
                           ),
                         ),
                       ],
@@ -1449,8 +1481,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color:
-                      AppState.isOffline ? Colors.orange : Colors.green,
+                  color: AppState.isOffline ? Colors.orange : Colors.green,
                 ),
               ),
             ],
@@ -1491,40 +1522,37 @@ class _DashboardScreenState extends State<DashboardScreen> {
             const Padding(
               padding: EdgeInsets.all(16),
               child: Text('Select Company',
-                  style: TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.w600)),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
             ),
             const Divider(height: 1),
             Flexible(
               child: ListView(
                 shrinkWrap: true,
                 children: AppState.companies.map((company) {
-              final isSelected =
-                  company.guid == AppState.selectedCompany?.guid;
-              return ListTile(
-                title: Text(company.name),
-                subtitle:
-                    Text(company.email ?? company.state ?? ''),
-                trailing: isSelected
-                    ? const Icon(Icons.check_circle,
-                        color: Colors.blue)
-                    : null,
-                onTap: () async {
-                  Navigator.pop(ctx);
-                  setState(() {
-                    AppState.selectedCompany = company;
-                    _companyGuid = company.guid;
-                    _company = company;
-                    _dashboardMetrics = [];
-                    _revenue  = '';
-                    _expenses = '';
-                    _net      = '';
-                  });
-                  await SecureStorage.saveCompanyGuid(company.guid);
-                  _loadMetricData();
-                },
-              );
-            }).toList(),
+                  final isSelected =
+                      company.guid == AppState.selectedCompany?.guid;
+                  return ListTile(
+                    title: Text(company.name),
+                    subtitle: Text(company.email ?? company.state ?? ''),
+                    trailing: isSelected
+                        ? const Icon(Icons.check_circle, color: Colors.blue)
+                        : null,
+                    onTap: () async {
+                      Navigator.pop(ctx);
+                      setState(() {
+                        AppState.selectedCompany = company;
+                        _companyGuid = company.guid;
+                        _company = company;
+                        _dashboardMetrics = [];
+                        _revenue = '';
+                        _expenses = '';
+                        _net = '';
+                      });
+                      await SecureStorage.saveCompanyGuid(company.guid);
+                      _loadMetricData();
+                    },
+                  );
+                }).toList(),
               ),
             ),
             const SizedBox(height: 8),
@@ -1558,8 +1586,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ));
     } else if (reportMetric == ReportMetric.payable) {
       Navigator.of(context).push(MaterialPageRoute(
-        builder: (_) =>
-            OutstandingDetailScreen(metric: reportMetric),
+        builder: (_) => OutstandingDetailScreen(metric: reportMetric),
       ));
     } else {
       Navigator.of(context).push(MaterialPageRoute(
@@ -1629,7 +1656,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               const SizedBox(height: 20),
               _buildProfitMarginChart(),
               const SizedBox(height: 20),
-              const AiAskBar(),
+              AiAskBar(),
               const SizedBox(height: 16),
             ],
           ),
@@ -1675,7 +1702,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           ),
                         ),
                         const SizedBox(width: 6),
-                        SvgPicture.string(AppIcons.chevronDown, width: 16, height: 16),
+                        SvgPicture.string(AppIcons.chevronDown,
+                            width: 16, height: 16),
                       ],
                     ),
                   ),
@@ -1699,7 +1727,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           padding: EdgeInsets.all(10),
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : Icon(Icons.sync, size: 18, color: AppColors.textSecondary),
+                      : Icon(Icons.sync,
+                          size: 18, color: AppColors.textSecondary),
                 ),
               ),
               const SizedBox(width: 8),
@@ -1724,8 +1753,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildDateRangeSelector() {
     return Padding(
-      padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.pagePadding),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pagePadding),
       child: PeriodSelector(
         selected: _selectedPeriod,
         onChanged: (v) async {
@@ -1736,21 +1764,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
               firstDate: DateTime(2015),
               lastDate: now,
               currentDate: now,
-              initialDateRange:
-                  _customStart != null && _customEnd != null
-                      ? DateTimeRange(
-                          start: _customStart!,
-                          end: _customEnd!)
-                      : DateTimeRange(
-                          start: DateTime(now.year, now.month, 1),
-                          end: now),
+              initialDateRange: _customStart != null && _customEnd != null
+                  ? DateTimeRange(start: _customStart!, end: _customEnd!)
+                  : DateTimeRange(
+                      start: DateTime(now.year, now.month, 1), end: now),
               initialEntryMode: DatePickerEntryMode.calendarOnly,
               builder: (ctx, child) => Theme(
                 data: Theme.of(ctx).copyWith(
-                  colorScheme:
-                      Theme.of(ctx).colorScheme.copyWith(
-                            primary: const Color(0xFF2D8BE0),
-                          ),
+                  colorScheme: Theme.of(ctx).colorScheme.copyWith(
+                        primary: const Color(0xFF2D8BE0),
+                      ),
                 ),
                 child: child!,
               ),
@@ -1780,10 +1803,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.pagePadding),
-          child: Text('Quick Actions',
-              style: AppTypography.cardLabel),
+          padding:
+              const EdgeInsets.symmetric(horizontal: AppSpacing.pagePadding),
+          child: Text('Quick Actions', style: AppTypography.cardLabel),
         ),
         const SizedBox(height: 10),
         SingleChildScrollView(
@@ -1797,7 +1819,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 final index = entry.key;
                 final metric = entry.value;
                 return Padding(
-                  padding: EdgeInsets.only(left: index > 0 ? 14 : 0),
+                  padding: EdgeInsets.only(left: index > 0 ? 12 : 0),
                   child: GestureDetector(
                     onTap: () {
                       if (metric == ReportMetric.receivable) {
@@ -1807,27 +1829,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           ),
                         );
                       } else {
-                        final isOutstanding =
-                            metric == ReportMetric.payable;
+                        final isOutstanding = metric == ReportMetric.payable;
                         Navigator.of(context).push(
                           MaterialPageRoute(
                             builder: (_) => isOutstanding
-                                ? OutstandingDetailScreen(
-                                    metric: metric)
-                                : MetricDetailScreen(
-                                    metric: metric),
+                                ? OutstandingDetailScreen(metric: metric)
+                                : MetricDetailScreen(metric: metric),
                           ),
                         );
                       }
                     },
                     child: Container(
-                      width: 84,
+                      width: 125,
                       padding: const EdgeInsets.symmetric(
-                          vertical: 10),
+                          vertical: 10, horizontal: 6),
                       decoration: BoxDecoration(
                         color: AppColors.surface,
-                        borderRadius: BorderRadius.circular(
-                            AppRadius.card),
+                        borderRadius: BorderRadius.circular(AppRadius.card),
                         boxShadow: AppShadows.card,
                         border: AppShadows.cardBorder,
                       ),
@@ -1835,33 +1853,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Container(
-                            width: 30,
-                            height: 30,
+                            width: 38,
+                            height: 38,
                             decoration: BoxDecoration(
                               color: metric.iconBgColor,
-                              borderRadius:
-                                  BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(10),
                             ),
                             child: Center(
                               child: SvgPicture.string(
                                 metric.icon,
-                                width: 15,
-                                height: 15,
+                                width: 18,
+                                height: 18,
                               ),
                             ),
                           ),
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 8),
                           Padding(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 4),
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
                             child: FittedBox(
                               fit: BoxFit.scaleDown,
                               child: Text(
                                 metric.displayName,
                                 style: AppTypography.cardLabel
-                                    .copyWith(fontSize: 10, letterSpacing: 0.2),
+                                    .copyWith(fontSize: 11, letterSpacing: 0.2),
                                 textAlign: TextAlign.center,
-                                maxLines: 2,
+                                maxLines: 1,
                               ),
                             ),
                           ),
@@ -1889,23 +1905,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (_dashboardMetrics.isEmpty) {
       // Show 4 loading skeleton cards while data is loading
       return Padding(
-        padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.pagePadding),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pagePadding),
         child: Wrap(
           spacing: AppSpacing.cardGap,
           runSpacing: AppSpacing.cardGap,
           children: List.generate(4, (i) {
-            final cardWidth =
-                (availableWidth - AppSpacing.pagePadding * 2 -
-                        AppSpacing.cardGap) /
-                    2;
+            final cardWidth = (availableWidth -
+                    AppSpacing.pagePadding * 2 -
+                    AppSpacing.cardGap) /
+                2;
             return Container(
               width: cardWidth,
               height: 100,
               decoration: BoxDecoration(
                 color: AppColors.surface,
-                borderRadius:
-                    BorderRadius.circular(AppRadius.card),
+                borderRadius: BorderRadius.circular(AppRadius.card),
                 boxShadow: AppShadows.card,
                 border: AppShadows.cardBorder,
               ),
@@ -1913,8 +1927,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 child: SizedBox(
                   width: 20,
                   height: 20,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2),
+                  child: CircularProgressIndicator(strokeWidth: 2),
                 ),
               ),
             );
@@ -1924,20 +1937,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
 
     final cardWidth =
-        (availableWidth - AppSpacing.pagePadding * 2 -
-                AppSpacing.cardGap) /
-            2;
+        (availableWidth - AppSpacing.pagePadding * 2 - AppSpacing.cardGap) / 2;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.pagePadding),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pagePadding),
       child: Wrap(
         spacing: AppSpacing.cardGap,
         runSpacing: AppSpacing.cardGap,
-        children:
-            _dashboardMetrics.asMap().entries.map((entry) {
+        children: _dashboardMetrics.asMap().entries.map((entry) {
           final index = entry.key;
-          final m     = entry.value;
+          final m = entry.value;
           return SizedBox(
             width: cardWidth,
             child: MetricCard(
@@ -1973,7 +1982,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _PieItem('Purchase (Cost)', purchase, AppColors.amber),
       _PieItem('Profit', profit, AppColors.green),
     ];
-    final displayValues = [_expenses, AmountFormatter.shortSpaced(profit)];
+    final displayValues = [_expenses, _net];
     final percentages = [purchasePct, profitPct];
 
     final pieSize = 150 * ts;
@@ -2024,18 +2033,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Container(
                 width: 10 * ts,
                 height: 10 * ts,
-                decoration: BoxDecoration(color: AppColors.blue, shape: BoxShape.circle),
+                decoration: BoxDecoration(
+                    color: AppColors.blue, shape: BoxShape.circle),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text('Total Sales',
-                    style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                    style: TextStyle(
+                        fontSize: 13, color: AppColors.textSecondary)),
               ),
               Text('₹$_revenue',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                  style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary)),
               const SizedBox(width: 10),
               Text('100%',
-                  style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                  style:
+                      TextStyle(fontSize: 11, color: AppColors.textSecondary),
                   textAlign: TextAlign.right),
             ],
           ),
@@ -2045,7 +2060,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             final pct = percentages[i];
             return Column(
               children: [
-                if (i == data.length - 1) Divider(height: 1, color: AppColors.divider),
+                if (i == data.length - 1)
+                  Divider(height: 1, color: AppColors.divider),
                 if (i == data.length - 1) const SizedBox(height: 8),
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 4),
@@ -2054,24 +2070,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       Container(
                         width: 10 * ts,
                         height: 10 * ts,
-                        decoration: BoxDecoration(color: item.color, shape: BoxShape.circle),
+                        decoration: BoxDecoration(
+                            color: item.color, shape: BoxShape.circle),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(item.label,
                             style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: i == data.length - 1 ? FontWeight.w600 : FontWeight.normal,
+                                fontSize: 13,
+                                fontWeight: i == data.length - 1
+                                    ? FontWeight.w600
+                                    : FontWeight.normal,
                                 color: AppColors.textSecondary)),
                       ),
                       Text('₹${displayValues[i]}',
                           style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: i == data.length - 1 ? FontWeight.w700 : FontWeight.w600,
-                              color: AppColors.textPrimary)),
+                              fontSize: 14,
+                              fontWeight: i == data.length - 1
+                                  ? FontWeight.w700
+                                  : FontWeight.w600,
+                              color: i == data.length - 1
+                                  ? AppColors.green
+                                  : AppColors.textPrimary)),
                       const SizedBox(width: 10),
                       Text('${pct.toStringAsFixed(0)}%',
-                          style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                          style: TextStyle(
+                              fontSize: 11, color: AppColors.textSecondary),
                           textAlign: TextAlign.right),
                     ],
                   ),
@@ -2092,7 +2116,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final profit = (sales - purchase).abs();
     final ts = _ts(context);
 
-    if (sales <= 0 || _purchaseCategories.isEmpty) return const SizedBox.shrink();
+    if (sales <= 0 || _purchaseCategories.isEmpty)
+      return const SizedBox.shrink();
 
     // _rawSales/_rawPurchase are in display units (e.g. 307.31 for "307.31 Cr")
     // Category amounts from DB are raw (e.g. 1122500000).
@@ -2109,7 +2134,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     double othersRaw = 0;
     for (final cat in _purchaseCategories) {
       final raw = (cat['net_amount'] as double).abs();
-      if (significantCats.length < maxSlices && totalCatRaw > 0 && (raw / totalCatRaw) >= minPct) {
+      if (significantCats.length < maxSlices &&
+          totalCatRaw > 0 &&
+          (raw / totalCatRaw) >= minPct) {
         significantCats.add(cat);
       } else {
         othersRaw += raw;
@@ -2124,8 +2151,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       Color(0xFF8B5CF6), // purple
       Color(0xFF14B8A6), // teal
     ];
-    const profitColor = Color(0xFF22C55E);  // green
-    const othersColor = Color(0xFF6B7280);  // grey
+    const profitColor = Color(0xFF22C55E); // green
+    const othersColor = Color(0xFF6B7280); // grey
 
     // Build pie items — every item here WILL be visible in the chart
     final pieItems = <_PieItem>[];
@@ -2157,7 +2184,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Revenue Breakdown (Detailed)', style: AppTypography.chartSectionTitle),
+          Text('Revenue Breakdown (Detailed)',
+              style: AppTypography.chartSectionTitle),
           const SizedBox(height: 20),
           // Donut chart — true proportions, labels inside or outside based on slice size
           Center(
@@ -2170,10 +2198,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   centerSpaceRadius: 40 * ts,
                   sections: List.generate(pieItems.length, (i) {
                     final item = pieItems[i];
-                    final pct = pieTotal > 0 ? (item.value / pieTotal * 100) : 0.0;
-                    final labelText = pct >= 1
-                        ? '${pct.toStringAsFixed(0)}%'
-                        : '<1%';
+                    final pct =
+                        pieTotal > 0 ? (item.value / pieTotal * 100) : 0.0;
+                    final labelText =
+                        pct >= 1 ? '${pct.toStringAsFixed(0)}%' : '<1%';
                     final showLabel = pct >= 8;
                     return PieChartSectionData(
                       color: item.color,
@@ -2215,13 +2243,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   Expanded(
                     child: Text(
                       item.label,
-                      style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                      style: TextStyle(
+                          fontSize: 12, color: AppColors.textSecondary),
                     ),
                   ),
                   const SizedBox(width: 8),
                   Text(
                     AmountFormatter.currencyShort(displayAmount),
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                    style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary),
                   ),
                 ],
               ),
@@ -2234,11 +2266,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Row(
             children: [
               Text('Total Sales',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary)),
               const Spacer(),
               Text(
                 '₹$_revenue',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary),
               ),
             ],
           ),
@@ -2246,10 +2284,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
           if (_purchaseCategories.length > 1) ...[
             const SizedBox(height: 14),
             GestureDetector(
-              onTap: () => setState(() => _showAllCategories = !_showAllCategories),
+              onTap: () =>
+                  setState(() => _showAllCategories = !_showAllCategories),
               child: Center(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
                     color: AppColors.blue.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(20),
@@ -2258,12 +2298,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        _showAllCategories ? 'See Less' : 'See All ${_purchaseCategories.length} Categories',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.blue),
+                        _showAllCategories
+                            ? 'See Less'
+                            : 'See All ${_purchaseCategories.length} Categories',
+                        style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.blue),
                       ),
                       const SizedBox(width: 4),
                       Icon(
-                        _showAllCategories ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                        _showAllCategories
+                            ? Icons.keyboard_arrow_up
+                            : Icons.keyboard_arrow_down,
                         size: 16,
                         color: AppColors.blue,
                       ),
@@ -2277,7 +2324,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               const SizedBox(height: 16),
               Divider(height: 1, color: AppColors.divider),
               const SizedBox(height: 14),
-              Text('All Purchase Categories', style: AppTypography.chartSectionTitle),
+              Text('All Purchase Categories',
+                  style: AppTypography.chartSectionTitle),
               const SizedBox(height: 14),
               ...List.generate(_purchaseCategories.length, (i) {
                 final cat = _purchaseCategories[i];
@@ -2290,7 +2338,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     : '${pctDisplay.toStringAsFixed(0)}%';
                 // Assign color: match pie color if it's a significant cat, else grey
                 final sigIndex = significantCats.indexOf(cat);
-                final barColor = sigIndex >= 0 ? categoryColors[sigIndex] : othersColor;
+                final barColor =
+                    sigIndex >= 0 ? categoryColors[sigIndex] : othersColor;
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 14),
                   child: Column(
@@ -2302,20 +2351,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           Expanded(
                             child: Text(
                               name,
-                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.textPrimary),
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  color: AppColors.textPrimary),
                             ),
                           ),
                           const SizedBox(width: 8),
                           Text(
                             AmountFormatter.currencyShort(rawAmount),
-                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                            style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textPrimary),
                           ),
                           const SizedBox(width: 8),
                           SizedBox(
                             width: 32,
                             child: Text(
                               pctText,
-                              style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                              style: TextStyle(
+                                  fontSize: 11, color: AppColors.textSecondary),
                               textAlign: TextAlign.right,
                             ),
                           ),
@@ -2345,30 +2401,45 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // ── Combined Sales/Purchase/Profit Chart ──────────────────────────────────
 
   Widget _buildCombinedTrendChart() {
-    if (_monthlySales.isEmpty && _monthlyPurchase.isEmpty && _monthlyProfit.isEmpty) {
+    if (_monthlySales.isEmpty &&
+        _monthlyPurchase.isEmpty &&
+        _monthlyProfit.isEmpty) {
       return const SizedBox.shrink();
     }
 
     // Merge all months
     final allMonths = <String>{};
-    for (final p in _monthlySales) { allMonths.add(p.label); }
-    for (final p in _monthlyPurchase) { allMonths.add(p.label); }
-    for (final p in _monthlyProfit) { allMonths.add(p.label); }
+    for (final p in _monthlySales) {
+      allMonths.add(p.label);
+    }
+    for (final p in _monthlyPurchase) {
+      allMonths.add(p.label);
+    }
+    for (final p in _monthlyProfit) {
+      allMonths.add(p.label);
+    }
     final months = allMonths.toList()..sort();
 
     // Aggregate if > 12 months
     final period = autoSelectPeriod(months.length);
 
     final aggSales = aggregateChartData(
-      ReportChartData(dataPoints: _monthlySales, chartType: ReportChartType.bar, title: ''),
+      ReportChartData(
+          dataPoints: _monthlySales, chartType: ReportChartType.bar, title: ''),
       period,
     ).dataPoints;
     final aggPurchase = aggregateChartData(
-      ReportChartData(dataPoints: _monthlyPurchase, chartType: ReportChartType.bar, title: ''),
+      ReportChartData(
+          dataPoints: _monthlyPurchase,
+          chartType: ReportChartType.bar,
+          title: ''),
       period,
     ).dataPoints;
     final aggProfit = aggregateChartData(
-      ReportChartData(dataPoints: _monthlyProfit, chartType: ReportChartType.bar, title: ''),
+      ReportChartData(
+          dataPoints: _monthlyProfit,
+          chartType: ReportChartType.bar,
+          title: ''),
       period,
     ).dataPoints;
 
@@ -2401,7 +2472,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       marginValues.add(margin);
     }
     final avgMargin = marginValues.isNotEmpty
-        ? marginValues.fold<double>(0, (sum, v) => sum + v) / marginValues.length
+        ? marginValues.fold<double>(0, (sum, v) => sum + v) /
+            marginValues.length
         : 0.0;
     final avgMarginColor = avgMargin >= 20
         ? const Color(0xFF22C55E)
@@ -2414,16 +2486,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final purchaseSpots = <FlSpot>[];
     for (int i = 0; i < sortedLabels.length; i++) {
       salesSpots.add(FlSpot(i.toDouble(), salesMap[sortedLabels[i]] ?? 0));
-      purchaseSpots.add(FlSpot(i.toDouble(), purchaseMap[sortedLabels[i]] ?? 0));
+      purchaseSpots
+          .add(FlSpot(i.toDouble(), purchaseMap[sortedLabels[i]] ?? 0));
     }
 
     double rawMax = 0;
-    for (final s in salesSpots) { if (s.y > rawMax) rawMax = s.y; }
-    for (final s in purchaseSpots) { if (s.y > rawMax) rawMax = s.y; }
-    for (final v in profitMap.values) { if (v.abs() > rawMax) rawMax = v.abs(); }
+    for (final s in salesSpots) {
+      if (s.y > rawMax) rawMax = s.y;
+    }
+    for (final s in purchaseSpots) {
+      if (s.y > rawMax) rawMax = s.y;
+    }
+    for (final v in profitMap.values) {
+      if (v.abs() > rawMax) rawMax = v.abs();
+    }
     // Round maxY up to next nice interval so top gridline aligns with chart top
     final interval = rawMax > 0 ? rawMax / 4 : 1.0;
-    final niceInterval = (interval / 1000000).ceil() * 1000000.0; // round to nearest million
+    final niceInterval =
+        (interval / 1000000).ceil() * 1000000.0; // round to nearest million
     // Top gridline + small extra so fl_chart draws the line inside the chart
     final topGrid = ((rawMax / niceInterval).ceil()) * niceInterval;
     final maxY = topGrid + (niceInterval * 0.15);
@@ -2443,8 +2523,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Row(
             children: [
               Flexible(
-
-                child: Text('Sales · Purchase · Profit', style: AppTypography.chartSectionTitle),
+                child: Text('Sales · Purchase · Profit',
+                    style: AppTypography.chartSectionTitle),
               ),
               const SizedBox(width: 8),
               Container(
@@ -2455,7 +2535,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 child: Text(
                   'Avg ${avgMargin.toStringAsFixed(1)}%',
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: avgMarginColor),
+                  style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: avgMarginColor),
                 ),
               ),
             ],
@@ -2464,15 +2547,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
           // Legend
           Row(
             children: [
-              Container(width: 14, height: 3, decoration: BoxDecoration(color: AppColors.blue, borderRadius: BorderRadius.circular(2))),
+              Container(
+                  width: 14,
+                  height: 3,
+                  decoration: BoxDecoration(
+                      color: AppColors.blue,
+                      borderRadius: BorderRadius.circular(2))),
               const SizedBox(width: 4),
               Text('Sales', style: AppTypography.chartLegendLabel),
               const SizedBox(width: 12),
-              Container(width: 14, height: 3, decoration: BoxDecoration(color: AppColors.amber, borderRadius: BorderRadius.circular(2))),
+              Container(
+                  width: 14,
+                  height: 3,
+                  decoration: BoxDecoration(
+                      color: AppColors.amber,
+                      borderRadius: BorderRadius.circular(2))),
               const SizedBox(width: 4),
               Text('Purchase', style: AppTypography.chartLegendLabel),
               const SizedBox(width: 12),
-              Container(width: 10, height: 10, decoration: BoxDecoration(color: const Color(0xFF4CAF50), borderRadius: BorderRadius.circular(2))),
+              Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                      color: const Color(0xFF4CAF50),
+                      borderRadius: BorderRadius.circular(2))),
               const SizedBox(width: 4),
               Text('Profit', style: AppTypography.chartLegendLabel),
             ],
@@ -2492,7 +2590,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       show: true,
                       drawVerticalLine: false,
                       horizontalInterval: niceInterval,
-                      getDrawingHorizontalLine: (_) => FlLine(color: Colors.grey[300]!, strokeWidth: 0.5, dashArray: [4, 4]),
+                      getDrawingHorizontalLine: (_) => FlLine(
+                          color: Colors.grey[300]!,
+                          strokeWidth: 0.5,
+                          dashArray: [4, 4]),
                     ),
                     titlesData: FlTitlesData(
                       leftTitles: AxisTitles(
@@ -2501,9 +2602,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           reservedSize: 60 * ts,
                           interval: niceInterval,
                           getTitlesWidget: (value, meta) {
-                            if (value == meta.max || value == meta.min) return const SizedBox.shrink();
+                            if (value == meta.max || value == meta.min)
+                              return const SizedBox.shrink();
                             if (value == 0) {
-                              return Text('0', style: AppTypography.chartAxisLabel);
+                              return Text('0',
+                                  style: AppTypography.chartAxisLabel);
                             }
                             return Text(
                               AmountFormatter.short(value),
@@ -2512,15 +2615,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           },
                         ),
                       ),
-                      rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                      topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                      rightTitles: const AxisTitles(
+                          sideTitles: SideTitles(showTitles: false)),
+                      topTitles: const AxisTitles(
+                          sideTitles: SideTitles(showTitles: false)),
                       bottomTitles: AxisTitles(
                         sideTitles: SideTitles(
                           showTitles: true,
                           interval: 1,
                           getTitlesWidget: (value, meta) {
                             final idx = value.toInt();
-                            if (idx < 0 || idx >= sortedLabels.length) return const SizedBox.shrink();
+                            if (idx < 0 || idx >= sortedLabels.length)
+                              return const SizedBox.shrink();
                             return Padding(
                               padding: const EdgeInsets.only(top: 14),
                               child: Transform.rotate(
@@ -2542,7 +2648,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       show: true,
                       border: Border(
                         left: BorderSide(color: Colors.grey[300]!, width: 0.5),
-                        bottom: BorderSide(color: Colors.grey[300]!, width: 0.5),
+                        bottom:
+                            BorderSide(color: Colors.grey[300]!, width: 0.5),
                       ),
                     ),
                     barTouchData: BarTouchData(
@@ -2566,7 +2673,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             toY: profitVal.abs(),
                             color: const Color(0xFF4CAF50),
                             width: sortedLabels.length > 8 ? 6 : 10,
-                            borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+                            borderRadius: const BorderRadius.vertical(
+                                top: Radius.circular(4)),
                           ),
                         ],
                       );
@@ -2584,10 +2692,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       maxY: maxY,
                       gridData: const FlGridData(show: false),
                       titlesData: FlTitlesData(
-                        leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 60 * ts, getTitlesWidget: (_, __) => const SizedBox.shrink())),
-                        rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                        topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                        bottomTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        leftTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                                showTitles: true,
+                                reservedSize: 60 * ts,
+                                getTitlesWidget: (_, __) =>
+                                    const SizedBox.shrink())),
+                        rightTitles: const AxisTitles(
+                            sideTitles: SideTitles(showTitles: false)),
+                        topTitles: const AxisTitles(
+                            sideTitles: SideTitles(showTitles: false)),
+                        bottomTitles: const AxisTitles(
+                            sideTitles: SideTitles(showTitles: false)),
                       ),
                       borderData: FlBorderData(show: false),
                       lineTouchData: LineTouchData(
@@ -2595,13 +2711,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           getTooltipColor: (_) => const Color(0xFF1A1A2E),
                           getTooltipItems: (touchedSpots) {
                             return touchedSpots.map((spot) {
-                              final label = spot.barIndex == 0 ? 'Sales' : 'Purchase';
-                              final color = spot.barIndex == 0 ? AppColors.blue : AppColors.amber;
+                              final label =
+                                  spot.barIndex == 0 ? 'Sales' : 'Purchase';
+                              final color = spot.barIndex == 0
+                                  ? AppColors.blue
+                                  : AppColors.amber;
                               final idx = spot.x.toInt();
-                              final period = idx >= 0 && idx < sortedLabels.length ? sortedLabels[idx] : '';
+                              final period =
+                                  idx >= 0 && idx < sortedLabels.length
+                                      ? sortedLabels[idx]
+                                      : '';
                               return LineTooltipItem(
                                 '$period\n$label: ₹${AmountFormatter.shortSpaced(spot.y)}',
-                                TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w600),
+                                TextStyle(
+                                    color: color,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600),
                               );
                             }).toList();
                           },
@@ -2636,32 +2761,39 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-
   // ── Shared data preparation for trend charts ──────────────────────────────
 
   Map<String, dynamic>? _prepareTrendData() {
     if (_monthlySales.isEmpty && _monthlyPurchase.isEmpty) return null;
 
     final allMonths = <String>{};
-    for (final p in _monthlySales) { allMonths.add(p.label); }
-    for (final p in _monthlyPurchase) { allMonths.add(p.label); }
+    for (final p in _monthlySales) {
+      allMonths.add(p.label);
+    }
+    for (final p in _monthlyPurchase) {
+      allMonths.add(p.label);
+    }
     final months = allMonths.toList()..sort();
 
     final period = autoSelectPeriod(months.length);
 
     final aggSales = aggregateChartData(
-      ReportChartData(dataPoints: _monthlySales, chartType: ReportChartType.bar, title: ''),
+      ReportChartData(
+          dataPoints: _monthlySales, chartType: ReportChartType.bar, title: ''),
       period,
     ).dataPoints;
     final aggPurchase = aggregateChartData(
-      ReportChartData(dataPoints: _monthlyPurchase, chartType: ReportChartType.bar, title: ''),
+      ReportChartData(
+          dataPoints: _monthlyPurchase,
+          chartType: ReportChartType.bar,
+          title: ''),
       period,
     ).dataPoints;
 
     final labelSet = <String>{};
     final sortedLabels = <String>[];
-    final baseOrder = [aggSales, aggPurchase]
-        .reduce((a, b) => a.length >= b.length ? a : b);
+    final baseOrder =
+        [aggSales, aggPurchase].reduce((a, b) => a.length >= b.length ? a : b);
     for (final p in baseOrder) {
       if (labelSet.add(p.label)) sortedLabels.add(p.label);
     }
@@ -2678,12 +2810,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final purchaseSpots = <FlSpot>[];
     for (int i = 0; i < sortedLabels.length; i++) {
       salesSpots.add(FlSpot(i.toDouble(), salesMap[sortedLabels[i]] ?? 0));
-      purchaseSpots.add(FlSpot(i.toDouble(), purchaseMap[sortedLabels[i]] ?? 0));
+      purchaseSpots
+          .add(FlSpot(i.toDouble(), purchaseMap[sortedLabels[i]] ?? 0));
     }
 
     double rawMax = 0;
-    for (final s in salesSpots) { if (s.y > rawMax) rawMax = s.y; }
-    for (final s in purchaseSpots) { if (s.y > rawMax) rawMax = s.y; }
+    for (final s in salesSpots) {
+      if (s.y > rawMax) rawMax = s.y;
+    }
+    for (final s in purchaseSpots) {
+      if (s.y > rawMax) rawMax = s.y;
+    }
 
     final interval = rawMax > 0 ? rawMax / 4 : 1.0;
     final niceInterval = (interval / 1000000).ceil() * 1000000.0;
@@ -2728,25 +2865,41 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Sales vs Purchase Trend', style: AppTypography.chartSectionTitle),
+          Text('Sales vs Purchase Trend',
+              style: AppTypography.chartSectionTitle),
           const SizedBox(height: 4),
-          Text('Shaded area = Profit', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+          Text('Shaded area = Profit',
+              style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
           const SizedBox(height: 12),
           Row(
             children: [
-              Container(width: 14, height: 3, decoration: BoxDecoration(color: AppColors.blue, borderRadius: BorderRadius.circular(2))),
+              Container(
+                  width: 14,
+                  height: 3,
+                  decoration: BoxDecoration(
+                      color: AppColors.blue,
+                      borderRadius: BorderRadius.circular(2))),
               const SizedBox(width: 4),
               Text('Sales', style: AppTypography.chartLegendLabel),
               const SizedBox(width: 16),
-              Container(width: 14, height: 3, decoration: BoxDecoration(color: AppColors.amber, borderRadius: BorderRadius.circular(2))),
+              Container(
+                  width: 14,
+                  height: 3,
+                  decoration: BoxDecoration(
+                      color: AppColors.amber,
+                      borderRadius: BorderRadius.circular(2))),
               const SizedBox(width: 4),
               Text('Purchase', style: AppTypography.chartLegendLabel),
               const SizedBox(width: 16),
-              Container(width: 14, height: 8, decoration: BoxDecoration(
-                color: const Color(0xFF22C55E).withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(2),
-                border: Border.all(color: const Color(0xFF22C55E), width: 0.5),
-              )),
+              Container(
+                  width: 14,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF22C55E).withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(2),
+                    border:
+                        Border.all(color: const Color(0xFF22C55E), width: 0.5),
+                  )),
               const SizedBox(width: 4),
               Text('Profit', style: AppTypography.chartLegendLabel),
             ],
@@ -2757,93 +2910,120 @@ class _DashboardScreenState extends State<DashboardScreen> {
             child: Padding(
               padding: const EdgeInsets.only(right: 16),
               child: LineChart(
-              LineChartData(
-                minX: 0,
-                maxX: (sortedLabels.length - 1).toDouble(),
-                minY: 0,
-                maxY: maxY,
-                gridData: FlGridData(
-                  show: true,
-                  drawVerticalLine: false,
-                  horizontalInterval: niceInterval,
-                  getDrawingHorizontalLine: (_) => FlLine(color: Colors.grey[300]!, strokeWidth: 0.5, dashArray: [4, 4]),
-                ),
-                titlesData: FlTitlesData(
-                  leftTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true, reservedSize: 60 * ts, interval: niceInterval,
-                      getTitlesWidget: (value, meta) {
-                        if (value == meta.max || value == meta.min) return const SizedBox.shrink();
-                        return Text(AmountFormatter.short(value), style: AppTypography.chartAxisLabel);
-                      },
-                    ),
+                LineChartData(
+                  minX: 0,
+                  maxX: (sortedLabels.length - 1).toDouble(),
+                  minY: 0,
+                  maxY: maxY,
+                  gridData: FlGridData(
+                    show: true,
+                    drawVerticalLine: false,
+                    horizontalInterval: niceInterval,
+                    getDrawingHorizontalLine: (_) => FlLine(
+                        color: Colors.grey[300]!,
+                        strokeWidth: 0.5,
+                        dashArray: [4, 4]),
                   ),
-                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true, interval: 1, reservedSize: 46 * ts,
-                      getTitlesWidget: (value, meta) {
-                        final idx = value.toInt();
-                        if (idx < 0 || idx >= sortedLabels.length) return const SizedBox.shrink();
-                        return Padding(
-                          padding: const EdgeInsets.only(top: 14),
-                          child: Transform.rotate(
-                            angle: -0.5,
-                            child: Text(
-                              formatChartLabel(sortedLabels[idx]),
-                              style: AppTypography.chartAxisLabel,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                  titlesData: FlTitlesData(
+                    leftTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 60 * ts,
+                        interval: niceInterval,
+                        getTitlesWidget: (value, meta) {
+                          if (value == meta.max || value == meta.min)
+                            return const SizedBox.shrink();
+                          return Text(AmountFormatter.short(value),
+                              style: AppTypography.chartAxisLabel);
+                        },
+                      ),
+                    ),
+                    rightTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false)),
+                    topTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false)),
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        interval: 1,
+                        reservedSize: 46 * ts,
+                        getTitlesWidget: (value, meta) {
+                          final idx = value.toInt();
+                          if (idx < 0 || idx >= sortedLabels.length)
+                            return const SizedBox.shrink();
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 14),
+                            child: Transform.rotate(
+                              angle: -0.5,
+                              child: Text(
+                                formatChartLabel(sortedLabels[idx]),
+                                style: AppTypography.chartAxisLabel,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
-                          ),
-                        );
-                      },
+                          );
+                        },
+                      ),
                     ),
                   ),
-                ),
-                borderData: FlBorderData(show: true, border: Border(
-                  left: BorderSide(color: Colors.grey[300]!, width: 0.5),
-                  bottom: BorderSide(color: Colors.grey[300]!, width: 0.5),
-                )),
-                lineTouchData: LineTouchData(
-                  touchTooltipData: LineTouchTooltipData(
-                    getTooltipColor: (_) => const Color(0xFF1A1A2E),
-                    getTooltipItems: (touchedSpots) {
-                      return touchedSpots.map((spot) {
-                        final idx = spot.x.toInt();
-                        final pl = idx >= 0 && idx < sortedLabels.length ? sortedLabels[idx] : '';
-                        if (spot.barIndex == 0) {
-                          final s = salesMap[pl] ?? 0;
-                          final p = purchaseMap[pl] ?? 0;
+                  borderData: FlBorderData(
+                      show: true,
+                      border: Border(
+                        left: BorderSide(color: Colors.grey[300]!, width: 0.5),
+                        bottom:
+                            BorderSide(color: Colors.grey[300]!, width: 0.5),
+                      )),
+                  lineTouchData: LineTouchData(
+                    touchTooltipData: LineTouchTooltipData(
+                      getTooltipColor: (_) => const Color(0xFF1A1A2E),
+                      getTooltipItems: (touchedSpots) {
+                        return touchedSpots.map((spot) {
+                          final idx = spot.x.toInt();
+                          final pl = idx >= 0 && idx < sortedLabels.length
+                              ? sortedLabels[idx]
+                              : '';
+                          if (spot.barIndex == 0) {
+                            final s = salesMap[pl] ?? 0;
+                            final p = purchaseMap[pl] ?? 0;
+                            return LineTooltipItem(
+                              '$pl\nSales: ₹${AmountFormatter.shortSpaced(s)}\nProfit: ₹${AmountFormatter.shortSpaced(s - p)}',
+                              AppTypography.chartTooltipValue,
+                            );
+                          }
                           return LineTooltipItem(
-                            '$pl\nSales: ₹${AmountFormatter.shortSpaced(s)}\nProfit: ₹${AmountFormatter.shortSpaced(s - p)}',
+                            'Purchase: ₹${AmountFormatter.shortSpaced(spot.y)}',
                             AppTypography.chartTooltipValue,
                           );
-                        }
-                        return LineTooltipItem(
-                          'Purchase: ₹${AmountFormatter.shortSpaced(spot.y)}',
-                          AppTypography.chartTooltipValue,
-                        );
-                      }).toList();
-                    },
+                        }).toList();
+                      },
+                    ),
                   ),
+                  lineBarsData: [
+                    LineChartBarData(
+                      spots: salesSpots,
+                      isCurved: true,
+                      color: AppColors.blue,
+                      barWidth: 2.5,
+                      dotData: FlDotData(show: sortedLabels.length <= 12),
+                      belowBarData: BarAreaData(
+                          show: true,
+                          color:
+                              const Color(0xFF22C55E).withValues(alpha: 0.18)),
+                    ),
+                    LineChartBarData(
+                      spots: purchaseSpots,
+                      isCurved: true,
+                      color: AppColors.amber,
+                      barWidth: 2.5,
+                      dotData: FlDotData(show: sortedLabels.length <= 12),
+                      belowBarData:
+                          BarAreaData(show: true, color: AppColors.surface),
+                    ),
+                  ],
                 ),
-                lineBarsData: [
-                  LineChartBarData(
-                    spots: salesSpots, isCurved: true, color: AppColors.blue, barWidth: 2.5,
-                    dotData: FlDotData(show: sortedLabels.length <= 12),
-                    belowBarData: BarAreaData(show: true, color: const Color(0xFF22C55E).withValues(alpha: 0.18)),
-                  ),
-                  LineChartBarData(
-                    spots: purchaseSpots, isCurved: true, color: AppColors.amber, barWidth: 2.5,
-                    dotData: FlDotData(show: sortedLabels.length <= 12),
-                    belowBarData: BarAreaData(show: true, color: AppColors.surface),
-                  ),
-                ],
               ),
             ),
-          ),
           ),
         ],
       ),
@@ -2875,11 +3055,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     final maxMargin = marginValues.reduce((a, b) => a > b ? a : b);
     final minMargin = marginValues.reduce((a, b) => a < b ? a : b);
-    final avgMargin = marginValues.fold<double>(0, (s, v) => s + v) / marginValues.length;
+    final avgMargin =
+        marginValues.fold<double>(0, (s, v) => s + v) / marginValues.length;
 
     final chartMinY = (minMargin - 5).clamp(-100.0, 100.0);
     final chartMaxY = (maxMargin + 10).clamp(chartMinY + 10, 100.0);
-    final yInterval = ((chartMaxY - chartMinY) / 4).ceilToDouble().clamp(5.0, 25.0);
+    final yInterval =
+        ((chartMaxY - chartMinY) / 4).ceilToDouble().clamp(5.0, 25.0);
 
     final marginColor = avgMargin >= 20
         ? const Color(0xFF22C55E)
@@ -2901,7 +3083,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         children: [
           Row(
             children: [
-              Text('Profit Margin Trend', style: AppTypography.chartSectionTitle),
+              Text('Profit Margin Trend',
+                  style: AppTypography.chartSectionTitle),
               const Spacer(),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -2911,110 +3094,148 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 child: Text(
                   'Avg ${avgMargin.toStringAsFixed(1)}%',
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: marginColor),
+                  style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: marginColor),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 4),
-          Text('(Sales − Purchase) ÷ Sales × 100', style: TextStyle(fontSize: 10, color: AppColors.textSecondary)),
+          Text('(Sales − Purchase) ÷ Sales × 100',
+              style: TextStyle(fontSize: 10, color: AppColors.textSecondary)),
           const SizedBox(height: 16),
           SizedBox(
             height: 180 * ts,
             child: Padding(
               padding: const EdgeInsets.only(right: 16),
               child: LineChart(
-              LineChartData(
-                clipData: const FlClipData.all(),
-                minX: 0,
-                maxX: (sortedLabels.length - 1).toDouble(),
-                minY: chartMinY,
-                maxY: chartMaxY,
-                gridData: FlGridData(
-                  show: true, drawVerticalLine: false, horizontalInterval: yInterval,
-                  getDrawingHorizontalLine: (_) => FlLine(color: Colors.grey[300]!, strokeWidth: 0.5, dashArray: [4, 4]),
-                ),
-                titlesData: FlTitlesData(
-                  leftTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true, reservedSize: 40 * ts, interval: yInterval,
-                      getTitlesWidget: (value, meta) {
-                        if (value == meta.max || value == meta.min) return const SizedBox.shrink();
-                        return Text('${value.toStringAsFixed(0)}%', style: AppTypography.chartAxisLabel);
-                      },
+                LineChartData(
+                  clipData: const FlClipData.all(),
+                  minX: 0,
+                  maxX: (sortedLabels.length - 1).toDouble(),
+                  minY: chartMinY,
+                  maxY: chartMaxY,
+                  gridData: FlGridData(
+                    show: true,
+                    drawVerticalLine: false,
+                    horizontalInterval: yInterval,
+                    getDrawingHorizontalLine: (_) => FlLine(
+                        color: Colors.grey[300]!,
+                        strokeWidth: 0.5,
+                        dashArray: [4, 4]),
+                  ),
+                  titlesData: FlTitlesData(
+                    leftTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 40 * ts,
+                        interval: yInterval,
+                        getTitlesWidget: (value, meta) {
+                          if (value == meta.max || value == meta.min)
+                            return const SizedBox.shrink();
+                          return Text('${value.toStringAsFixed(0)}%',
+                              style: AppTypography.chartAxisLabel);
+                        },
+                      ),
+                    ),
+                    rightTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false)),
+                    topTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false)),
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        interval: 1,
+                        reservedSize: 44 * ts,
+                        getTitlesWidget: (value, meta) {
+                          final idx = value.toInt();
+                          if (idx < 0 || idx >= sortedLabels.length)
+                            return const SizedBox.shrink();
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 10),
+                            child: Transform.rotate(
+                              angle: -0.45,
+                              child: Text(formatChartLabel(sortedLabels[idx]),
+                                  style: AppTypography.chartAxisLabel),
+                            ),
+                          );
+                        },
+                      ),
                     ),
                   ),
-                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true, interval: 1, reservedSize: 44 * ts,
-                      getTitlesWidget: (value, meta) {
-                        final idx = value.toInt();
-                        if (idx < 0 || idx >= sortedLabels.length) return const SizedBox.shrink();
-                        return Padding(
-                          padding: const EdgeInsets.only(top: 10),
-                          child: Transform.rotate(
-                            angle: -0.45,
-                            child: Text(formatChartLabel(sortedLabels[idx]), style: AppTypography.chartAxisLabel),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-                borderData: FlBorderData(show: true, border: Border(
-                  left: BorderSide(color: Colors.grey[300]!, width: 0.5),
-                  bottom: BorderSide(color: Colors.grey[300]!, width: 0.5),
-                )),
-                lineTouchData: LineTouchData(
-                  touchTooltipData: LineTouchTooltipData(
-                    getTooltipColor: (_) => const Color(0xFF1A1A2E),
-                    getTooltipItems: (touchedSpots) {
-                      return touchedSpots.map((spot) {
-                        final idx = spot.x.toInt();
-                        final pl = idx >= 0 && idx < sortedLabels.length ? sortedLabels[idx] : '';
-                        final s = salesMap[pl] ?? 0;
-                        final p = purchaseMap[pl] ?? 0;
-                        return LineTooltipItem(
-                          '$pl\nMargin: ${spot.y.toStringAsFixed(1)}%\nProfit: ₹${AmountFormatter.shortSpaced(s - p)}',
-                          AppTypography.chartTooltipValue,
-                        );
-                      }).toList();
-                    },
-                  ),
-                ),
-                lineBarsData: [
-                  LineChartBarData(
-                    spots: marginSpots, isCurved: true, curveSmoothness: 0.2, preventCurveOverShooting: true, color: marginColor, barWidth: 2.5,
-                    dotData: FlDotData(
+                  borderData: FlBorderData(
                       show: true,
-                      getDotPainter: (spot, _, __, ___) => FlDotCirclePainter(
-                        radius: 3.5, color: marginColor, strokeWidth: 1.5, strokeColor: Colors.white,
-                      ),
+                      border: Border(
+                        left: BorderSide(color: Colors.grey[300]!, width: 0.5),
+                        bottom:
+                            BorderSide(color: Colors.grey[300]!, width: 0.5),
+                      )),
+                  lineTouchData: LineTouchData(
+                    touchTooltipData: LineTouchTooltipData(
+                      getTooltipColor: (_) => const Color(0xFF1A1A2E),
+                      getTooltipItems: (touchedSpots) {
+                        return touchedSpots.map((spot) {
+                          final idx = spot.x.toInt();
+                          final pl = idx >= 0 && idx < sortedLabels.length
+                              ? sortedLabels[idx]
+                              : '';
+                          final s = salesMap[pl] ?? 0;
+                          final p = purchaseMap[pl] ?? 0;
+                          return LineTooltipItem(
+                            '$pl\nMargin: ${spot.y.toStringAsFixed(1)}%\nProfit: ₹${AmountFormatter.shortSpaced(s - p)}',
+                            AppTypography.chartTooltipValue,
+                          );
+                        }).toList();
+                      },
                     ),
-                    belowBarData: BarAreaData(show: true, color: marginColor.withValues(alpha: 0.10)),
                   ),
-                ],
-                extraLinesData: ExtraLinesData(
-                  horizontalLines: [
-                    HorizontalLine(
-                      y: avgMargin,
-                      color: marginColor.withValues(alpha: 0.5),
-                      strokeWidth: 1,
-                      dashArray: [6, 4],
-                      label: HorizontalLineLabel(
+                  lineBarsData: [
+                    LineChartBarData(
+                      spots: marginSpots,
+                      isCurved: true,
+                      curveSmoothness: 0.2,
+                      preventCurveOverShooting: true,
+                      color: marginColor,
+                      barWidth: 2.5,
+                      dotData: FlDotData(
                         show: true,
-                        alignment: Alignment.topRight,
-                        style: TextStyle(fontSize: 11, color: marginColor, fontWeight: FontWeight.w600),
-                        labelResolver: (_) => 'Avg ${avgMargin.toStringAsFixed(1)}%',
+                        getDotPainter: (spot, _, __, ___) => FlDotCirclePainter(
+                          radius: 3.5,
+                          color: marginColor,
+                          strokeWidth: 1.5,
+                          strokeColor: Colors.white,
+                        ),
                       ),
+                      belowBarData: BarAreaData(
+                          show: true,
+                          color: marginColor.withValues(alpha: 0.10)),
                     ),
                   ],
+                  extraLinesData: ExtraLinesData(
+                    horizontalLines: [
+                      HorizontalLine(
+                        y: avgMargin,
+                        color: marginColor.withValues(alpha: 0.5),
+                        strokeWidth: 1,
+                        dashArray: [6, 4],
+                        label: HorizontalLineLabel(
+                          show: true,
+                          alignment: Alignment.topRight,
+                          style: TextStyle(
+                              fontSize: 11,
+                              color: marginColor,
+                              fontWeight: FontWeight.w600),
+                          labelResolver: (_) =>
+                              'Avg ${avgMargin.toStringAsFixed(1)}%',
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
           ),
         ],
       ),
@@ -3039,8 +3260,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           boxShadow: AppShadows.card,
           border: AppShadows.cardBorder,
         ),
-        child: const Center(
-            child: CircularProgressIndicator(strokeWidth: 2)),
+        child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
       );
     }
 
@@ -3075,9 +3295,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     return KpiSection(
       onEditTap: _openKpiManager,
-      children:
-          _kpiConfigs.asMap().entries.map((entry) {
-        final i      = entry.key;
+      children: _kpiConfigs.asMap().entries.map((entry) {
+        final i = entry.key;
         final config = entry.value;
         final metric = getMetricById(config.metricId);
         if (metric == null) return const SizedBox.shrink();

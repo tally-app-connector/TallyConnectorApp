@@ -133,11 +133,13 @@ import 'database/database_helper.dart';
 import 'utils/secure_storage.dart';
 import 'services/auth_service.dart';
 
-// ── Navigation destination imports ────────────────────────────────────────────
+// ── Desktop-only imports ─────────────────────────────────────────────────────
 import 'screens/desktop/setting_screen.dart';
-import 'screens/mobile/database_overview_screen.dart';
 import 'screens/home/analytics_dashboard.dart';
 import 'screens/Analysis/analysis_home_screen.dart';
+
+// ── Mobile-only imports ──────────────────────────────────────────────────────
+import 'screens/mobile/database_overview_screen.dart';
 import 'screens/mobile/reports_overview_screen.dart';
 import 'screens/mobile/mobile_profile_tab.dart';
 import 'screens/theme/app_theme.dart';
@@ -593,6 +595,7 @@ class _AppShellState extends State<AppShell> with SingleTickerProviderStateMixin
 
   @override
   Widget build(BuildContext context) {
+    syncBrightness(context);
     return widget.isMobile ? _buildMobileShell() : _buildDesktopShell();
   }
 
@@ -630,12 +633,19 @@ class _AppShellState extends State<AppShell> with SingleTickerProviderStateMixin
           ),
           // ── Screen content ───────────────────────────────────────────────
           Expanded(
-            child: IndexedStack(
-              index: _currentIndex,
-              children: List.generate(
-                _desktopDestinations.length,
-                (i) => _desktopScreenForIndex(i),
-              ),
+            child: ValueListenableBuilder<ThemeMode>(
+              valueListenable: themeModeNotifier,
+              builder: (context, mode, __) {
+                syncBrightness(context);
+                return IndexedStack(
+                  key: ValueKey(mode),
+                  index: _currentIndex,
+                  children: List.generate(
+                    _desktopDestinations.length,
+                    (i) => _desktopScreenForIndex(i),
+                  ),
+                );
+              },
             ),
           ),
         ],

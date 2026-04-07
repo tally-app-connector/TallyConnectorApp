@@ -5,21 +5,24 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class FontScaleNotifier extends ValueNotifier<double> {
   static const String _key = 'app_font_scale';
-  static const double defaultScale = 1.15;
+  static const double defaultScale = 1.0;
 
   // Available options: label → scale factor
   static const Map<String, double> options = {
     'Small': 0.85,
-    'Default': 1.20,
-    'Large': 1.30,
-    'Extra Large': 1.50,
+    'Default': 1.0,
+    'Large': 1.15,
+    'Extra Large': 1.30,
   };
 
   FontScaleNotifier() : super(defaultScale);
 
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
-    value = prefs.getDouble(_key) ?? defaultScale;
+    final saved = prefs.getDouble(_key) ?? defaultScale;
+    // Snap to nearest option so selection always highlights
+    final match = options.values.where((v) => (v - saved).abs() < 0.01);
+    value = match.isNotEmpty ? match.first : defaultScale;
   }
 
   Future<void> setScale(double scale) async {
@@ -53,17 +56,23 @@ class ThemeModeNotifier extends ValueNotifier<ThemeMode> {
 
   static ThemeMode _fromString(String s) {
     switch (s) {
-      case 'light': return ThemeMode.light;
-      case 'dark': return ThemeMode.dark;
-      default: return ThemeMode.system;
+      case 'light':
+        return ThemeMode.light;
+      case 'dark':
+        return ThemeMode.dark;
+      default:
+        return ThemeMode.system;
     }
   }
 
   static String _toString(ThemeMode m) {
     switch (m) {
-      case ThemeMode.light: return 'light';
-      case ThemeMode.dark: return 'dark';
-      case ThemeMode.system: return 'system';
+      case ThemeMode.light:
+        return 'light';
+      case ThemeMode.dark:
+        return 'dark';
+      case ThemeMode.system:
+        return 'system';
     }
   }
 }
@@ -75,33 +84,51 @@ final themeModeNotifier = ThemeModeNotifier();
 Brightness _appBrightness = Brightness.light;
 void setAppBrightness(Brightness b) => _appBrightness = b;
 
+/// Call this at the top of any screen's build() to ensure AppColors
+/// reflects the current theme. Reads brightness from the nearest Theme.
+void syncBrightness(BuildContext context) {
+  _appBrightness = Theme.of(context).brightness;
+}
+
 // ── Colors ────────────────────────────────────────────────────────────────────
 
 class AppColors {
   static bool get _dark => _appBrightness == Brightness.dark;
 
   // Semantic colors
-  static Color get background    => _dark ? const Color(0xFF121218) : const Color(0xFFF7F8FA);
-  static Color get surface       => _dark ? const Color(0xFF1E1E2A) : const Color(0xFFFFFFFF);
-  static Color get textPrimary   => _dark ? const Color(0xFFE8E8ED) : const Color(0xFF1A1A2E);
-  static Color get textSecondary => _dark ? const Color(0xFF8A8A9A) : const Color(0xFF9CA3AF);
-  static Color get divider       => _dark ? const Color(0xFF2C2C3A) : const Color(0xFFE5E7EB);
-  static Color get pillBg        => _dark ? const Color(0xFF252535) : const Color(0xFFF3F4F6);
-  static Color get chartGrid     => _dark ? const Color(0xFF2C2C3A) : const Color(0xFFD1D5DB);
+  static Color get background =>
+      _dark ? const Color(0xFF121218) : const Color(0xFFF7F8FA);
+  static Color get surface =>
+      _dark ? const Color(0xFF1E1E2A) : const Color(0xFFFFFFFF);
+  static Color get textPrimary =>
+      _dark ? const Color(0xFFE8E8ED) : const Color(0xFF1A1A2E);
+  static Color get textSecondary =>
+      _dark ? const Color(0xFF8A8A9A) : const Color(0xFF9CA3AF);
+  static Color get divider =>
+      _dark ? const Color(0xFF2C2C3A) : const Color(0xFFE5E7EB);
+  static Color get pillBg =>
+      _dark ? const Color(0xFF252535) : const Color(0xFFF3F4F6);
+  static Color get chartGrid =>
+      _dark ? const Color(0xFF2C2C3A) : const Color(0xFFD1D5DB);
 
   // Brand colors — same in both modes
-  static const blue   = Color(0xFF2D8BE0);
-  static const green  = Color(0xFF16A34A);
-  static const red    = Color(0xFFEF4444);
-  static const amber  = Color(0xFFF59E0B);
+  static const blue = Color(0xFF2D8BE0);
+  static const green = Color(0xFF16A34A);
+  static const red = Color(0xFFEF4444);
+  static const amber = Color(0xFFF59E0B);
   static const purple = Color(0xFF8B5CF6);
 
   // Icon backgrounds — dimmed for dark
-  static Color get iconBgBlue   => _dark ? const Color(0xFF1A2A40) : const Color(0xFFEBF5FF);
-  static Color get iconBgGreen  => _dark ? const Color(0xFF152E20) : const Color(0xFFECFDF5);
-  static Color get iconBgAmber  => _dark ? const Color(0xFF2E2510) : const Color(0xFFFFFBEB);
-  static Color get iconBgPurple => _dark ? const Color(0xFF201A35) : const Color(0xFFF5F3FF);
-  static Color get iconBgRed    => _dark ? const Color(0xFF2E1515) : const Color(0xFFFEF2F2);
+  static Color get iconBgBlue =>
+      _dark ? const Color(0xFF1A2A40) : const Color(0xFFEBF5FF);
+  static Color get iconBgGreen =>
+      _dark ? const Color(0xFF152E20) : const Color(0xFFECFDF5);
+  static Color get iconBgAmber =>
+      _dark ? const Color(0xFF2E2510) : const Color(0xFFFFFBEB);
+  static Color get iconBgPurple =>
+      _dark ? const Color(0xFF201A35) : const Color(0xFFF5F3FF);
+  static Color get iconBgRed =>
+      _dark ? const Color(0xFF2E1515) : const Color(0xFFFEF2F2);
 }
 
 // ── Typography ────────────────────────────────────────────────────────────────
@@ -111,79 +138,80 @@ class AppTypography {
   static const String fontSerif = 'Inter';
 
   static TextStyle get dashboardLabel => TextStyle(
-    fontSize: 11,
-    fontWeight: FontWeight.w600,
-    letterSpacing: 1.5,
-    color: AppColors.textSecondary,
-  );
+        fontSize: 11,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 1.5,
+        color: AppColors.textSecondary,
+      );
 
   static TextStyle get companyName => TextStyle(
-    fontSize: 14,
-    fontWeight: FontWeight.w600,
-    color: AppColors.textPrimary,
-  );
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+        color: AppColors.textPrimary,
+      );
 
   static TextStyle get cardLabel => TextStyle(
-    fontSize: 11,
-    fontWeight: FontWeight.w600,
-    letterSpacing: 0.8,
-    color: AppColors.textSecondary,
-  );
+        fontSize: 11,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0.8,
+        color: AppColors.textSecondary,
+      );
 
   static TextStyle get cardValue => TextStyle(
-    fontSize: 22,
-    fontWeight: FontWeight.w700,
-    color: AppColors.textPrimary,
-    letterSpacing: -0.5,
-  );
+        fontSize: 22,
+        fontWeight: FontWeight.w700,
+        color: AppColors.textPrimary,
+        letterSpacing: -0.5,
+      );
 
   static TextStyle get cardUnit => TextStyle(
-    fontSize: 13,
-    fontWeight: FontWeight.w500,
-    color: AppColors.textSecondary,
-  );
+        fontSize: 13,
+        fontWeight: FontWeight.w500,
+        color: AppColors.textSecondary,
+      );
 
   static TextStyle get pageTitle => TextStyle(
-    fontSize: 18,
-    fontWeight: FontWeight.w700,
-    color: AppColors.textPrimary,
-  );
+        fontSize: 18,
+        fontWeight: FontWeight.w700,
+        color: AppColors.textPrimary,
+      );
 
   static TextStyle get itemTitle => TextStyle(
-    fontSize: 14,
-    fontWeight: FontWeight.w600,
-    color: AppColors.textPrimary,
-  );
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+        color: AppColors.textPrimary,
+      );
 
   static TextStyle get itemSubtitle => TextStyle(
-    fontSize: 12,
-    color: AppColors.textSecondary,
-  );
+        fontSize: 12,
+        color: AppColors.textSecondary,
+      );
 
   // ── Chart common styles ──────────────────────────────────────────────
   static TextStyle get chartAxisLabel => TextStyle(
-    fontSize: 10,
-    fontWeight: FontWeight.w500,
-    color: AppColors.textSecondary,
-  );
+        fontSize: 10,
+        fontWeight: FontWeight.w500,
+        color: AppColors.textSecondary,
+      );
 
   static TextStyle get chartSectionTitle => TextStyle(
-    fontSize: 13,
-    fontWeight: FontWeight.w600,
-    letterSpacing: 0.5,
-    color: AppColors._dark ? const Color(0xFFD0D0DA) : const Color(0xFF4A4A5A),
-  );
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0.5,
+        color:
+            AppColors._dark ? const Color(0xFFD0D0DA) : const Color(0xFF4A4A5A),
+      );
 
   static TextStyle get chartLegendLabel => TextStyle(
-    fontSize: 11,
-    color: AppColors.textSecondary,
-  );
+        fontSize: 11,
+        color: AppColors.textSecondary,
+      );
 
   static TextStyle get chartLegendValue => TextStyle(
-    fontSize: 12,
-    fontWeight: FontWeight.w600,
-    color: AppColors.textPrimary,
-  );
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+        color: AppColors.textPrimary,
+      );
 
   static const chartTooltipLabel = TextStyle(
     fontSize: 12,
@@ -204,9 +232,9 @@ class AppTypography {
   );
 
   static TextStyle get badge => TextStyle(
-    fontSize: 11,
-    fontWeight: FontWeight.w600,
-  );
+        fontSize: 11,
+        fontWeight: FontWeight.w600,
+      );
 
   static const pillActive = TextStyle(
     fontSize: 12,
@@ -215,10 +243,10 @@ class AppTypography {
   );
 
   static TextStyle get pillInactive => TextStyle(
-    fontSize: 12,
-    fontWeight: FontWeight.w500,
-    color: AppColors.textSecondary,
-  );
+        fontSize: 12,
+        fontWeight: FontWeight.w500,
+        color: AppColors.textSecondary,
+      );
 }
 
 class AppSpacing {
@@ -238,18 +266,32 @@ class AppShadows {
 
   static List<BoxShadow> get card => _dark
       ? []
-      : [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 12, offset: const Offset(0, 2))];
+      : [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 12,
+              offset: const Offset(0, 2))
+        ];
 
   static List<BoxShadow> get headerIcon => _dark
       ? []
-      : [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 1))];
+      : [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.03),
+              blurRadius: 8,
+              offset: const Offset(0, 1))
+        ];
 
   static List<BoxShadow> get pillActive => _dark
       ? []
-      : [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 4, offset: const Offset(0, 1))];
+      : [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 4,
+              offset: const Offset(0, 1))
+        ];
 
   // Use this border for cards in dark mode instead of shadows
-  static Border? get cardBorder => _dark
-      ? Border.all(color: AppColors.divider, width: 0.5)
-      : null;
+  static Border? get cardBorder =>
+      _dark ? Border.all(color: AppColors.divider, width: 0.5) : null;
 }

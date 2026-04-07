@@ -601,18 +601,60 @@ class _ReceivableScreenState extends State<ReceivableScreen> {
     final total = amounts.reduce((a, b) => a + b);
     if (total <= 0) return const SizedBox.shrink();
 
+    // Build legend items (only non-zero buckets)
+    final legendItems = <Widget>[];
+    for (int i = 0; i < 7; i++) {
+      if (amounts[i] <= 0) continue;
+      final pct = amounts[i] / total * 100;
+      final pctText = pct < 1 ? '<1%' : '${pct.toStringAsFixed(0)}%';
+      legendItems.add(
+        Padding(
+          padding: const EdgeInsets.only(bottom: 5),
+          child: Row(
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: _bucketColors[i],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(width: 4),
+              Text(_bucketLabels[i],
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      fontSize: 9, color: AppColors.textPrimary)),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(AmountFormatter.short(amounts[i]),
+                    maxLines: 1,
+                    style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary)),
+              ),
+              Text(pctText,
+                  style: TextStyle(
+                      fontSize: 9, color: AppColors.textSecondary)),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Row(
       children: [
         SizedBox(
-          width: 160,
-          height: 160,
+          width: 110,
+          height: 110,
           child: PieChart(
             PieChartData(
               sectionsSpace: 2,
-              centerSpaceRadius: 28,
+              centerSpaceRadius: 18,
               sections: () {
-                // Give small slices a minimum visible value
-                final minSlice = total * 0.03; // 3% minimum
+                final minSlice = total * 0.03;
                 final adjusted = List<double>.generate(
                     7,
                     (i) => amounts[i] > 0
@@ -628,67 +670,23 @@ class _ReceivableScreenState extends State<ReceivableScreen> {
                       showTitle: false,
                     );
                   }
-                  final pct = amounts[i] / total * 100;
                   return PieChartSectionData(
                     color: _bucketColors[i],
                     value: adjusted[i],
-                    title: pct >= 3 ? '${pct.toStringAsFixed(1)}%' : '',
-                    radius: 42,
-                    titleStyle: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                    ),
-                    titlePositionPercentageOffset: 0.55,
+                    title: '',
+                    radius: 28,
+                    showTitle: false,
                   );
                 });
               }(),
             ),
           ),
         ),
-        const SizedBox(width: 16),
+        const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: List.generate(7, (i) {
-              if (amounts[i] <= 0) return const SizedBox.shrink();
-              final pct = amounts[i] / total * 100;
-              final pctText = pct < 1 ? '<1%' : '${pct.toStringAsFixed(0)}%';
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 5),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: _bucketColors[i],
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(_bucketLabels[i],
-                          style: TextStyle(
-                              fontSize: 11, color: AppColors.textPrimary)),
-                    ),
-                    Text(AmountFormatter.short(amounts[i]),
-                        style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textPrimary)),
-                    const SizedBox(width: 6),
-                    SizedBox(
-                      width: 32,
-                      child: Text(pctText,
-                          textAlign: TextAlign.right,
-                          style: TextStyle(
-                              fontSize: 10, color: AppColors.textSecondary)),
-                    ),
-                  ],
-                ),
-              );
-            }),
+            children: legendItems,
           ),
         ),
       ],
@@ -779,7 +777,7 @@ class _ReceivableScreenState extends State<ReceivableScreen> {
           child: Text(
             'AGING PARTY WISE OUTSTANDING',
             style: AppTypography.dashboardLabel
-                .copyWith(color: AppColors.textSecondary),
+                .copyWith(color: AppColors.textSecondary, letterSpacing: 0.8),
           ),
         ),
         // Top 4 parties
@@ -905,13 +903,11 @@ class _ReceivableScreenState extends State<ReceivableScreen> {
                   ),
                 ),
                 const SizedBox(width: 6),
-                SizedBox(
-                  width: 28,
-                  child: Text('${pct.toStringAsFixed(0)}%',
-                      style: TextStyle(
-                          fontSize: 9, color: AppColors.textSecondary),
-                      textAlign: TextAlign.right),
-                ),
+                Text('${pct.toStringAsFixed(0)}%',
+                    maxLines: 1,
+                    style: TextStyle(
+                        fontSize: 9, color: AppColors.textSecondary),
+                    textAlign: TextAlign.right),
               ],
             ),
           ],

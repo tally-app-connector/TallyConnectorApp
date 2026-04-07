@@ -58,17 +58,26 @@ class DetailSearchBar extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.divider),
       ),
-      child: TextField(
-        controller: controller,
-        onChanged: onChanged,
-        style: const TextStyle(fontSize: 14),
-        decoration: InputDecoration(
-          hintText: placeholder,
-          hintStyle: TextStyle(fontSize: 14, color: AppColors.textSecondary),
-          prefixIcon: Icon(Icons.search, size: 20, color: AppColors.textSecondary),
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(vertical: 12),
-        ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          const SizedBox(width: 12),
+          Icon(Icons.search, size: 20, color: AppColors.textSecondary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: TextField(
+              controller: controller,
+              onChanged: onChanged,
+              style: const TextStyle(fontSize: 14),
+              decoration: InputDecoration(
+                hintText: placeholder,
+                hintStyle: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+                border: InputBorder.none,
+                isCollapsed: true,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -121,14 +130,16 @@ class _ExpandableCardState extends State<ExpandableCard> {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-            child: Text(widget.title, style: AppTypography.cardLabel),
+            child: Text(widget.title, style: AppTypography.chartSectionTitle),
           ),
           ...visible,
           if (canLoadMore)
             TextButton(
-              onPressed: () => setState(() => _visibleCount += widget.loadMoreCount),
+              onPressed: () =>
+                  setState(() => _visibleCount += widget.loadMoreCount),
               child: Center(
-                child: Text('Show more', style: TextStyle(fontSize: 13, color: AppColors.blue)),
+                child: Text('Show more',
+                    style: TextStyle(fontSize: 13, color: AppColors.blue)),
               ),
             ),
           const SizedBox(height: 8),
@@ -185,7 +196,10 @@ class TopSellingItemRow extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(name, style: AppTypography.itemTitle, overflow: TextOverflow.ellipsis),
+                    Text(name,
+                        style: AppTypography.itemTitle,
+                        maxLines: 5,
+                        overflow: TextOverflow.ellipsis),
                     Text(units, style: AppTypography.itemSubtitle),
                   ],
                 ),
@@ -193,11 +207,15 @@ class TopSellingItemRow extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text(revenue, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                  Text(revenue,
+                      style: const TextStyle(
+                          fontSize: 14, fontWeight: FontWeight.w600)),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                     decoration: BoxDecoration(
-                      color: (isPositive ? AppColors.green : AppColors.red).withValues(alpha: 0.12),
+                      color: (isPositive ? AppColors.green : AppColors.red)
+                          .withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
@@ -214,7 +232,8 @@ class TopSellingItemRow extends StatelessWidget {
             ],
           ),
         ),
-        if (showDivider) Divider(height: 1, indent: 52, color: AppColors.divider),
+        if (showDivider)
+          Divider(height: 1, indent: 52, color: AppColors.divider),
       ],
     );
   }
@@ -318,7 +337,8 @@ class DateRangeSelector extends StatelessWidget {
               decoration: BoxDecoration(
                 color: isSelected ? AppColors.blue : AppColors.surface,
                 borderRadius: BorderRadius.circular(20),
-                border: isSelected ? null : Border.all(color: AppColors.divider),
+                border:
+                    isSelected ? null : Border.all(color: AppColors.divider),
               ),
               child: Text(
                 opt.$1,

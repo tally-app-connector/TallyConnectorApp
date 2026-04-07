@@ -41,6 +41,18 @@ class ReportChart extends StatelessWidget {
         return _buildAreaChart();
       case ReportChartType.pie:
         return _buildPieChart();
+      case ReportChartType.scatter:
+        return _buildScatterChart();
+      case ReportChartType.stepLine:
+        return _buildStepLineChart();
+      case ReportChartType.rangeLine:
+        return _buildRangeLineChart();
+      case ReportChartType.gradientBar:
+        return _buildGradientBarChart();
+      case ReportChartType.lollipop:
+        return _buildLollipopChart();
+      case ReportChartType.candlestick:
+        return _buildCandlestickChart();
     }
   }
 
@@ -770,6 +782,948 @@ class ReportChart extends StatelessWidget {
       rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
     );
   }
+
+  // ── SCATTER CHART ─────────────────────────────────────────────────────────
+
+  Widget _buildScatterChart() {
+    final rawMaxY = data.dataPoints
+        .fold<double>(0, (p, dp) => dp.value.abs() > p ? dp.value.abs() : p);
+    if (rawMaxY == 0) {
+      return SizedBox(
+        height: height,
+        child: Center(
+            child: Text('No data for selected period',
+                style: TextStyle(color: AppColors.textSecondary))),
+      );
+    }
+
+    final niceInterval = _chartNiceInterval(rawMaxY);
+    final adjustedMaxY = (rawMaxY / niceInterval).ceil() * niceInterval;
+    final maxY = adjustedMaxY + (adjustedMaxY * 0.02);
+    final defaultColor =
+        data.legends.isNotEmpty ? data.legends.first.color : AppColors.blue;
+    final hasMultipleColors = data.legends.length > 1 &&
+        data.legends.length == data.dataPoints.length;
+
+    return Padding(
+      padding: const EdgeInsets.only(right: 10),
+      child: SizedBox(
+        height: height,
+        child: ScatterChart(
+          ScatterChartData(
+            maxY: maxY,
+            minY: 0,
+            maxX: (data.dataPoints.length - 1).toDouble() + 0.5,
+            minX: -0.5,
+            scatterTouchData: ScatterTouchData(
+              enabled: true,
+              touchTooltipData: ScatterTouchTooltipData(
+                fitInsideHorizontally: true,
+                fitInsideVertically: true,
+                getTooltipColor: (_) => const Color(0xFF1A1A2E),
+                getTooltipItems: (touchedSpot) {
+                  final index = touchedSpot.x.toInt();
+                  final label = index >= 0 && index < data.dataPoints.length
+                      ? _formatLabel(data.dataPoints[index].label)
+                      : '';
+                  return ScatterTooltipItem(
+                    '$label\n${AmountFormatter.shortSpaced(touchedSpot.y)}',
+                    textStyle: AppTypography.chartTooltipValue,
+                  );
+                },
+              ),
+            ),
+            titlesData: _buildTitlesData(adjustedMaxY, niceInterval),
+            borderData: FlBorderData(
+              show: true,
+              border: Border(
+                bottom: BorderSide(color: AppColors.divider, width: 0.5),
+                left: BorderSide(color: AppColors.divider, width: 0.5),
+              ),
+            ),
+            gridData: FlGridData(
+              show: true,
+              drawVerticalLine: false,
+              horizontalInterval: niceInterval,
+              getDrawingHorizontalLine: (value) => FlLine(
+                color: const Color(0xFFBFC3CA),
+                strokeWidth: 0.8,
+                dashArray: [5, 3],
+              ),
+            ),
+            scatterSpots: data.dataPoints.asMap().entries.map((entry) {
+              final index = entry.key;
+              final point = entry.value;
+              final dotColor = hasMultipleColors
+                  ? data.legends[index].color
+                  : defaultColor;
+              final normalizedRadius =
+                  4 + (point.value.abs() / rawMaxY) * 12;
+              return ScatterSpot(
+                index.toDouble(),
+                point.value.abs(),
+                dotPainter: FlDotCirclePainter(
+                  radius: normalizedRadius,
+                  color: dotColor.withValues(alpha: 0.7),
+                  strokeWidth: 2,
+                  strokeColor: dotColor,
+                ),
+              );
+            }).toList(),
+          ),
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOutCubic,
+        ),
+      ),
+    );
+  }
+
+  // ── STEP LINE CHART ───────────────────────────────────────────────────────
+
+  Widget _buildStepLineChart() {
+    final rawMaxY = data.dataPoints
+        .fold<double>(0, (p, dp) => dp.value.abs() > p ? dp.value.abs() : p);
+    if (rawMaxY == 0) {
+      return SizedBox(
+        height: height,
+        child: Center(
+            child: Text('No data for selected period',
+                style: TextStyle(color: AppColors.textSecondary))),
+      );
+    }
+
+    final niceInterval = _chartNiceInterval(rawMaxY);
+    final adjustedMaxY = (rawMaxY / niceInterval).ceil() * niceInterval;
+    final maxY = adjustedMaxY + (adjustedMaxY * 0.02);
+    final lineColor =
+        data.legends.isNotEmpty ? data.legends.first.color : AppColors.blue;
+
+    final spots = data.dataPoints.asMap().entries.map((entry) {
+      return FlSpot(entry.key.toDouble(), entry.value.value.abs());
+    }).toList();
+
+    return Padding(
+      padding: const EdgeInsets.only(right: 10),
+      child: SizedBox(
+        height: height,
+        child: LineChart(
+          LineChartData(
+            maxY: maxY,
+            minY: 0,
+            lineTouchData: LineTouchData(
+              enabled: true,
+              touchTooltipData: LineTouchTooltipData(
+                fitInsideHorizontally: true,
+                fitInsideVertically: true,
+                getTooltipColor: (_) => const Color(0xFF1A1A2E),
+                getTooltipItems: (touchedSpots) {
+                  return touchedSpots.map((spot) {
+                    final index = spot.x.toInt();
+                    final label = index >= 0 && index < data.dataPoints.length
+                        ? _formatLabel(data.dataPoints[index].label)
+                        : '';
+                    return LineTooltipItem(
+                      '$label\n${AmountFormatter.shortSpaced(spot.y)}',
+                      AppTypography.chartTooltipValue,
+                    );
+                  }).toList();
+                },
+              ),
+            ),
+            titlesData: _buildTitlesData(adjustedMaxY, niceInterval),
+            borderData: FlBorderData(
+              show: true,
+              border: Border(
+                bottom: BorderSide(color: AppColors.divider, width: 0.5),
+                left: BorderSide(color: AppColors.divider, width: 0.5),
+              ),
+            ),
+            gridData: FlGridData(
+              show: true,
+              drawVerticalLine: false,
+              horizontalInterval: niceInterval,
+              getDrawingHorizontalLine: (value) => FlLine(
+                color: const Color(0xFFBFC3CA),
+                strokeWidth: 0.8,
+                dashArray: [5, 3],
+              ),
+            ),
+            lineBarsData: [
+              LineChartBarData(
+                spots: spots,
+                isCurved: false,
+                isStepLineChart: true,
+                color: lineColor,
+                barWidth: 2.5,
+                isStrokeCapRound: true,
+                dotData: FlDotData(
+                  show: true,
+                  getDotPainter: (spot, percent, barData, index) {
+                    return FlDotCirclePainter(
+                      radius: 3,
+                      color: Colors.white,
+                      strokeWidth: 2,
+                      strokeColor: lineColor,
+                    );
+                  },
+                ),
+                belowBarData: BarAreaData(
+                  show: true,
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      lineColor.withValues(alpha: 0.3),
+                      lineColor.withValues(alpha: 0.05),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOutCubic,
+        ),
+      ),
+    );
+  }
+
+  // ── RANGE LINE CHART ──────────────────────────────────────────────────────
+
+  static const _rangeHighColor = AppColors.green;
+  static const _rangeMedColor = Color(0xFFF59E0B);
+  static const _rangeLowColor = AppColors.red;
+
+  Color _rangeColor(double value, double maxVal) {
+    final ratio = maxVal > 0 ? value / maxVal : 0.0;
+    if (ratio >= 0.66) return _rangeHighColor;
+    if (ratio >= 0.33) return _rangeMedColor;
+    return _rangeLowColor;
+  }
+
+  Widget _buildRangeLineChart() {
+    final rawMaxY = data.dataPoints
+        .fold<double>(0, (p, dp) => dp.value.abs() > p ? dp.value.abs() : p);
+    if (rawMaxY == 0) {
+      return SizedBox(
+        height: height,
+        child: Center(
+            child: Text('No data for selected period',
+                style: TextStyle(color: AppColors.textSecondary))),
+      );
+    }
+
+    final niceInterval = _chartNiceInterval(rawMaxY);
+    final adjustedMaxY = (rawMaxY / niceInterval).ceil() * niceInterval;
+    final maxY = adjustedMaxY + (adjustedMaxY * 0.02);
+
+    final highThreshold = rawMaxY * 0.66;
+    final medThreshold = rawMaxY * 0.33;
+
+    final spots = data.dataPoints.asMap().entries.map((entry) {
+      return FlSpot(entry.key.toDouble(), entry.value.value.abs());
+    }).toList();
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(right: 10),
+          child: SizedBox(
+            height: height,
+            child: LineChart(
+              LineChartData(
+                maxY: maxY,
+                minY: 0,
+                lineTouchData: LineTouchData(
+                  enabled: true,
+                  touchTooltipData: LineTouchTooltipData(
+                    fitInsideHorizontally: true,
+                    fitInsideVertically: true,
+                    getTooltipColor: (_) => const Color(0xFF1A1A2E),
+                    getTooltipItems: (touchedSpots) {
+                      bool shown = false;
+                      return touchedSpots.map((spot) {
+                        if (shown) return null;
+                        if (spot.barIndex != touchedSpots.last.barIndex) return null;
+                        shown = true;
+                        final index = spot.x.toInt();
+                        final label = index >= 0 && index < data.dataPoints.length
+                            ? _formatLabel(data.dataPoints[index].label)
+                            : '';
+                        final val = spot.y;
+                        final level = val >= highThreshold
+                            ? 'High'
+                            : (val >= medThreshold ? 'Medium' : 'Low');
+                        return LineTooltipItem(
+                          '$label\n${AmountFormatter.shortSpaced(val)} ($level)',
+                          AppTypography.chartTooltipValue,
+                        );
+                      }).toList();
+                    },
+                  ),
+                ),
+                titlesData: _buildTitlesData(adjustedMaxY, niceInterval),
+                borderData: FlBorderData(
+                  show: true,
+                  border: Border(
+                    bottom: BorderSide(color: AppColors.divider, width: 0.5),
+                    left: BorderSide(color: AppColors.divider, width: 0.5),
+                  ),
+                ),
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  horizontalInterval: niceInterval,
+                  getDrawingHorizontalLine: (value) => FlLine(
+                    color: const Color(0xFFBFC3CA),
+                    strokeWidth: 0.8,
+                    dashArray: [5, 3],
+                  ),
+                ),
+                extraLinesData: ExtraLinesData(
+                  horizontalLines: [
+                    HorizontalLine(
+                      y: highThreshold,
+                      color: _rangeHighColor.withValues(alpha: 0.4),
+                      strokeWidth: 1,
+                      dashArray: [6, 4],
+                      label: HorizontalLineLabel(
+                        show: true,
+                        alignment: Alignment.topRight,
+                        style: TextStyle(fontSize: 8, color: _rangeHighColor, fontWeight: FontWeight.w600),
+                        labelResolver: (_) => 'High',
+                      ),
+                    ),
+                    HorizontalLine(
+                      y: medThreshold,
+                      color: _rangeMedColor.withValues(alpha: 0.4),
+                      strokeWidth: 1,
+                      dashArray: [6, 4],
+                      label: HorizontalLineLabel(
+                        show: true,
+                        alignment: Alignment.topRight,
+                        style: TextStyle(fontSize: 8, color: _rangeMedColor, fontWeight: FontWeight.w600),
+                        labelResolver: (_) => 'Medium',
+                      ),
+                    ),
+                  ],
+                ),
+                lineBarsData: [
+                  for (int i = 0; i < spots.length - 1; i++)
+                    LineChartBarData(
+                      spots: [spots[i], spots[i + 1]],
+                      isCurved: false,
+                      barWidth: 3,
+                      isStrokeCapRound: true,
+                      color: _rangeColor(
+                        (spots[i].y + spots[i + 1].y) / 2,
+                        rawMaxY,
+                      ),
+                      dotData: const FlDotData(show: false),
+                      belowBarData: BarAreaData(show: false),
+                    ),
+                  LineChartBarData(
+                    spots: spots,
+                    isCurved: false,
+                    color: Colors.transparent,
+                    barWidth: 0,
+                    dotData: FlDotData(
+                      show: true,
+                      getDotPainter: (spot, percent, barData, index) {
+                        final dotColor = _rangeColor(spot.y, rawMaxY);
+                        return FlDotCirclePainter(
+                          radius: 5,
+                          color: dotColor,
+                          strokeWidth: 2,
+                          strokeColor: Colors.white,
+                        );
+                      },
+                    ),
+                    belowBarData: BarAreaData(
+                      show: true,
+                      color: AppColors.blue.withValues(alpha: 0.06),
+                    ),
+                  ),
+                ],
+              ),
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeOutCubic,
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _rangeLegendDot(_rangeHighColor, 'High'),
+            const SizedBox(width: 16),
+            _rangeLegendDot(_rangeMedColor, 'Medium'),
+            const SizedBox(width: 16),
+            _rangeLegendDot(_rangeLowColor, 'Low'),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _rangeLegendDot(Color color, String label) {
+    return Row(
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 4),
+        Text(label, style: AppTypography.chartLegendLabel),
+      ],
+    );
+  }
+
+  // ── GRADIENT BAR CHART ────────────────────────────────────────────────────
+
+  Widget _buildGradientBarChart() {
+    final rawMaxY = data.dataPoints
+        .fold<double>(0, (p, dp) => dp.value.abs() > p ? dp.value.abs() : p);
+    if (rawMaxY == 0) {
+      return SizedBox(
+        height: height,
+        child: Center(
+            child: Text('No data for selected period',
+                style: TextStyle(color: AppColors.textSecondary))),
+      );
+    }
+
+    final niceInterval = _chartNiceInterval(rawMaxY);
+    final adjustedMaxY = (rawMaxY / niceInterval).ceil() * niceInterval;
+    final maxY = adjustedMaxY + (adjustedMaxY * 0.02);
+    final defaultColor =
+        data.legends.isNotEmpty ? data.legends.first.color : AppColors.blue;
+
+    final n = data.dataPoints.length;
+    final barWidth = n <= 5 ? 24.0 : (n <= 8 ? 16.0 : (n <= 14 ? 10.0 : 6.0));
+
+    final hasMultipleColors = data.legends.length > 1 &&
+        data.legends.length == data.dataPoints.length;
+
+    return SizedBox(
+      height: height,
+      child: BarChart(
+        BarChartData(
+          alignment: BarChartAlignment.spaceAround,
+          maxY: maxY.toDouble(),
+          minY: 0,
+          barTouchData: BarTouchData(
+            enabled: true,
+            touchTooltipData: BarTouchTooltipData(
+              fitInsideHorizontally: true,
+              fitInsideVertically: true,
+              getTooltipColor: (_) => const Color(0xFF1A1A2E),
+              getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                final point = data.dataPoints[groupIndex];
+                return BarTooltipItem(
+                  '${point.label}\n',
+                  AppTypography.chartTooltipLabel,
+                  children: [
+                    TextSpan(
+                      text: AmountFormatter.shortSpaced(point.value),
+                      style: AppTypography.chartTooltipValue,
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+          titlesData: FlTitlesData(
+            show: true,
+            bottomTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                getTitlesWidget: (value, meta) {
+                  final index = value.toInt();
+                  if (index < 0 || index >= data.dataPoints.length) {
+                    return const SizedBox.shrink();
+                  }
+                  final step = n > 10 ? 2 : 1;
+                  if (n > 10 && index % step != 0) {
+                    return const SizedBox.shrink();
+                  }
+                  return Transform.translate(
+                    offset: const Offset(-5, 12),
+                    child: Transform.rotate(
+                      angle: -0.60,
+                      child: Text(
+                        _formatLabel(data.dataPoints[index].label),
+                        style: AppTypography.chartAxisLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  );
+                },
+                reservedSize: 75,
+              ),
+            ),
+            leftTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                getTitlesWidget: (value, meta) {
+                  if (value == 0) return const SizedBox.shrink();
+                  if (value > adjustedMaxY + 0.01) return const SizedBox.shrink();
+                  if (value % niceInterval != 0) return const SizedBox.shrink();
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 4),
+                    child: Text(
+                      AmountFormatter.short(value),
+                      style: AppTypography.chartAxisLabel,
+                      maxLines: 1,
+                    ),
+                  );
+                },
+                reservedSize: 58,
+                interval: niceInterval,
+              ),
+            ),
+            topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          ),
+          borderData: FlBorderData(
+            show: true,
+            border: Border(
+              bottom: BorderSide(color: AppColors.divider, width: 0.5),
+              left: BorderSide(color: AppColors.divider, width: 0.5),
+            ),
+          ),
+          gridData: FlGridData(
+            show: true,
+            drawVerticalLine: false,
+            horizontalInterval: niceInterval,
+            getDrawingHorizontalLine: (value) => FlLine(
+              color: const Color(0xFFBFC3CA),
+              strokeWidth: 0.8,
+              dashArray: [5, 3],
+            ),
+          ),
+          barGroups: data.dataPoints.asMap().entries.map((entry) {
+            final index = entry.key;
+            final point = entry.value;
+            final baseColor =
+                hasMultipleColors ? data.legends[index].color : defaultColor;
+            return BarChartGroupData(
+              x: index,
+              barRods: [
+                BarChartRodData(
+                  toY: point.value.abs(),
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      baseColor,
+                      baseColor.withValues(alpha: 0.3),
+                    ],
+                  ),
+                  width: barWidth,
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(6),
+                    topRight: Radius.circular(6),
+                  ),
+                ),
+              ],
+            );
+          }).toList(),
+        ),
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOutCubic,
+      ),
+    );
+  }
+
+  // ── LOLLIPOP CHART ────────────────────────────────────────────────────────
+
+  Widget _buildLollipopChart() {
+    final rawMaxY = data.dataPoints
+        .fold<double>(0, (p, dp) => dp.value.abs() > p ? dp.value.abs() : p);
+    if (rawMaxY == 0) {
+      return SizedBox(
+        height: height,
+        child: Center(
+            child: Text('No data for selected period',
+                style: TextStyle(color: AppColors.textSecondary))),
+      );
+    }
+
+    final niceInterval = _chartNiceInterval(rawMaxY);
+    final adjustedMaxY = (rawMaxY / niceInterval).ceil() * niceInterval;
+    final maxY = adjustedMaxY + (adjustedMaxY * 0.02);
+    final defaultColor =
+        data.legends.isNotEmpty ? data.legends.first.color : AppColors.blue;
+    final hasMultipleColors = data.legends.length > 1 &&
+        data.legends.length == data.dataPoints.length;
+
+    return SizedBox(
+      height: height,
+      child: BarChart(
+        BarChartData(
+          alignment: BarChartAlignment.spaceAround,
+          maxY: maxY.toDouble(),
+          minY: 0,
+          barTouchData: BarTouchData(
+            enabled: true,
+            touchTooltipData: BarTouchTooltipData(
+              fitInsideHorizontally: true,
+              fitInsideVertically: true,
+              getTooltipColor: (_) => const Color(0xFF1A1A2E),
+              getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                final point = data.dataPoints[groupIndex];
+                return BarTooltipItem(
+                  '${point.label}\n',
+                  AppTypography.chartTooltipLabel,
+                  children: [
+                    TextSpan(
+                      text: AmountFormatter.shortSpaced(point.value),
+                      style: AppTypography.chartTooltipValue,
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+          titlesData: FlTitlesData(
+            show: true,
+            bottomTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                getTitlesWidget: (value, meta) {
+                  final index = value.toInt();
+                  if (index < 0 || index >= data.dataPoints.length) {
+                    return const SizedBox.shrink();
+                  }
+                  final n = data.dataPoints.length;
+                  final step = n > 10 ? 2 : 1;
+                  if (n > 10 && index % step != 0) {
+                    return const SizedBox.shrink();
+                  }
+                  return Transform.translate(
+                    offset: const Offset(-5, 12),
+                    child: Transform.rotate(
+                      angle: -0.60,
+                      child: Text(
+                        _formatLabel(data.dataPoints[index].label),
+                        style: AppTypography.chartAxisLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  );
+                },
+                reservedSize: 75,
+              ),
+            ),
+            leftTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                getTitlesWidget: (value, meta) {
+                  if (value == 0) return const SizedBox.shrink();
+                  if (value > adjustedMaxY + 0.01) return const SizedBox.shrink();
+                  if (value % niceInterval != 0) return const SizedBox.shrink();
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 4),
+                    child: Text(
+                      AmountFormatter.short(value),
+                      style: AppTypography.chartAxisLabel,
+                      maxLines: 1,
+                    ),
+                  );
+                },
+                reservedSize: 58,
+                interval: niceInterval,
+              ),
+            ),
+            topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          ),
+          borderData: FlBorderData(
+            show: true,
+            border: Border(
+              bottom: BorderSide(color: AppColors.divider, width: 0.5),
+              left: BorderSide(color: AppColors.divider, width: 0.5),
+            ),
+          ),
+          gridData: FlGridData(
+            show: true,
+            drawVerticalLine: false,
+            horizontalInterval: niceInterval,
+            getDrawingHorizontalLine: (value) => FlLine(
+              color: const Color(0xFFBFC3CA),
+              strokeWidth: 0.8,
+              dashArray: [5, 3],
+            ),
+          ),
+          barGroups: data.dataPoints.asMap().entries.map((entry) {
+            final index = entry.key;
+            final point = entry.value;
+            final color =
+                hasMultipleColors ? data.legends[index].color : defaultColor;
+            final val = point.value.abs();
+            return BarChartGroupData(
+              x: index,
+              barRods: [
+                BarChartRodData(
+                  toY: val,
+                  color: color.withValues(alpha: 0.5),
+                  width: 2,
+                  borderRadius: BorderRadius.zero,
+                ),
+                BarChartRodData(
+                  fromY: val > (maxY * 0.03) ? val - (maxY * 0.03) : 0,
+                  toY: val,
+                  color: color,
+                  width: 14,
+                  borderRadius: BorderRadius.circular(7),
+                ),
+              ],
+            );
+          }).toList(),
+        ),
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOutCubic,
+      ),
+    );
+  }
+
+  // ── CANDLESTICK CHART ─────────────────────────────────────────────────────
+
+  Widget _buildCandlestickChart() {
+    if (data.dataPoints.length < 2) {
+      return SizedBox(
+        height: height,
+        child: Center(
+            child: Text('Not enough data for candlestick',
+                style: TextStyle(color: AppColors.textSecondary))),
+      );
+    }
+
+    final candles = <_CandleData>[];
+    for (int i = 0; i < data.dataPoints.length; i++) {
+      final open = i > 0 ? data.dataPoints[i - 1].value.abs() : data.dataPoints[i].value.abs();
+      final close = data.dataPoints[i].value.abs();
+      final spread = (open - close).abs() * 0.3;
+      final high = (open > close ? open : close) + spread;
+      final low = ((open < close ? open : close) - spread).clamp(0.0, double.infinity);
+      candles.add(_CandleData(
+        label: data.dataPoints[i].label,
+        open: open,
+        close: close,
+        high: high,
+        low: low,
+      ));
+    }
+
+    double rawMaxY = 0;
+    for (final c in candles) {
+      if (c.high > rawMaxY) rawMaxY = c.high;
+    }
+    if (rawMaxY == 0) {
+      return SizedBox(
+        height: height,
+        child: Center(
+            child: Text('No data for selected period',
+                style: TextStyle(color: AppColors.textSecondary))),
+      );
+    }
+
+    final niceInterval = _chartNiceInterval(rawMaxY);
+    final adjustedMaxY = (rawMaxY / niceInterval).ceil() * niceInterval;
+    final maxY = adjustedMaxY + (adjustedMaxY * 0.02);
+
+    final n = candles.length;
+    final bodyWidth = n <= 5 ? 16.0 : (n <= 8 ? 12.0 : (n <= 14 ? 8.0 : 5.0));
+
+    return Column(
+      children: [
+        SizedBox(
+          height: height,
+          child: BarChart(
+            BarChartData(
+              alignment: BarChartAlignment.spaceAround,
+              maxY: maxY,
+              minY: 0,
+              barTouchData: BarTouchData(
+                enabled: true,
+                touchTooltipData: BarTouchTooltipData(
+                  fitInsideHorizontally: true,
+                  fitInsideVertically: true,
+                  getTooltipColor: (_) => const Color(0xFF1A1A2E),
+                  getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                    if (rodIndex != 1) return null;
+                    final c = candles[groupIndex];
+                    return BarTooltipItem(
+                      '${_formatLabel(c.label)}\n',
+                      AppTypography.chartTooltipLabel,
+                      children: [
+                        TextSpan(
+                          text: AmountFormatter.shortSpaced(c.close),
+                          style: AppTypography.chartTooltipValue,
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+              titlesData: FlTitlesData(
+                show: true,
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    getTitlesWidget: (value, meta) {
+                      final index = value.toInt();
+                      if (index < 0 || index >= candles.length) {
+                        return const SizedBox.shrink();
+                      }
+                      final step = n > 10 ? 2 : 1;
+                      if (n > 10 && index % step != 0) {
+                        return const SizedBox.shrink();
+                      }
+                      return Transform.translate(
+                        offset: const Offset(-5, 12),
+                        child: Transform.rotate(
+                          angle: -0.60,
+                          child: Text(
+                            _formatLabel(candles[index].label),
+                            style: AppTypography.chartAxisLabel,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      );
+                    },
+                    reservedSize: 75,
+                  ),
+                ),
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    getTitlesWidget: (value, meta) {
+                      if (value == 0) return const SizedBox.shrink();
+                      if (value > adjustedMaxY + 0.01) return const SizedBox.shrink();
+                      if (value % niceInterval != 0) return const SizedBox.shrink();
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 4),
+                        child: Text(
+                          AmountFormatter.short(value),
+                          style: AppTypography.chartAxisLabel,
+                          maxLines: 1,
+                        ),
+                      );
+                    },
+                    reservedSize: 58,
+                    interval: niceInterval,
+                  ),
+                ),
+                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              ),
+              borderData: FlBorderData(
+                show: true,
+                border: Border(
+                  bottom: BorderSide(color: AppColors.divider, width: 0.5),
+                  left: BorderSide(color: AppColors.divider, width: 0.5),
+                ),
+              ),
+              gridData: FlGridData(
+                show: true,
+                drawVerticalLine: false,
+                horizontalInterval: niceInterval,
+                getDrawingHorizontalLine: (value) => FlLine(
+                  color: const Color(0xFFBFC3CA),
+                  strokeWidth: 0.8,
+                  dashArray: [5, 3],
+                ),
+              ),
+              barGroups: candles.asMap().entries.map((entry) {
+                final index = entry.key;
+                final c = entry.value;
+                final isUp = c.close >= c.open;
+                final bodyColor = isUp ? AppColors.green : AppColors.red;
+                final wickColor = bodyColor.withValues(alpha: 0.6);
+                final minBody = maxY * 0.015;
+                var bodyTop = isUp ? c.close : c.open;
+                var bodyBottom = isUp ? c.open : c.close;
+                if ((bodyTop - bodyBottom) < minBody) {
+                  bodyTop = c.close + minBody / 2;
+                  bodyBottom = c.close - minBody / 2;
+                  if (bodyBottom < 0) bodyBottom = 0;
+                }
+
+                return BarChartGroupData(
+                  x: index,
+                  barRods: [
+                    BarChartRodData(
+                      fromY: c.low,
+                      toY: c.high,
+                      color: wickColor,
+                      width: 1.5,
+                      borderRadius: BorderRadius.zero,
+                    ),
+                    BarChartRodData(
+                      fromY: bodyBottom,
+                      toY: bodyTop,
+                      color: bodyColor,
+                      width: bodyWidth,
+                      borderRadius: BorderRadius.circular(1),
+                    ),
+                  ],
+                );
+              }).toList(),
+            ),
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOutCubic,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 10, height: 10,
+              decoration: BoxDecoration(color: AppColors.green, borderRadius: BorderRadius.circular(2)),
+            ),
+            const SizedBox(width: 4),
+            Text('Up', style: AppTypography.chartLegendLabel),
+            const SizedBox(width: 16),
+            Container(
+              width: 10, height: 10,
+              decoration: BoxDecoration(color: AppColors.red, borderRadius: BorderRadius.circular(2)),
+            ),
+            const SizedBox(width: 4),
+            Text('Down', style: AppTypography.chartLegendLabel),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+//  CANDLESTICK DATA MODEL
+// ─────────────────────────────────────────────
+class _CandleData {
+  final String label;
+  final double open;
+  final double close;
+  final double high;
+  final double low;
+
+  const _CandleData({
+    required this.label,
+    required this.open,
+    required this.close,
+    required this.high,
+    required this.low,
+  });
 }
 
 // ─────────────────────────────────────────────

@@ -667,7 +667,7 @@ class _MetricDetailScreenState extends State<MetricDetailScreen> {
   void _showShareOptions() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.surface, // old: Colors.white
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -685,7 +685,7 @@ class _MetricDetailScreenState extends State<MetricDetailScreen> {
                   height: 4,
                   margin: const EdgeInsets.only(bottom: 16),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFD1D5DB),
+                    color: AppColors.divider, // old: Color(0xFFD1D5DB)
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -721,7 +721,7 @@ class _MetricDetailScreenState extends State<MetricDetailScreen> {
                 thickness: 0.5,
                 indent: 20,
                 endIndent: 20,
-                color: Colors.grey.shade300,
+                color: AppColors.divider, // old: Colors.grey.shade300
               ),
 
               // Option 2 — Excel export
@@ -974,16 +974,20 @@ class _MetricDetailScreenState extends State<MetricDetailScreen> {
       child: Row(
         children: [
           // Back button
-          GestureDetector(
-            onTap: () => Navigator.of(context).pop(),
-            child: SizedBox(
-              width: 36,
-              height: 36,
-              child: Center(
-                child: Icon(
-                  Icons.arrow_back_ios_new,
-                  size: 16,
-                  color: AppColors.textPrimary,
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(18),
+              onTap: () => Navigator.of(context).pop(),
+              child: SizedBox(
+                width: 40,
+                height: 40,
+                child: Center(
+                  child: Icon(
+                    Icons.arrow_back_ios_new,
+                    size: 18,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
               ),
             ),

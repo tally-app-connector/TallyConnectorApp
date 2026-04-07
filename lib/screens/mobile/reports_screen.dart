@@ -789,9 +789,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.delete_outline, color: Colors.red),
+              leading: Icon(Icons.delete_outline, color: AppColors.red), // old: Colors.red
               title: const Text('Remove Logo',
-                  style: TextStyle(color: Colors.red)),
+                  style: TextStyle(color: AppColors.red)), // old: Colors.red
               onTap: () {
                 Navigator.pop(ctx);
                 _removeCompanyLogo();
@@ -1022,7 +1022,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       context: context,
       barrierDismissible: false,
       builder: (_) => const Center(
-        child: CircularProgressIndicator(color: Color(0xFF16A34A)),
+        child: CircularProgressIndicator(color: AppColors.green), // old: Color(0xFF16A34A)
       ),
     );
 
@@ -1053,12 +1053,13 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    syncBrightness(context);
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.dark.copyWith(
         statusBarColor: Colors.transparent,
       ),
       child: Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.background, // old: Colors.white
         floatingActionButton: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -1067,7 +1068,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
               child: FloatingActionButton.small(
                 heroTag: 'excel',
                 onPressed: _openExcelExport,
-                backgroundColor: const Color(0xFF16A34A),
+                backgroundColor: AppColors.green, // old: Color(0xFF16A34A)
                 child: const Icon(Icons.table_chart, color: Colors.white, size: 20),
               ),
             ),

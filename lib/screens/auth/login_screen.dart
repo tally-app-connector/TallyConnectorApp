@@ -1,17 +1,19 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:tally_connector/screens/mobile/dashboard_screen.dart';
 import '../../services/auth_service.dart';
 import '../../utils/validators.dart';
 import '../../utils/message_helper.dart';
 import '../../utils/secure_storage.dart';
 import '../../widgets/custom_text_field.dart';
+import '../../database/database_helper.dart';
+import '../../models/company_model.dart';
+import '../../main.dart';
+import '../main.dart';
+import '../theme/app_theme.dart';
 import 'signup_screen.dart';
 import 'forgot_password_screen.dart';
 import 'email_verification_screen.dart';
-import '../home/home_screen.dart';
-import '../mobile/mobile_home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -33,6 +35,27 @@ class _LoginScreenState extends State<LoginScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _initAppState() async {
+    try {
+      final db = await DatabaseHelper.instance.database;
+      final companyMaps = await db.query('companies');
+      final companies = companyMaps.map((m) => Company.fromMap(m)).toList();
+      AppState.companies = companies;
+
+      final savedGuid = await SecureStorage.getSelectedCompanyGuid();
+      if (savedGuid != null && savedGuid.isNotEmpty) {
+        final match = companies.where((c) => c.guid == savedGuid);
+        AppState.selectedCompany = match.isNotEmpty
+            ? match.first
+            : (companies.isNotEmpty ? companies.first : null);
+      } else if (companies.isNotEmpty) {
+        AppState.selectedCompany = companies.first;
+      }
+    } catch (e) {
+      debugPrint('Failed to init AppState after login: $e');
+    }
   }
 
   Future<void> _handleLogin() async {
@@ -71,10 +94,11 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!isVerified) {
         _showVerificationPrompt();
       } else {
-        final Widget homeScreen = _isMobile ? const DashboardScreen() : const HomeScreen();
+        await _initAppState();
+        if (!mounted) return;
         Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (_) => homeScreen),
+          MaterialPageRoute(builder: (_) => AppShell(isMobile: _isMobile)),
           (route) => false,
         );
       }
@@ -92,7 +116,7 @@ class _LoginScreenState extends State<LoginScreen> {
       builder: (context) => AlertDialog(
         title: Row(
           children: [
-            Icon(Icons.warning_amber, color: Colors.orange.shade700),
+            Icon(Icons.warning_amber, color: AppColors.amber), // old: Colors.orange.shade700
             const SizedBox(width: 8),
             const Text('Email Not Verified'),
           ],
@@ -102,12 +126,13 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context);
-              final Widget homeScreen = _isMobile ? const DashboardScreen() : const HomeScreen();
+              await _initAppState();
+              if (!mounted) return;
               Navigator.pushAndRemoveUntil(
                 context,
-                MaterialPageRoute(builder: (_) => homeScreen),
+                MaterialPageRoute(builder: (_) => AppShell(isMobile: _isMobile)),
                 (route) => false,
               );
             },
@@ -136,6 +161,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.background, // old: default
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -146,18 +172,18 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Icon(Icons.account_balance_wallet, size: 80, color: Colors.blue.shade700),
+                  Icon(Icons.account_balance_wallet, size: 80, color: AppColors.blue), // old: Colors.blue.shade700
                   const SizedBox(height: 16),
                   Text(
                     'Tally Connector',
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.blue.shade700),
+                    style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AppColors.blue), // old: Colors.blue.shade700
                   ),
                   const SizedBox(height: 8),
                   Text(
                     'Welcome back! Login to continue',
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+                    style: TextStyle(fontSize: 16, color: AppColors.textSecondary), // old: Colors.grey.shade600
                   ),
                   const SizedBox(height: 40),
                   CustomTextField(
