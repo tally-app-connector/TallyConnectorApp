@@ -2143,6 +2143,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import '../../widgets/desktop_responsive_wrapper.dart';
 import '../theme/app_theme.dart';
 import '../icons/app_icons.dart';
 import '../../models/report_data.dart';
@@ -2570,7 +2571,8 @@ class _OutstandingDetailScreenState extends State<OutstandingDetailScreen> {
                     ? const Center(
                         child: CircularProgressIndicator(color: AppColors.blue),
                       )
-                    : SingleChildScrollView(
+                    : DesktopResponsiveWrapper(
+                        child: SingleChildScrollView(
                         physics: const BouncingScrollPhysics(),
                         padding: const EdgeInsets.only(bottom: 32),
                         child: Column(
@@ -2655,6 +2657,7 @@ class _OutstandingDetailScreenState extends State<OutstandingDetailScreen> {
                             ),
                           ],
                         ),
+                      ),
                       ),
               ),
             ],

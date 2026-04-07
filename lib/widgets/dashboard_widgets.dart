@@ -33,6 +33,7 @@ class MetricCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    syncBrightness(context);
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -41,6 +42,7 @@ class MetricCard extends StatelessWidget {
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(AppRadius.card),
           boxShadow: AppShadows.card,
+          border: AppShadows.cardBorder,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -109,6 +111,7 @@ class PeriodSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    syncBrightness(context);
     return Row(
       children: options.map((opt) {
         final isSelected = opt == selected;
@@ -156,6 +159,7 @@ class RevenueBreakdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    syncBrightness(context);
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: AppSpacing.pagePadding),
       padding: const EdgeInsets.all(20),
@@ -230,6 +234,7 @@ class AiAskBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    syncBrightness(context);
     return GestureDetector(
       onTap: () => _openAI(context),
       child: Container(
@@ -303,6 +308,7 @@ class KpiSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    syncBrightness(context);
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: AppSpacing.pagePadding),
       decoration: BoxDecoration(
@@ -364,6 +370,7 @@ class KeyMetricRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    syncBrightness(context);
     return Column(
       children: [
         Padding(

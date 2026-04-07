@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import '../../widgets/desktop_responsive_wrapper.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:screenshot/screenshot.dart';
@@ -775,7 +776,8 @@ class _MetricDetailScreenState extends State<MetricDetailScreen> {
                     ? const Center(
                         child: CircularProgressIndicator(color: AppColors.blue),
                       )
-                    : SingleChildScrollView(
+                    : DesktopResponsiveWrapper(
+                        child: SingleChildScrollView(
                         physics: const BouncingScrollPhysics(),
                         padding: const EdgeInsets.only(bottom: 32),
                         child: Column(
@@ -908,6 +910,7 @@ class _MetricDetailScreenState extends State<MetricDetailScreen> {
                             ],
                           ],
                         ),
+                      ),
                       ),
               ),
             ],

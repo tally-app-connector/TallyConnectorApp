@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import '../../widgets/desktop_responsive_wrapper.dart';
 import '../../services/ai/ai_provider_service.dart';
 import '../../models/ai/metric_config.dart';
 import '../../config/ai_dependencies.dart';
@@ -121,7 +122,8 @@ class _AIQueriesScreenState extends State<AIQueriesScreen> {
           ),
         ],
       ),
-      body: Column(
+      body: DesktopResponsiveWrapper(
+        child: Column(
         children: [
           // Horizontal scrollable metric categories
           Container(
@@ -326,6 +328,7 @@ class _AIQueriesScreenState extends State<AIQueriesScreen> {
             ),
           ),
         ],
+      ),
       ),
     );
   }

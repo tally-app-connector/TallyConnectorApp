@@ -9,3 +9,4 @@ library desktop_screens;
 
 export 'setting_screen.dart';
 export 'database_viewer_screen.dart';
+export 'desktop_dashboard_screen.dart';

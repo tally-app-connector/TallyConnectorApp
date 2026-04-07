@@ -539,6 +539,7 @@ import '../auth/email_verification_screen.dart';
 import 'dart:convert';
 import '../../utils/message_helper.dart';
 import '../../services/sync_service.dart';
+import '../../widgets/onboarding_guide_dialog.dart';
 import './ai_queries_screen.dart';
 import '../theme/app_theme.dart';
 
@@ -752,7 +753,27 @@ class _HomeScreenState extends State<HomeScreen>
                   _buildSectionHeader('Sync Controls'),
                   const SizedBox(height: 14),
                   _buildSyncGrid(),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 20),
+
+                  // Setup Guide button
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: OutlinedButton.icon(
+                      onPressed: () => showOnboardingGuide(context),
+                      icon: const Icon(Icons.rocket_launch_rounded, size: 18),
+                      label: const Text('Show Setup Guide'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: _primary,
+                        side: BorderSide(
+                            color: _primary.withValues(alpha: 0.3)),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
 
                     // AI Queries - New Feature!
                     _buildFeatureCard(

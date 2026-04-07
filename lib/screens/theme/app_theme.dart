@@ -118,17 +118,17 @@ class AppColors {
   static const amber = Color(0xFFF59E0B);
   static const purple = Color(0xFF8B5CF6);
 
-  // Icon backgrounds — dimmed for dark
+  // Icon backgrounds — vibrant in both modes
   static Color get iconBgBlue =>
-      _dark ? const Color(0xFF1A2A40) : const Color(0xFFEBF5FF);
+      _dark ? const Color(0xFF1E3A5F) : const Color(0xFFEBF5FF);
   static Color get iconBgGreen =>
-      _dark ? const Color(0xFF152E20) : const Color(0xFFECFDF5);
+      _dark ? const Color(0xFF1A4D32) : const Color(0xFFECFDF5);
   static Color get iconBgAmber =>
-      _dark ? const Color(0xFF2E2510) : const Color(0xFFFFFBEB);
+      _dark ? const Color(0xFF4D3A1A) : const Color(0xFFFFFBEB);
   static Color get iconBgPurple =>
-      _dark ? const Color(0xFF201A35) : const Color(0xFFF5F3FF);
+      _dark ? const Color(0xFF2D2150) : const Color(0xFFF5F3FF);
   static Color get iconBgRed =>
-      _dark ? const Color(0xFF2E1515) : const Color(0xFFFEF2F2);
+      _dark ? const Color(0xFF4D1F1F) : const Color(0xFFFEF2F2);
 }
 
 // ── Typography ────────────────────────────────────────────────────────────────

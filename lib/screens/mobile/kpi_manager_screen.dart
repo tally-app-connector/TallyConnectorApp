@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../widgets/desktop_responsive_wrapper.dart';
 import '../theme/app_theme.dart';
 import '../icons/app_icons.dart';
 import '../../models/kpi_metric.dart';
@@ -112,6 +113,7 @@ class _KpiManagerScreenState extends State<KpiManagerScreen> {
 
               // Content
               Expanded(
+                child: DesktopResponsiveWrapper(
                 child: SingleChildScrollView(
                   physics: const BouncingScrollPhysics(),
                   padding: const EdgeInsets.only(bottom: 32),
@@ -143,6 +145,7 @@ class _KpiManagerScreenState extends State<KpiManagerScreen> {
                       ],
                     ],
                   ),
+                ),
                 ),
               ),
             ],

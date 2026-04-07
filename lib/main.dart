@@ -124,6 +124,7 @@
 // }
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/mobile/dashboard_screen.dart';
@@ -132,9 +133,11 @@ import 'models/company_model.dart';
 import 'database/database_helper.dart';
 import 'utils/secure_storage.dart';
 import 'services/auth_service.dart';
+import 'services/local_notification_service.dart';
 
 // ── Desktop-only imports ─────────────────────────────────────────────────────
 import 'screens/desktop/setting_screen.dart';
+import 'screens/desktop/desktop_dashboard_screen.dart';
 import 'screens/home/analytics_dashboard.dart';
 import 'screens/Analysis/analysis_home_screen.dart';
 
@@ -143,6 +146,7 @@ import 'screens/mobile/database_overview_screen.dart';
 import 'screens/mobile/reports_overview_screen.dart';
 import 'screens/mobile/mobile_profile_tab.dart';
 import 'screens/theme/app_theme.dart';
+import 'widgets/onboarding_guide_dialog.dart';
 import 'config/ai_dependencies.dart';
 import 'config/api_config.dart';
 import 'config/ai_endpoints.dart';
@@ -157,6 +161,16 @@ void main() async {
   }
   await fontScaleNotifier.load();
   await themeModeNotifier.load();
+
+  // Initialize local notification service (scheduled reminders, alerts, etc.)
+  await LocalNotificationService.init();
+
+  // // ── Test notification (uncomment to test again) ───────────────────────
+  // await LocalNotificationService.showNow(
+  //   id: 999,
+  //   title: 'Tally Connector',
+  //   body: 'Push notification is working!',
+  // );
   AiDependencies.apiBaseUrl = ApiConfig.baseUrl;
   AiDependencies.databaseProvider = () => DatabaseHelper.instance.database;
   AiDependencies.claudeApiKey = AiConfig.claudeApiKey;
@@ -525,6 +539,7 @@ class _AppShellState extends State<AppShell> with SingleTickerProviderStateMixin
     _Dest(Icons.home_work_rounded, 'Analysis'),
     _Dest(Icons.storage_rounded, 'Database'),
     _Dest(Icons.settings_rounded, 'Settings'),
+    _Dest(Icons.dashboard_customize_rounded, 'Detail Page'),
   ];
 
   // ── Mobile destinations (3 tabs in bottom nav — same as Dashboard had) ────────
@@ -545,6 +560,19 @@ class _AppShellState extends State<AppShell> with SingleTickerProviderStateMixin
       _tabController = TabController(
           length: _desktopDestinations.length, vsync: this)
         ..addListener(_onTabChanged);
+    }
+
+    // Show onboarding guide on first launch
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _maybeShowOnboarding();
+    });
+  }
+
+  Future<void> _maybeShowOnboarding() async {
+    final prefs = await SharedPreferences.getInstance();
+    final completed = prefs.getBool('onboarding_completed') ?? false;
+    if (!completed && mounted) {
+      showOnboardingGuide(context);
     }
   }
 
@@ -587,6 +615,7 @@ class _AppShellState extends State<AppShell> with SingleTickerProviderStateMixin
       case 2: return AnalysisHomeScreen();
       case 3: return const DatabaseOverviewScreen();
       case 4: return const DesktopSettingsScreen();
+      case 5: return const DesktopDashboardScreen();
       default: return const HomeScreen();
     }
   }

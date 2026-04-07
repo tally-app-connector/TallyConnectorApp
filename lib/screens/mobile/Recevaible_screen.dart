@@ -6,6 +6,7 @@ import '../theme/app_theme.dart';
 import '../Analysis/bill_wise_detail_screen.dart';
 import '../../models/report_data.dart';
 import '../../services/sales_service.dart';
+import '../../widgets/desktop_responsive_wrapper.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ReceivableScreen — main overview (shows top 4 parties + View More)
@@ -307,44 +308,46 @@ class _ReceivableScreenState extends State<ReceivableScreen> {
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
               onRefresh: _loadData,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(_hPad),
-                child: Column(
-                  children: [
-                    // Summary cards
-                    _buildSummaryCards(),
-                    const SizedBox(height: _hPad),
-                    // Aging + Party list card
-                    Container(
-                      decoration: BoxDecoration(
-                        color: AppColors.surface,
-                        borderRadius: BorderRadius.circular(AppRadius.card),
-                        boxShadow: AppShadows.card,
-                        border: AppShadows.cardBorder,
+              child: DesktopResponsiveWrapper(
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.all(_hPad),
+                  child: Column(
+                    children: [
+                      // Summary cards
+                      _buildSummaryCards(),
+                      const SizedBox(height: _hPad),
+                      // Aging + Party list card
+                      Container(
+                        decoration: BoxDecoration(
+                          color: AppColors.surface,
+                          borderRadius: BorderRadius.circular(AppRadius.card),
+                          boxShadow: AppShadows.card,
+                          border: AppShadows.cardBorder,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildAgingSection(),
+                            _buildPartySection(),
+                            const SizedBox(height: 8),
+                          ],
+                        ),
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildAgingSection(),
-                          _buildPartySection(),
-                          const SizedBox(height: 8),
-                        ],
+                      const SizedBox(height: _hPad),
+                      // Fastest Paying Parties — separate card
+                      Container(
+                        decoration: BoxDecoration(
+                          color: AppColors.surface,
+                          borderRadius: BorderRadius.circular(AppRadius.card),
+                          boxShadow: AppShadows.card,
+                          border: AppShadows.cardBorder,
+                        ),
+                        child: _buildFastestPayingSection(),
                       ),
-                    ),
-                    const SizedBox(height: _hPad),
-                    // Fastest Paying Parties — separate card
-                    Container(
-                      decoration: BoxDecoration(
-                        color: AppColors.surface,
-                        borderRadius: BorderRadius.circular(AppRadius.card),
-                        boxShadow: AppShadows.card,
-                        border: AppShadows.cardBorder,
-                      ),
-                      child: _buildFastestPayingSection(),
-                    ),
-                    const SizedBox(height: _hPad),
-                  ],
+                      const SizedBox(height: _hPad),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -1445,29 +1448,30 @@ class _AllPartiesScreenState extends State<_AllPartiesScreen> {
           ),
         ),
       ),
-      body: Column(
-        children: [
-          // Filter chips
-          Container(
-            color: AppColors.surface,
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  _filterChip('All', -1),
-                  _filterChip('30+', 30),
-                  _filterChip('60+', 60),
-                  _filterChip('90+', 90),
-                  _filterChip('120+', 120),
-                  _filterChip('180+', 180),
-                ],
+      body: DesktopResponsiveWrapper(
+        child: Column(
+          children: [
+            // Filter chips
+            Container(
+              color: AppColors.surface,
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _filterChip('All', -1),
+                    _filterChip('30+', 30),
+                    _filterChip('60+', 60),
+                    _filterChip('90+', 90),
+                    _filterChip('120+', 120),
+                    _filterChip('180+', 180),
+                  ],
+                ),
               ),
             ),
-          ),
 
-          // List
-          Expanded(
+            // List
+            Expanded(
             child: filtered.isEmpty
                 ? Center(
                     child: Column(
@@ -1605,6 +1609,7 @@ class _AllPartiesScreenState extends State<_AllPartiesScreen> {
                   ),
           ),
         ],
+        ),
       ),
     );
   }

@@ -41,6 +41,12 @@ dependencies:
   share_plus: ^7.2.2
   fl_chart: ^1.2.0
 
+  # Local Push Notifications (scheduled & immediate)
+  flutter_local_notifications: ^18.0.1
+  timezone: ^0.10.0
+  # Windows desktop notifications
+  local_notifier: ^0.1.6
+
   # Utilities
   path: ^1.9.0
 
